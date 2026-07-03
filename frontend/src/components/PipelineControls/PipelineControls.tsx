@@ -54,6 +54,15 @@ export function PipelineControls({ card }: Props) {
     return () => { alive = false; };
   }, [card.columnId, card.id, projectId, status]);
 
+  // Limpa "running" preso quando o card sai de uma etapa ativa (evita Stop fantasma em validate_ci/done).
+  const isActiveStage = ACTIVE_STAGE_COLUMNS.includes(card.columnId);
+  useEffect(() => {
+    if (!isActiveStage && status === 'running') {
+      setStatus('idle');
+      setWsCardId(null);
+    }
+  }, [isActiveStage, status]);
+
   const handleStop = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
     if (!projectId) return;
@@ -122,7 +131,7 @@ export function PipelineControls({ card }: Props) {
         </button>
       )}
 
-      {isRunning && (
+      {isRunning && isActiveStage && (
         <button className={styles.stopButton} onClick={handleStop} title="Interromper o agente para corrigir">
           ⏹ Stop
         </button>
