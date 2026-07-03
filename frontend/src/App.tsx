@@ -1,6 +1,6 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { Card as CardType, ColumnId, COLUMNS, isValidTransition, ExecutionStatus, Project, WorkflowStatus, WorkflowStage } from './types';
+import { Card as CardType, Column, ColumnId, ExecutionStatus, Project, WorkflowStatus, WorkflowStage } from './types';
 import { useAgentExecution } from './hooks/useAgentExecution';
 import { useWorkflowAutomation } from './hooks/useWorkflowAutomation';
 import { useChat } from './hooks/useChat';
@@ -14,6 +14,9 @@ import KanbanPage from './pages/KanbanPage';
 import ChatPage from './pages/ChatPage';
 import SettingsPage from './pages/SettingsPage';
 import styles from './App.module.css';
+
+// Fase 3b: execucao migra para o runner no backend
+const AUTO_RUN_ON_DRAG = false;
 
 function App() {
   const { getSavedView, saveView } = useViewPersistence();
@@ -31,8 +34,24 @@ function App() {
   const [initialWorkflowStatuses, setInitialWorkflowStatuses] = useState<Map<string, WorkflowStatus> | undefined>();
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(() => localStorage.getItem('orq.currentProjectId'));
+  const [boardColumns, setBoardColumns] = useState<Column[]>([]);
+  const [boardTransitions, setBoardTransitions] = useState<Record<string, string[]>>({});
   const didMountProjectIdEffect = useRef(false);
   const dragStartColumnRef = useRef<ColumnId | null>(null);
+
+  const isValidMove = (from: string, to: string) => (boardTransitions[from] ?? []).includes(to);
+
+  // Carrega a configuração do workflow (colunas + transições) do backend
+  useEffect(() => {
+    import('./api/workflows').then(({ getWorkflow }) =>
+      getWorkflow('dev').then(wf => {
+        setBoardColumns(wf.columns
+          .sort((a, b) => a.order - b.order)
+          .map(c => ({ id: c.key as ColumnId, title: c.label } as Column)));
+        setBoardTransitions(wf.transitions);
+      }).catch(err => console.error('[App] getWorkflow failed', err))
+    );
+  }, []);
 
   // Callback para atualizar cards quando uma execução completar
   const handleExecutionComplete = async (cardId: string, status: ExecutionStatus) => {
@@ -477,12 +496,12 @@ function App() {
     if (!activeCardData || !startColumn) return;
 
     // Check if we're over a column
-    const isOverColumn = COLUMNS.some(col => col.id === overId);
+    const isOverColumn = boardColumns.some(col => col.id === overId);
     if (isOverColumn) {
       const newColumnId = overId as ColumnId;
       // Só move visualmente se for uma transição válida ou mesma coluna
       if (activeCardData.columnId !== newColumnId) {
-        if (isValidTransition(startColumn, newColumnId)) {
+        if (isValidMove(startColumn, newColumnId)) {
           moveCard(activeId, newColumnId);
         }
       }
@@ -492,7 +511,7 @@ function App() {
     // Check if we're over another card
     const overCard = cards.find(c => c.id === overId);
     if (overCard && activeCardData.columnId !== overCard.columnId) {
-      if (isValidTransition(startColumn, overCard.columnId)) {
+      if (isValidMove(startColumn, overCard.columnId)) {
         moveCard(activeId, overCard.columnId);
       }
     }
@@ -516,7 +535,7 @@ function App() {
     let finalColumnId: ColumnId | null = null;
 
     // Check if dropped on a column
-    const isOverColumn = COLUMNS.some(col => col.id === overId);
+    const isOverColumn = boardColumns.some(col => col.id === overId);
     if (isOverColumn) {
       finalColumnId = overId as ColumnId;
     } else {
@@ -529,8 +548,8 @@ function App() {
 
     if (!finalColumnId || finalColumnId === startColumn) return;
 
-    // Validar transição SDLC
-    if (!isValidTransition(startColumn, finalColumnId)) {
+    // Validar transição conforme config do workflow (backend)
+    if (!isValidMove(startColumn, finalColumnId)) {
       // Reverter para coluna original
       moveCard(activeId, startColumn);
       alert(`Transição inválida: ${startColumn} → ${finalColumnId}.\nSiga o fluxo SDLC: backlog → plan → implement → test → review → done`);
@@ -551,94 +570,98 @@ function App() {
     }
 
     // Triggers baseados na transição
-    if (startColumn === 'backlog' && finalColumnId === 'plan') {
-      console.log(`[App] Card moved from backlog to plan: ${card.title}`);
+    // Fase 3b: pipeline SDLC deixa de ser disparado pelo drag no browser;
+    // execução migra para o runner no backend. Ladder mantida (desligada) até lá.
+    if (AUTO_RUN_ON_DRAG) {
+      if (startColumn === 'backlog' && finalColumnId === 'plan') {
+        console.log(`[App] Card moved from backlog to plan: ${card.title}`);
 
-      // 1. Execute expert triage first (blocking)
-      setLoadingExpertsCardId(card.id);
-      console.log(`[App] Starting expert triage for card: ${card.title}`);
-      const triageResult = await executeExpertTriage(card);
-      setLoadingExpertsCardId(null);
+        // 1. Execute expert triage first (blocking)
+        setLoadingExpertsCardId(card.id);
+        console.log(`[App] Starting expert triage for card: ${card.title}`);
+        const triageResult = await executeExpertTriage(card);
+        setLoadingExpertsCardId(null);
 
-      // 2. Update card with identified experts
-      if (triageResult.success && Object.keys(triageResult.experts).length > 0) {
-        updateCardExperts(card.id, triageResult.experts);
-        console.log(`[App] Identified experts:`, Object.keys(triageResult.experts));
-      }
-
-      // 3. Execute plan with expert context
-      const cardWithExperts = { ...card, experts: triageResult.experts };
-      const result = await executePlan(cardWithExperts);
-      if (result.success && result.specPath) {
-        updateCardSpecPath(card.id, result.specPath);
-        console.log(`[App] Spec path saved: ${result.specPath}`);
-      }
-    } else if (startColumn === 'plan' && finalColumnId === 'implement') {
-      // Buscar o card atualizado (pode ter specPath agora)
-      const updatedCard = cards.find(c => c.id === activeId);
-      if (updatedCard?.specPath) {
-        console.log(`[App] Card moved from plan to implement: ${updatedCard.title}`);
-        console.log(`[App] Executing /implement with spec: ${updatedCard.specPath}`);
-        executeImplement(updatedCard);
-      } else {
-        alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
-        moveCard(activeId, startColumn);
-      }
-    } else if (startColumn === 'implement' && finalColumnId === 'test') {
-      // Trigger: implement → test - Executar /test-implementation
-      const updatedCard = cards.find(c => c.id === activeId);
-      if (updatedCard?.specPath) {
-        console.log(`[App] Card moved from implement to test: ${updatedCard.title}`);
-        console.log(`[App] Executing /test-implementation with spec: ${updatedCard.specPath}`);
-        executeTest(updatedCard);
-      } else {
-        alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
-        moveCard(activeId, startColumn);
-      }
-    } else if (startColumn === 'test' && finalColumnId === 'review') {
-      // Trigger: test → review - Executar /review
-      const updatedCard = cards.find(c => c.id === activeId);
-      if (updatedCard?.specPath) {
-        console.log(`[App] Card moved from test to review: ${updatedCard.title}`);
-        console.log(`[App] Executing /review with spec: ${updatedCard.specPath}`);
-        executeReview(updatedCard);
-      } else {
-        alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
-        moveCard(activeId, startColumn);
-      }
-    } else if (startColumn === 'review' && finalColumnId === 'done') {
-      // Trigger: review → done - Fazer merge automático e sync de experts
-      const updatedCard = cards.find(c => c.id === activeId);
-      if (updatedCard?.branchName) {
-        console.log(`[App] Card moved from review to done: ${updatedCard.title}`);
-        console.log(`[App] Starting automatic merge for branch: ${updatedCard.branchName}`);
-
-        // Tentar fazer merge
-        const mergeResult = await handleCompletedReview(updatedCard.id);
-
-        if (mergeResult.success) {
-          console.log(`[App] Merge successful for card: ${updatedCard.title}`);
-        } else if (mergeResult.status === 'resolving') {
-          console.log(`[App] Merge has conflicts, AI is resolving automatically`);
-          // Card já está em done, merge será completado em background
-        } else {
-          console.error(`[App] Merge failed: ${mergeResult.error}`);
-          alert(`Falha ao fazer merge: ${mergeResult.error}\nO card foi movido para Done, mas o merge precisa ser feito manualmente.`);
+        // 2. Update card with identified experts
+        if (triageResult.success && Object.keys(triageResult.experts).length > 0) {
+          updateCardExperts(card.id, triageResult.experts);
+          console.log(`[App] Identified experts:`, Object.keys(triageResult.experts));
         }
-      } else {
-        console.log(`[App] Card has no branch, skipping merge`);
-      }
 
-      // Execute expert sync in background (non-blocking)
-      if (updatedCard?.experts && Object.keys(updatedCard.experts).length > 0) {
-        console.log(`[App] Starting expert sync for card: ${updatedCard.title}`);
-        executeExpertSync(updatedCard).then(result => {
-          if (result.success) {
-            console.log(`[App] Expert sync completed:`, result.syncedExperts);
+        // 3. Execute plan with expert context
+        const cardWithExperts = { ...card, experts: triageResult.experts };
+        const result = await executePlan(cardWithExperts);
+        if (result.success && result.specPath) {
+          updateCardSpecPath(card.id, result.specPath);
+          console.log(`[App] Spec path saved: ${result.specPath}`);
+        }
+      } else if (startColumn === 'plan' && finalColumnId === 'implement') {
+        // Buscar o card atualizado (pode ter specPath agora)
+        const updatedCard = cards.find(c => c.id === activeId);
+        if (updatedCard?.specPath) {
+          console.log(`[App] Card moved from plan to implement: ${updatedCard.title}`);
+          console.log(`[App] Executing /implement with spec: ${updatedCard.specPath}`);
+          executeImplement(updatedCard);
+        } else {
+          alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
+          moveCard(activeId, startColumn);
+        }
+      } else if (startColumn === 'implement' && finalColumnId === 'test') {
+        // Trigger: implement → test - Executar /test-implementation
+        const updatedCard = cards.find(c => c.id === activeId);
+        if (updatedCard?.specPath) {
+          console.log(`[App] Card moved from implement to test: ${updatedCard.title}`);
+          console.log(`[App] Executing /test-implementation with spec: ${updatedCard.specPath}`);
+          executeTest(updatedCard);
+        } else {
+          alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
+          moveCard(activeId, startColumn);
+        }
+      } else if (startColumn === 'test' && finalColumnId === 'review') {
+        // Trigger: test → review - Executar /review
+        const updatedCard = cards.find(c => c.id === activeId);
+        if (updatedCard?.specPath) {
+          console.log(`[App] Card moved from test to review: ${updatedCard.title}`);
+          console.log(`[App] Executing /review with spec: ${updatedCard.specPath}`);
+          executeReview(updatedCard);
+        } else {
+          alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
+          moveCard(activeId, startColumn);
+        }
+      } else if (startColumn === 'review' && finalColumnId === 'done') {
+        // Trigger: review → done - Fazer merge automático e sync de experts
+        const updatedCard = cards.find(c => c.id === activeId);
+        if (updatedCard?.branchName) {
+          console.log(`[App] Card moved from review to done: ${updatedCard.title}`);
+          console.log(`[App] Starting automatic merge for branch: ${updatedCard.branchName}`);
+
+          // Tentar fazer merge
+          const mergeResult = await handleCompletedReview(updatedCard.id);
+
+          if (mergeResult.success) {
+            console.log(`[App] Merge successful for card: ${updatedCard.title}`);
+          } else if (mergeResult.status === 'resolving') {
+            console.log(`[App] Merge has conflicts, AI is resolving automatically`);
+            // Card já está em done, merge será completado em background
           } else {
-            console.error(`[App] Expert sync failed:`, result.error);
+            console.error(`[App] Merge failed: ${mergeResult.error}`);
+            alert(`Falha ao fazer merge: ${mergeResult.error}\nO card foi movido para Done, mas o merge precisa ser feito manualmente.`);
           }
-        });
+        } else {
+          console.log(`[App] Card has no branch, skipping merge`);
+        }
+
+        // Execute expert sync in background (non-blocking)
+        if (updatedCard?.experts && Object.keys(updatedCard.experts).length > 0) {
+          console.log(`[App] Starting expert sync for card: ${updatedCard.title}`);
+          executeExpertSync(updatedCard).then(result => {
+            if (result.success) {
+              console.log(`[App] Expert sync completed:`, result.syncedExperts);
+            } else {
+              console.error(`[App] Expert sync failed:`, result.error);
+            }
+          });
+        }
       }
     }
   };
@@ -651,7 +674,7 @@ function App() {
       case 'kanban':
         return (
           <KanbanPage
-            columns={COLUMNS}
+            columns={boardColumns}
             cards={cards}
             activeCard={activeCard}
             sensors={sensors}

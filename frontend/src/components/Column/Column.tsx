@@ -23,10 +23,9 @@ export function Column({ column, cards, onRemoveCard, onUpdateCard, getExecution
     id: column.id,
   });
 
-  const isArchivedColumn = column.id === 'archived';
-  const isCanceladoColumn = column.id === 'cancelado';
-  const isCompletedColumn = column.id === 'completed';
-  const isCollapsible = isArchivedColumn || isCanceladoColumn || isCompletedColumn;
+  // Colapsável apenas quando o chamador fornece um handler de toggle
+  // (deixou de depender de ids fixos como 'archived'/'cancelado'/'completed')
+  const isCollapsible = Boolean(onToggleCollapse);
 
   return (
     <div

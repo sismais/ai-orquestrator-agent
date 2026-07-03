@@ -19,39 +19,24 @@ interface BoardProps {
   loadingExpertsCardId?: string | null;
 }
 
-export function Board({ columns, cards, onAddCard, onRemoveCard, onUpdateCard, getExecutionStatus, getWorkflowStatus, onRunWorkflow, isArchivedCollapsed, onToggleArchivedCollapse, isCanceladoCollapsed, onToggleCanceladoCollapse, fetchLogsHistory, loadingExpertsCardId }: BoardProps) {
+export function Board({ columns, cards, onAddCard, onRemoveCard, onUpdateCard, getExecutionStatus, getWorkflowStatus, onRunWorkflow, fetchLogsHistory, loadingExpertsCardId }: BoardProps) {
   return (
     <div className={styles.board}>
-      {columns.map(column => {
-        const isArchived = column.id === 'archived';
-        const isCancelado = column.id === 'cancelado';
-
-        return (
-          <Column
-            key={column.id}
-            column={column}
-            cards={cards.filter(card => card.columnId === column.id)}
-            onAddCard={onAddCard}
-            onRemoveCard={onRemoveCard}
-            onUpdateCard={onUpdateCard}
-            getExecutionStatus={getExecutionStatus}
-            getWorkflowStatus={getWorkflowStatus}
-            onRunWorkflow={onRunWorkflow}
-            isCollapsed={
-              isArchived ? isArchivedCollapsed :
-              isCancelado ? isCanceladoCollapsed :
-              false
-            }
-            onToggleCollapse={
-              isArchived ? onToggleArchivedCollapse :
-              isCancelado ? onToggleCanceladoCollapse :
-              undefined
-            }
-            fetchLogsHistory={fetchLogsHistory}
-            loadingExpertsCardId={loadingExpertsCardId}
-          />
-        );
-      })}
+      {columns.map(column => (
+        <Column
+          key={column.id}
+          column={column}
+          cards={cards.filter(card => card.columnId === column.id)}
+          onAddCard={onAddCard}
+          onRemoveCard={onRemoveCard}
+          onUpdateCard={onUpdateCard}
+          getExecutionStatus={getExecutionStatus}
+          getWorkflowStatus={getWorkflowStatus}
+          onRunWorkflow={onRunWorkflow}
+          fetchLogsHistory={fetchLogsHistory}
+          loadingExpertsCardId={loadingExpertsCardId}
+        />
+      ))}
     </div>
   );
 }

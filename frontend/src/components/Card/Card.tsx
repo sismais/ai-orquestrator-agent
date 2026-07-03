@@ -305,7 +305,8 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
             </div>
           )}
         </div>
-        {card.columnId === 'backlog' && !isActivelyRunning && (
+        {/* Fase 3b: execucao via runner no backend - botao "Run workflow" desativado no browser */}
+        {false && card.columnId === 'backlog' && !isActivelyRunning && (
           <button
             className={styles.runButton}
             onClick={(e) => {
