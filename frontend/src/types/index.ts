@@ -1,4 +1,6 @@
-export type ColumnId = 'backlog' | 'plan' | 'implement' | 'test' | 'review' | 'done' | 'completed' | 'archived' | 'cancelado';
+// Colunas vem do config do workflow (board config-driven). Tipo aberto — a validacao de
+// transicao vem do config (isValidMove), nao de um Literal fixo.
+export type ColumnId = string;
 export type ExpertConfidence = 'high' | 'medium' | 'low';
 
 export interface ExpertMatch {

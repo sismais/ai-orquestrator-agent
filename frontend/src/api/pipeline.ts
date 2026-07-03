@@ -36,6 +36,40 @@ export async function runPipeline(projectId: string, cardId: string): Promise<{ 
   return response.json();
 }
 
+export interface CardComment {
+  id: string;
+  author: string | null;   // 'agent' | 'human' | null
+  text: string;
+  timestamp: string;
+}
+
+/** Responde a pausa do card e RETOMA o pipeline automaticamente. */
+export async function answerPipeline(projectId: string, cardId: string, message: string): Promise<{ executionId: string }> {
+  const response = await fetch(`${base(projectId, cardId)}/answer`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || `Falha ao responder: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/** Thread de comentarios do card (pergunta do agente / resposta humana), mais antigo primeiro. */
+export async function getCardComments(cardId: string): Promise<CardComment[]> {
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/activities/card/${encodeURIComponent(cardId)}`);
+  if (!response.ok) return [];
+  const data = await response.json();
+  const rows: Array<{ id: string; type: string; userId: string | null; description: string | null; timestamp: string }> =
+    data.activities || data || [];
+  return rows
+    .filter(r => r.type === 'commented')
+    .map(r => ({ id: r.id, author: r.userId, text: r.description || '', timestamp: r.timestamp }))
+    .reverse(); // endpoint devolve desc; queremos cronologico
+}
+
 /** Ultimo run do card + logs persistidos (para reload/historico do painel). */
 export async function getExecution(projectId: string, cardId: string): Promise<PipelineExecutionState> {
   const response = await fetch(`${base(projectId, cardId)}/execution`);
