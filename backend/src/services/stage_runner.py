@@ -62,12 +62,17 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
     extra = extra or {}
     task = f"{title}. {description}".strip().rstrip(".")
     header = f"Voce trabalha no repositorio em `{worktree}` (worktree isolada do card)."
+    answer = extra.get("human_answer")
+    answer_block = (
+        f"\n\nO humano respondeu a uma pausa anterior — considere isto acima de tudo:\n\"{answer}\"\n"
+        if answer else ""
+    )
 
     if stage_key == "plan":
         # Planner e read-only (Read/Glob/Grep): devolve o plano como TEXTO (nao escreve arquivo no repo).
         # O orquestrador captura o texto e passa pro implement — nada de artefato do runner na branch.
         return (
-            f"{header}\n\nTarefa: {task}\n\n"
+            f"{header}\n\nTarefa: {task}{answer_block}\n\n"
             "Produza o conteudo do plano de implementacao (abordagem, arquivos afetados, reuso, riscos), "
             "derivando do que ja existe no projeto. Responda com o plano em markdown. "
             "Se uma decisao de arquitetura nao tiver base no projeto, devolva tambem um bloco JSON "
@@ -85,7 +90,7 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
         plan = extra.get("plan")
         plan_block = f"\n\nPlano de referencia (do estagio anterior):\n{plan}\n" if plan else ""
         return (
-            f"{header}\n\nTarefa: {task}{plan_block}\n\n"
+            f"{header}\n\nTarefa: {task}{answer_block}{plan_block}\n\n"
             "Implemente editando o codigo e criando/atualizando testes quando fizer sentido. "
             "Siga o AGENTS.md do projeto se existir. NAO faca commit. "
             "Ao terminar, reporte os arquivos mudados e `status: done` (ou `needs_human` com o motivo)."

@@ -135,6 +135,45 @@ async def test_pending_questions_on_plan_pauses(maker):
     assert counts.get("implement") is None
 
 
+async def test_resume_starts_at_stage_with_answer(maker):
+    card_id = await _make_project_card(maker)
+    # simula card pausado (backlog -> paused e transicao valida no config dev)
+    async with maker() as s:
+        await CardRepository(s).move(card_id, "paused")
+        await s.commit()
+    seen: dict[str, list] = {}
+
+    async def fake(stage_key, worktree, prompt, on_log=None):
+        seen.setdefault(stage_key, []).append(prompt)
+        text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text, cost_usd=0.0)
+
+    await pipeline_service.run_pipeline(
+        "p1", card_id, session_maker=maker, stage_fn=fake,
+        resume_stage="implement", human_answer="use a lib X",
+    )
+    assert "plan" not in seen                       # retomou sem refazer o plan
+    assert seen.get("implement")                    # comecou no implement
+    assert "use a lib X" in seen["implement"][0]    # resposta humana injetada no prompt
+    assert await _card_column(maker, card_id) == "validate_ci"
+
+
+async def test_pause_writes_agent_comment(maker):
+    from sqlalchemy import select as _select
+    from src.models.activity_log import ActivityLog, ActivityType
+    card_id = await _make_project_card(maker)
+    fake, _ = make_stage_fn({"plan": ['{"pendingQuestions":[{"question":"qual banco?"}]}']})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    async with maker() as s:
+        acts = (await s.execute(
+            _select(ActivityLog).where(
+                ActivityLog.card_id == card_id,
+                ActivityLog.activity_type == ActivityType.COMMENTED,
+            )
+        )).scalars().all()
+    assert any(a.user_id == "agent" and "qual banco" in (a.description or "") for a in acts)
+
+
 async def test_logs_persisted(maker):
     from sqlalchemy import select
     from src.models.execution import ExecutionLog

@@ -10,6 +10,7 @@ Roda em background (o endpoint dispara e retorna na hora). Abre sua propria sess
 
 import json
 from datetime import datetime
+from pathlib import Path
 from typing import Optional
 
 from sqlalchemy import select
@@ -19,6 +20,7 @@ from ..git_workspace import GitWorkspaceManager
 from ..models.card import Card
 from ..models.execution import Execution, ExecutionLog, ExecutionStatus
 from ..models.project_registry import Project
+from ..repositories.activity_repository import ActivityRepository
 from ..repositories.card_repository import CardRepository
 from ..services.card_ws import card_ws_manager
 from ..services.execution_ws import execution_ws_manager
@@ -84,6 +86,19 @@ class _LogSink:
             pass
 
 
+def _format_questions(pend: list) -> str:
+    """Formata as pendingQuestions do agente num texto legivel para o card."""
+    lines = ["O agente precisa da sua decisao para continuar:"]
+    for i, q in enumerate(pend, 1):
+        if isinstance(q, dict):
+            question = q.get("question") or q.get("q") or str(q)
+            ctx = q.get("context")
+            lines.append(f"{i}. {question}" + (f"\n   ({ctx})" if ctx else ""))
+        else:
+            lines.append(f"{i}. {q}")
+    return "\n".join(lines)
+
+
 def _first_stage(transitions: dict, current: str) -> Optional[str]:
     """Onde comecar: a propria coluna se ja e um estagio, senao a proxima ativa."""
     if has_stage(current):
@@ -128,11 +143,17 @@ async def run_pipeline(
     card_id: str,
     *,
     execution_id: Optional[str] = None,
+    resume_stage: Optional[str] = None,
+    human_answer: Optional[str] = None,
     session_maker=async_session_maker,
     stage_fn=_default_run_stage,
     max_iterations: int = DEFAULT_MAX_ITERATIONS,
 ) -> None:
-    """Executa o pipeline do card. Silencioso em falha (marca a Execution e para)."""
+    """Executa o pipeline do card. Silencioso em falha (marca a Execution e para).
+
+    `resume_stage`/`human_answer`: retomada apos pausa — comeca em `resume_stage` (reusando a
+    worktree existente), injetando a resposta humana no prompt da primeira etapa.
+    """
     async with session_maker() as s:
         project = (await s.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
         repo = CardRepository(s)
@@ -164,14 +185,21 @@ async def run_pipeline(
             if res is not None and res.cost_usd:
                 total_cost += float(res.cost_usd)
 
-        async def finish_pause(reason: str, context: Optional[str]) -> None:
+        async def finish_pause(reason: str, context: Optional[str], question: Optional[str] = None) -> None:
             await log.event(f"PAUSE: {reason}")
+            # a pergunta do agente vira comentario no card (thread de interacao humana)
+            q = question or f"{reason}\n\n{context or ''}".strip()
+            try:
+                await ActivityRepository(s).add_comment(card_id, "agent", q[:1900])
+            except Exception:  # noqa: BLE001
+                pass
             prev = card.column_id
             moved, err = await repo.move(card_id, "paused")
             await s.commit()
             if not err:
                 await _broadcast_moved(card, prev, "paused")
             execution.status = ExecutionStatus.PAUSED
+            execution.workflow_stage = execution.workflow_stage  # preserva a etapa onde pausou
             execution.workflow_error = f"{reason} | {context or ''}"[:1900]
             execution.is_active = False
             execution.completed_at = datetime.utcnow()
@@ -182,24 +210,29 @@ async def run_pipeline(
             except Exception:  # noqa: BLE001
                 pass
 
-        # 1) worktree (reuso ao longo do card)
-        try:
-            wt = await prepare_worktree(project.path, base_branch, card_id)
-        except Exception as e:  # noqa: BLE001
-            await finish_pause("falha ao preparar worktree", str(e))
-            return
-        if not wt.success or not wt.worktree_path:
-            await finish_pause("falha ao criar worktree", wt.error)
-            return
-        card.worktree_path = wt.worktree_path
-        card.branch_name = wt.branch_name
-        await s.commit()
-        worktree = wt.worktree_path
+        # 1) worktree — na retomada reusa a existente (preserva os commits); senao cria pristina
+        reuse = bool(resume_stage and card.worktree_path and Path(card.worktree_path).exists())
+        if reuse:
+            worktree = card.worktree_path
+        else:
+            try:
+                wt = await prepare_worktree(project.path, base_branch, card_id)
+            except Exception as e:  # noqa: BLE001
+                await finish_pause("falha ao preparar worktree", str(e))
+                return
+            if not wt.success or not wt.worktree_path:
+                await finish_pause("falha ao criar worktree", wt.error)
+                return
+            card.worktree_path = wt.worktree_path
+            card.branch_name = wt.branch_name
+            await s.commit()
+            worktree = wt.worktree_path
 
         transitions = await repo._get_transitions_for_card(card)
         iteration = 0
         plan_text: Optional[str] = None
-        col = _first_stage(transitions, card.column_id)
+        pending_answer = human_answer  # injetado apenas na primeira etapa da retomada
+        col = resume_stage or _first_stage(transitions, card.column_id)
 
         # 2) laco de estagios
         while col and has_stage(col):
@@ -220,6 +253,9 @@ async def run_pipeline(
                 extra["diff"] = await gm.diff_against_base(worktree, base_branch)
             elif col == "implement" and plan_text:
                 extra["plan"] = plan_text
+            if pending_answer:
+                extra["human_answer"] = pending_answer
+                pending_answer = None
             prompt = build_stage_prompt(col, card.title, card.description or "", worktree, extra)
             res = await stage_fn(col, worktree, prompt, on_log=log)
             await log.flush()
@@ -229,8 +265,10 @@ async def run_pipeline(
                 return
 
             if col == "plan":
-                if parse_pending_questions(res.text):
-                    await finish_pause("plan: pendencias de arquitetura", res.text[:1500])
+                pend = parse_pending_questions(res.text)
+                if pend:
+                    await finish_pause("plan: pendencias de arquitetura", res.text[:1500],
+                                       question=_format_questions(pend))
                     return
                 plan_text = res.text
                 col = next_active_column(transitions, "plan")
@@ -238,7 +276,10 @@ async def run_pipeline(
             elif col == "implement":
                 nh = detect_needs_human(res.text)
                 if nh:
-                    await finish_pause("implement: needs_human", nh)
+                    await finish_pause(
+                        "implement: needs_human", nh,
+                        question=f"O agente precisa da sua decisao para continuar:\n\n{nh}",
+                    )
                     return
                 await gm.commit_all(worktree, f"wip: {card.title[:60]}")
                 col = next_active_column(transitions, "implement")
@@ -249,7 +290,11 @@ async def run_pipeline(
                 if blocking > 0:
                     if iteration >= max_iterations:
                         await finish_pause(
-                            f"review nao convergiu apos {iteration} iteracoes", json.dumps(f)[:1500]
+                            f"review nao convergiu apos {iteration} iteracoes", json.dumps(f)[:1500],
+                            question=(
+                                f"A revisao nao convergiu apos {iteration} tentativas de correcao. "
+                                "Como devo proceder? (ex.: aceitar como esta, priorizar um achado, mudar a abordagem)"
+                            ),
                         )
                         return
                     iteration += 1

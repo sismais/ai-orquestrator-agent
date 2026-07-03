@@ -62,6 +62,15 @@ class ActivityRepository:
         await self.session.refresh(activity)
         return activity
 
+    async def add_comment(self, card_id: str, author: str, text: str) -> ActivityLog:
+        """Grava um comentario no card (author sentinela: 'agent' | 'human')."""
+        return await self.log_activity(
+            card_id=card_id,
+            activity_type=ActivityType.COMMENTED,
+            user_id=author,
+            description=text,
+        )
+
     async def get_recent_activities(
         self, limit: int = 10, offset: int = 0
     ) -> list[dict[str, Any]]:

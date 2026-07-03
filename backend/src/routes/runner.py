@@ -3,16 +3,29 @@
 import asyncio
 
 from fastapi import APIRouter, Depends, HTTPException
+from pydantic import BaseModel
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from ..database import get_db
-from ..models.execution import Execution, ExecutionLog
+from ..models.execution import Execution, ExecutionLog, ExecutionStatus
 from ..models.project_registry import Project
+from ..repositories.activity_repository import ActivityRepository
 from ..repositories.card_repository import CardRepository
 from ..services.pipeline_service import create_execution, run_pipeline
 
 router = APIRouter(prefix="/api/projects/{project_id}/cards", tags=["runner"])
+
+
+class AnswerRequest(BaseModel):
+    message: str
+
+
+def _resume_stage_from(workflow_stage: str | None) -> str:
+    """Etapa de retomada a partir de onde pausou (review nao-convergencia -> implement)."""
+    if workflow_stage == "review":
+        return "implement"
+    return workflow_stage or "plan"
 
 
 @router.post("/{card_id}/execute")
@@ -32,6 +45,40 @@ async def execute_card(project_id: str, card_id: str, db: AsyncSession = Depends
     asyncio.create_task(run_pipeline(project_id, card_id, execution_id=execution_id))
 
     return {"success": True, "executionId": execution_id, "cardId": card_id}
+
+
+@router.post("/{card_id}/answer")
+async def answer_card(project_id: str, card_id: str, body: AnswerRequest,
+                      db: AsyncSession = Depends(get_db)):
+    """Responde a pausa do card (comentario do humano) e RETOMA o pipeline automaticamente."""
+    message = (body.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Resposta vazia")
+
+    project = (await db.execute(select(Project).where(Project.id == project_id))).scalar_one_or_none()
+    if not project:
+        raise HTTPException(status_code=404, detail="Project not found")
+    repo = CardRepository(db)
+    card = await repo.get_by_id(card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+
+    last = (await db.execute(
+        select(Execution).where(Execution.card_id == card_id).order_by(Execution.started_at.desc())
+    )).scalars().first()
+    if not last or last.status != ExecutionStatus.PAUSED:
+        raise HTTPException(status_code=409, detail="Card nao esta pausado")
+
+    # comentario do humano no thread do card
+    await ActivityRepository(db).add_comment(card_id, "human", message)
+    resume_stage = _resume_stage_from(last.workflow_stage)
+    execution_id = await create_execution(db, card_id, card.title)
+
+    asyncio.create_task(run_pipeline(
+        project_id, card_id, execution_id=execution_id,
+        resume_stage=resume_stage, human_answer=message,
+    ))
+    return {"success": True, "executionId": execution_id, "resumeStage": resume_stage}
 
 
 @router.get("/{card_id}/execution")
