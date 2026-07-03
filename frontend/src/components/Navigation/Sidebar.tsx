@@ -49,7 +49,7 @@ const Sidebar = ({ currentModule, onNavigate }: SidebarProps) => {
           <span className={styles.logoIcon}>
             <i className="fa-solid fa-rocket"></i>
           </span>
-          <h2 className={styles.logoText}>Zenflow</h2>
+          <h2 className={styles.logoText}>Sismais AI Orquestrador</h2>
         </div>
       </div>
 
@@ -80,7 +80,7 @@ const Sidebar = ({ currentModule, onNavigate }: SidebarProps) => {
       <div className={styles.footer}>
         <ThemeToggle />
         <div className={styles.footerInfo}>
-          <span className={styles.footerLabel}>Zenflow</span>
+          <span className={styles.footerLabel}>Sismais AI Orquestrador</span>
           <span className={styles.footerVersion}>v1.0.0</span>
         </div>
       </div>

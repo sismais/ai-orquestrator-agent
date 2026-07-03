@@ -22,7 +22,7 @@ const TopNav = ({ currentModule, onNavigate }: TopNavProps) => {
             <path d="M13 2L3 14h9l-1 8 10-12h-9l1-8z"/>
           </svg>
         </div>
-        <span className={styles.logoText}>Zenflow</span>
+        <span className={styles.logoText}>Sismais AI Orquestrador</span>
       </div>
 
       <div className={styles.navCenter}>

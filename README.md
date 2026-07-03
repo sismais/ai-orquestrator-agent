@@ -1,11 +1,12 @@
-# 🚀 Zenflow
+# 🚀 Sismais AI Orquestrador
 
-![Version](https://img.shields.io/badge/version-1.0.0-blue)
 ![License](https://img.shields.io/badge/license-MIT-green)
 ![Python](https://img.shields.io/badge/python-3.9+-blue)
 ![Node](https://img.shields.io/badge/node-18+-green)
 
-Sistema inteligente de gestão de workflow com IA integrada. Gerencie seus projetos com automação inteligente executando tarefas através de cards no board.
+Painel Kanban que **dirige e acompanha agentes de IA** (o Sismais AI DevKit) operando sobre projetos reais: cada coluna é uma etapa executada por uma skill-agente, orquestrada pelo backend numa git worktree isolada por card, com logs ao vivo — parando no *ready-to-merge* para o humano aprovar e fazer o merge.
+
+> **Fork** de [eduwxyz/orquestrator-agent](https://github.com/eduwxyz/orquestrator-agent) ("Zenflow"), sob licença MIT — atribuição preservada em [LICENSE](LICENSE). Repositório privado da Sismais Tecnologia.
 
 ## ✨ Features
 

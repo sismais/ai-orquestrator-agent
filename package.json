@@ -1,8 +1,8 @@
 {
-  "name": "zenflow",
+  "name": "sismais-ai-orquestrador",
   "private": true,
   "version": "1.0.0",
-  "description": "Zenflow - Sistema inteligente de gestão de workflow com IA",
+  "description": "Sismais AI Orquestrador - painel que dirige agentes de IA (DevKit) sobre projetos reais",
   "scripts": {
     "dev": "concurrently \"npm run dev:frontend\" \"npm run dev:backend\"",
     "dev:frontend": "npm run dev --prefix frontend",
