@@ -2,6 +2,7 @@ import { useState, useEffect } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { Card as CardType, ExecutionStatus, WorkflowStatus, ExecutionHistory } from '../../types';
 import { LogsModal } from '../LogsModal';
+import { PipelineControls } from '../PipelineControls';
 import { CardEditModal } from '../CardEditModal';
 import { BranchIndicator } from '../BranchIndicator';
 import { ExpertBadges } from '../ExpertBadges';
@@ -22,7 +23,7 @@ interface CardProps {
   isLoadingExperts?: boolean;
 }
 
-export function Card({ card, onRemove, onUpdateCard, isDragging = false, executionStatus, workflowStatus, onRunWorkflow, fetchLogsHistory, isLoadingExperts }: CardProps) {
+export function Card({ card, onRemove, onUpdateCard, isDragging = false, executionStatus, workflowStatus, fetchLogsHistory, isLoadingExperts }: CardProps) {
   const [isLogsOpen, setIsLogsOpen] = useState(false);
   const [isEditOpen, setIsEditOpen] = useState(false);
   const [removingImageId, setRemovingImageId] = useState<string | null>(null);
@@ -305,28 +306,8 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
             </div>
           )}
         </div>
-        {/* Fase 3b: execucao via runner no backend - botao "Run workflow" desativado no browser */}
-        {false && card.columnId === 'backlog' && !isActivelyRunning && (
-          <button
-            className={styles.runButton}
-            onClick={(e) => {
-              e.stopPropagation();
-              onRunWorkflow?.(card);
-            }}
-            aria-label="Run workflow"
-            title="Executar workflow completo automaticamente"
-          >
-            <svg
-              width="16"
-              height="16"
-              viewBox="0 0 16 16"
-              fill="currentColor"
-            >
-              <path d="M4 2l10 6-10 6V2z" />
-            </svg>
-            Run
-          </button>
-        )}
+        {/* Fase 3b-resto: execucao via pipeline orquestrado no backend */}
+        <PipelineControls card={card} />
         {card.columnId === 'done' && (
           <>
             <button

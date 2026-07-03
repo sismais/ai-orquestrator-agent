@@ -1,0 +1,52 @@
+/**
+ * API client do pipeline orquestrado pelo backend (Fase 3b-resto).
+ * Dispara o runner (plan -> implement -> review, com fix-loop/pause) e consulta o run.
+ */
+
+import { API_CONFIG } from './config';
+import type { ExecutionLog } from '../types';
+
+export interface PipelineExecution {
+  id: string;
+  status: 'idle' | 'running' | 'success' | 'error' | 'paused' | null;
+  workflowStage?: string | null;
+  workflowError?: string | null;
+  costUsd?: number | null;
+  isActive?: boolean;
+  startedAt?: string | null;
+  completedAt?: string | null;
+}
+
+export interface PipelineExecutionState {
+  execution: PipelineExecution | null;
+  logs: ExecutionLog[];
+}
+
+function base(projectId: string, cardId: string): string {
+  return `${API_CONFIG.BASE_URL}/api/projects/${encodeURIComponent(projectId)}/cards/${encodeURIComponent(cardId)}`;
+}
+
+/** Dispara o pipeline em background; retorna o executionId (o progresso vem por WS). */
+export async function runPipeline(projectId: string, cardId: string): Promise<{ executionId: string }> {
+  const response = await fetch(`${base(projectId, cardId)}/execute`, { method: 'POST' });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || `Falha ao iniciar pipeline: ${response.statusText}`);
+  }
+  return response.json();
+}
+
+/** Ultimo run do card + logs persistidos (para reload/historico do painel). */
+export async function getExecution(projectId: string, cardId: string): Promise<PipelineExecutionState> {
+  const response = await fetch(`${base(projectId, cardId)}/execution`);
+  if (!response.ok) {
+    throw new Error(`Falha ao carregar execucao: ${response.statusText}`);
+  }
+  const data = await response.json();
+  const logs: ExecutionLog[] = (data.logs || []).map((lg: { type: string; content: string }) => ({
+    timestamp: new Date().toISOString(),
+    type: lg.type,
+    content: lg.content,
+  }));
+  return { execution: data.execution, logs };
+}

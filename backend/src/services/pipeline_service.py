@@ -92,10 +92,15 @@ def _first_stage(transitions: dict, current: str) -> Optional[str]:
 
 
 async def _broadcast_moved(card: Card, from_col: str, to_col: str) -> None:
+    # Serializa o card completo (mesma forma do routes/cards.py) — o front SUBSTITUI o card
+    # pelo payload; enviar parcial apagaria titulo/descricao/etc.
     try:
-        await card_ws_manager.broadcast_card_moved(
-            card.id, from_col, to_col, {"id": card.id, "columnId": to_col},
-        )
+        from ..schemas.card import CardResponse
+        card_dict = CardResponse.model_validate(card).model_dump(by_alias=True, mode="json")
+    except Exception:  # noqa: BLE001
+        card_dict = {"id": card.id, "columnId": to_col}
+    try:
+        await card_ws_manager.broadcast_card_moved(card.id, from_col, to_col, card_dict)
     except Exception:  # noqa: BLE001
         pass
 

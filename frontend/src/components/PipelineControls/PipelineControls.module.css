@@ -1,0 +1,51 @@
+.runButton,
+.logsButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border: none;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: opacity 0.15s ease, transform 0.05s ease;
+}
+
+.runButton {
+  background: var(--accent, #6d5efc);
+  color: #fff;
+}
+
+.logsButton {
+  background: var(--surface-2, #2a2a35);
+  color: var(--text, #e6e6ef);
+}
+
+.runButton:hover:not(:disabled),
+.logsButton:hover {
+  opacity: 0.9;
+}
+
+.runButton:active:not(:disabled) {
+  transform: scale(0.98);
+}
+
+.runButton:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
+.spinner {
+  width: 12px;
+  height: 12px;
+  border: 2px solid rgba(255, 255, 255, 0.35);
+  border-top-color: #fff;
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
