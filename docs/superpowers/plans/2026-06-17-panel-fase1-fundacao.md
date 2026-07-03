@@ -176,6 +176,13 @@ cd /d/Sismais/Fontes/ai-orquestrator-agent && git add spike/ docs/superpowers/no
 
 **Objetivo:** remover o que sai no v1 (Qdrant, `/live`, Gemini, lixo) e garantir que o app ainda sobe.
 
+> **Execução (2026-06-17):** feitos só os cortes **seguros** — arquivos-lixo, `docker-compose.yml`,
+> e `sentence-transformers` (torch) do manifesto. **Live/votação, Orchestrator autônomo e Gemini
+> foram ADIADOS para a Fase 3** (decisão do usuário): acoplam ao núcleo que a Fase 3 reescreve
+> (`agent.py:525`→`live_broadcast_service`; `chat_service`→`orchestrator`; Gemini interleaved no
+> `agent.py`). Ficam inertes até lá (`ORCHESTRATOR_ENABLED=false`; Gemini não ofertado).
+> Pontos de acoplamento e arquivos catalogados em `docs/superpowers/notes/2026-06-17-fork-code-map.md`.
+
 - [ ] **Step 1: Qdrant + embeddings**
 - Remover `docker-compose.yml` (só sobe o Qdrant).
 - Remover `backend/src/services/qdrant_service.py`, `memory_service.py` e imports/usos deles (inclusive no `orchestrator_service.py`, que já desligamos no boot — pode remover o arquivo inteiro nesta fase, pois é "adiar" no design).
