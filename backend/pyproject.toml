@@ -1,7 +1,7 @@
 [project]
-name = "zenflow-server"
+name = "sismais-ai-orquestrador-server"
 version = "1.0.0"
-description = "Backend server for Zenflow - AI-powered workflow management"
+description = "Backend do Sismais AI Orquestrador - painel que dirige agentes de IA"
 requires-python = ">=3.10"
 dependencies = [
     "fastapi>=0.109.0",
@@ -19,3 +19,4 @@ dev = [
 
 [tool.pytest.ini_options]
 asyncio_mode = "auto"
+testpaths = ["tests"]
