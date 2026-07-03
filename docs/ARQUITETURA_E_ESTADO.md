@@ -40,13 +40,22 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - **Board renderiza as colunas do config** (`GET /api/workflows/dev`), não hardcoded.
 - **Move validado pelo config** (front `isValidMove`, back `card_repository.move` via `is_valid_transition`).
 
-### Runner (Fase 3b — CORE provado)
-- `services/runner_service.py` + `POST /api/projects/{projectId}/cards/{cardId}/execute`.
-- Fluxo: cria worktree do repo do projeto (`git_workspace.create_worktree`) → **copia `devkit/.claude`
-  para dentro da worktree** (mecanismo do spike) → invoca o SDK (`cwd=worktree`,
-  `setting_sources=["project"]`, `permission_mode="acceptEdits"`) → coleta logs/custo.
-- **Provado:** executou um agente real que editou código em `spike-loop-test` (~$0.34 via Max).
-- **Ainda NÃO faz:** sequenciar colunas, streaming pro board, fix-loop, Pause-or-Decide, PR/CI, cleanup.
+### Runner / Pipeline (Fase 3b — completa; 3b-core + 3b-resto provados)
+- `services/runner_service.py` (worktree + copia `devkit/.claude`) · `services/stage_runner.py` (roda **um estágio**
+  do DevKit como `query()` focada: corpo do `.md` do agente vira system prompt, tools do agente = `allowed_tools`) ·
+  `services/pipeline_service.py` (**o orquestrador**) · `services/findings.py` (parse de achados/pendências).
+- `POST /api/projects/{pid}/cards/{cid}/execute` dispara o pipeline **em background** (retorna `executionId` na hora);
+  `GET .../execution` devolve o run + logs (reload do painel).
+- **O backend é o orquestrador** (ocupa o papel da skill `sismais-dev-loop`; os `.mjs` de estado não foram migrados de
+  propósito). Fluxo por card, **1 worktree reusada**: `plan → implement → review`, cada coluna rodando seu agente de
+  estágio; **fix-loop** review→implement (teto `maxIterations=4` → pausa); **Pause-or-Decide** (pendências do plan,
+  `needs_human`, não-convergência, exceção → card em `paused`); **avança a coluna** do card (config); o backend **commita**
+  na branch (excluindo os dirs injetados `.claude`/`.sismais`); logs em **lote** → `execution_ws` + `execution_logs`.
+  Review limpo → avança pra `validate_ci` e **para** (fronteira 3c).
+- **Provado (real, spike-loop-test):** card percorreu plan→implement→review com **2 voltas de fix-loop** e parou em
+  `validate_ci` (~$2 via Max); painel de logs no board renderiza o histórico. Estado/logs nas tabelas `executions`/`execution_logs`.
+- **Ainda NÃO faz:** push/PR/CI/ready-to-merge (**3c**); trilha SDD completa no `plan` (hoje só planner); model-por-etapa;
+  auto-cleanup completo de worktree (helper existe; hoje mantém a worktree p/ 3c/inspeção).
 
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
@@ -72,7 +81,7 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 | 2b-2 | Frontend: seletor de projeto + projectId nas chamadas + troca sem reload | ✅ |
 | 3a | Board dirigido por config (colunas + move por config); auto-run desligado | ✅ |
 | **3b-core** | **Runner executa agente real em worktree do projeto** | ✅ **provado** |
-| 3b-resto | Sequenciar colunas, streaming de logs pro board (WS+lote), fix-loop, Pause-or-Decide, avançar coluna, cleanup worktree | ⏳ |
+| **3b-resto** | Sequenciar colunas, streaming de logs pro board (WS+lote), fix-loop, Pause-or-Decide, avançar coluna, commit pelo backend | ✅ **provado** |
 | 3c | push → `gh pr create --draft` → espera-CI (`ci-triage`) → **para no ready-to-merge** | ⏳ |
 | 3d | Remover `ActiveProject`/`database_manager`/ativo-global; cortar Live/Orchestrator/Gemini; consolidar os 2 controles de projeto | ⏳ |
 
@@ -87,7 +96,8 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 
 - `backend/src/main.py` — app, routers, lifespan (create_tables → light_migrations → remap → seed workflow).
 - `backend/src/database.py` — engine único via `DATABASE_URL`; `get_session()`.
-- `backend/src/services/runner_service.py` — **o runner** (3b).
+- `backend/src/services/{runner_service,stage_runner,pipeline_service,findings}.py` — **o runner + pipeline** (3b).
+- `backend/src/models/execution.py` — `Execution`/`ExecutionLog` (estado do run + logs; reusados pelo pipeline).
 - `backend/src/routes/{cards,projects_registry,workflows,runner}.py` — APIs project-scoped.
 - `backend/src/repositories/card_repository.py` — `move()` valida por config.
 - `backend/src/services/{workflow_seed,workflow_rules,light_migrations}.py` — config + migração de colunas.
