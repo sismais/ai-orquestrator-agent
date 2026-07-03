@@ -10,6 +10,7 @@ class ExecutionStatus(enum.Enum):
     RUNNING = "running"
     SUCCESS = "success"
     ERROR = "error"
+    PAUSED = "paused"
 
 class Execution(Base):
     __tablename__ = "executions"

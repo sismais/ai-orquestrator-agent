@@ -26,7 +26,9 @@ class DiffStats(BaseModel):
     file_diffs: List[FileDiff] = []  # Detailed diff content per file
 
 
-ColumnId = Literal["backlog", "plan", "implement", "test", "review", "done", "completed", "archived", "cancelado"]
+# Colunas vêm do config do workflow (tabela Workflow), não de um Literal fixo.
+# A validação de coluna/transição é responsabilidade do config (is_valid_transition), não do schema.
+ColumnId = str
 ModelType = Literal[
     "opus-4.5", "sonnet-4.5", "haiku-4.5",  # Claude models
     "gemini-3-pro", "gemini-3-flash"  # Gemini models

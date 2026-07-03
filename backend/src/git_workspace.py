@@ -212,6 +212,27 @@ class GitWorkspaceManager:
 
         return True
 
+    async def commit_all(self, worktree_path: str, message: str) -> tuple[bool, str]:
+        """Faz `add -A` + `commit` dentro da worktree. Nada a commitar tambem conta como sucesso."""
+        await self._run_git_command(["git", "add", "-A"], cwd=worktree_path)
+        returncode, stdout, stderr = await self._run_git_command(
+            ["git", "commit", "-m", message], cwd=worktree_path
+        )
+        out = (stdout + stderr).strip()
+        if returncode == 0:
+            return True, out
+        # "nothing to commit" nao e erro para o orquestrador
+        if "nothing to commit" in out.lower():
+            return True, out
+        return False, out
+
+    async def diff_against_base(self, worktree_path: str, base_branch: str) -> str:
+        """Diff da worktree contra a base (`git diff <base>...HEAD`). Vazio se sem mudancas."""
+        _, stdout, _ = await self._run_git_command(
+            ["git", "diff", f"{base_branch}...HEAD"], cwd=worktree_path
+        )
+        return stdout
+
     async def list_active_worktrees(self) -> List[Dict[str, str]]:
         """Lista todos os worktrees ativos."""
         _, output, _ = await self._run_git_command(

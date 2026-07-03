@@ -1,0 +1,146 @@
+import inspect
+
+import pytest
+import src.models  # noqa: F401
+from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
+
+from src.database import Base
+from src.git_workspace import GitWorkspaceManager, WorktreeResult
+from src.models.execution import Execution
+from src.models.project_registry import Project
+from src.repositories.card_repository import CardRepository
+from src.schemas.card import CardCreate
+from src.services import pipeline_service
+from src.services.stage_runner import StageResult
+
+
+@pytest.fixture
+async def maker():
+    engine = create_async_engine("sqlite+aiosqlite:///:memory:")
+    async with engine.begin() as conn:
+        await conn.run_sync(Base.metadata.create_all)
+    m = async_sessionmaker(engine, class_=AsyncSession, expire_on_commit=False)
+    yield m
+    await engine.dispose()
+
+
+@pytest.fixture(autouse=True)
+def stub_git(monkeypatch, tmp_path):
+    """Neutraliza git/worktree reais no unit test do orquestrador."""
+    async def fake_prepare(project_path, base_branch, card_id):
+        wt = tmp_path / f"wt-{card_id[:8]}"
+        wt.mkdir(exist_ok=True)
+        return WorktreeResult(success=True, worktree_path=str(wt), branch_name="agent/test")
+
+    async def fake_commit(self, worktree_path, message):
+        return True, "ok"
+
+    async def fake_diff(self, worktree_path, base_branch):
+        return "diff --git a/x b/x\n+mudou"
+
+    monkeypatch.setattr(pipeline_service, "prepare_worktree", fake_prepare)
+    monkeypatch.setattr(GitWorkspaceManager, "commit_all", fake_commit)
+    monkeypatch.setattr(GitWorkspaceManager, "diff_against_base", fake_diff)
+
+
+def make_stage_fn(script):
+    """script: {stage_key: [texts...]} — devolvidos por chamada; default benigno."""
+    counts: dict[str, int] = {}
+
+    async def fake(stage_key, worktree, prompt, on_log=None):
+        if on_log:
+            r = on_log(f"[{stage_key}] trabalhando...\n")
+            if inspect.isawaitable(r):
+                await r
+        idx = counts.get(stage_key, 0)
+        counts[stage_key] = idx + 1
+        texts = script.get(stage_key)
+        text = texts[min(idx, len(texts) - 1)] if texts else f"{stage_key} ok"
+        return StageResult(ok=True, text=text, cost_usd=0.01)
+
+    return fake, counts
+
+
+async def _make_project_card(maker):
+    async with maker() as s:
+        s.add(Project(id="p1", name="proj", path="/tmp/proj", workflow_id="dev", base_branch="main"))
+        repo = CardRepository(s)
+        card = await repo.create(CardCreate(title="Tarefa X"), project_id="p1")
+        await s.commit()
+        return card.id
+
+
+async def _card_column(maker, card_id):
+    async with maker() as s:
+        c = await CardRepository(s).get_by_id(card_id)
+        return c.column_id
+
+
+async def _last_execution(maker, card_id):
+    from sqlalchemy import select
+    async with maker() as s:
+        return (await s.execute(
+            select(Execution).where(Execution.card_id == card_id).order_by(Execution.started_at.desc())
+        )).scalars().first()
+
+
+async def test_happy_path_lands_on_validate_ci(maker):
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({"review": ['{"blocks":[],"fixNow":[],"suggestions":[]}']})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "validate_ci"
+    ex = await _last_execution(maker, card_id)
+    assert ex.status.value == "success"
+    assert counts.get("plan") == 1 and counts.get("implement") == 1 and counts.get("review") == 1
+
+
+async def test_fix_loop_runs_implement_twice(maker):
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({"review": [
+        '{"blocks":[{"titulo":"bug","arquivo":"a.py:1","porque":"x"}],"fixNow":[]}',
+        '{"blocks":[],"fixNow":[]}',
+    ]})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "validate_ci"
+    assert counts.get("implement") == 2 and counts.get("review") == 2
+
+
+async def test_non_convergence_pauses(maker):
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({"review": ['{"blocks":[{"titulo":"sempre"}],"fixNow":[]}']})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake, max_iterations=2)
+
+    assert await _card_column(maker, card_id) == "paused"
+    ex = await _last_execution(maker, card_id)
+    assert ex.status.value == "paused"
+
+
+async def test_needs_human_on_implement_pauses_before_review(maker):
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({"implement": ["status: needs_human — migration arriscada"]})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "paused"
+    assert counts.get("review") is None  # nem chegou em review
+
+
+async def test_pending_questions_on_plan_pauses(maker):
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({"plan": ['{"pendingQuestions":[{"question":"qual banco?"}]}']})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "paused"
+    assert counts.get("implement") is None
+
+
+async def test_logs_persisted(maker):
+    from sqlalchemy import select
+    from src.models.execution import ExecutionLog
+    card_id = await _make_project_card(maker)
+    fake, _ = make_stage_fn({"review": ['{"blocks":[],"fixNow":[]}']})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    async with maker() as s:
+        logs = (await s.execute(select(ExecutionLog))).scalars().all()
+    assert len(logs) > 0
