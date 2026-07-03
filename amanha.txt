@@ -1,3 +1,0 @@
-Não dá refresh automático ao pular de coluna, 
-Quando finalizou o card, n modificou o agent especialista 
-Não adicionou no card uma representação de quais agents especialistas foram  identificados

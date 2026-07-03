@@ -1,3 +1,0 @@
-1. Adicionar mais experts: Frontend, WebSocket, Chat - basta adicionar ao AVAILABLE_EXPERTS
-  2. Melhorar UI: Tooltip mais rico nos badges com reason completo
-  3. Metricas: Rastrear quais experts sao mais usados

@@ -16,7 +16,9 @@
 
 **Objetivo:** backend em `:3001` e board em `:5173` no ar. (Porta 3001 vem do Makefile + do proxy do Vite; ignore o `8000` do `docs/CONFIGURATION.md` — é drift.)
 
-- [ ] **Step 1: Pré-requisitos** — confirmar `python --version` (≥3.9), `node --version` (≥18), `git --version`, e Claude Code CLI instalado. Ter uma `ANTHROPIC_API_KEY` válida.
+- [ ] **Step 1: Pré-requisitos** — confirmar `python --version` (≥3.9), `node --version` (≥18), `git --version`, e Claude Code CLI instalado **e logado** (`~/.claude/.credentials.json` presente).
+
+**Auth (decisão):** o `claude-agent-sdk` roda o Claude Code CLI por baixo. Sem `ANTHROPIC_API_KEY` no ambiente, ele usa o **login do CLI** — aqui a **assinatura Max** já logada (`subscriptionType: max`, scope `user:inference`). Então **`ANTHROPIC_API_KEY` é opcional**: default = assinatura Max; setar a chave só se quiser forçar a API (CI/carga pesada, onde os termos pedem API key). O fork **não** exige a chave (`settings.py` não tem campo de key da Anthropic). Confirmação empírica no spike da Task 3.
 
 - [ ] **Step 2: Backend — venv + deps**
 ```bash
@@ -27,13 +29,12 @@ pip install -r requirements.txt
 ```
 Esperado: instala fastapi, `claude-agent-sdk`, sqlalchemy, aiosqlite, qdrant-client, sentence-transformers, google-generativeai. (qdrant/sentence-transformers/gemini serão cortados na Task 4 — por ora instala tudo pra subir.)
 
-- [ ] **Step 3: `backend/.env`** — copiar do exemplo e setar chave + porta:
+- [ ] **Step 3: `backend/.env`** — copiar do exemplo e setar porta:
 ```bash
 cp .env.example .env 2>/dev/null || true
 ```
-Editar `backend/.env`, garantindo:
+Editar `backend/.env`, garantindo (note: **sem `ANTHROPIC_API_KEY`** — usa a assinatura Max do CLI; ver Step 1):
 ```env
-ANTHROPIC_API_KEY=sk-ant-...
 PORT=3001
 DATABASE_URL=sqlite+aiosqlite:///./auth.db
 STORE_DB_IN_PROJECT=true
