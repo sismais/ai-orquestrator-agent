@@ -108,10 +108,11 @@ function mapCardResponseToCard(response: CardResponse): Card {
 }
 
 /**
- * Fetch all cards from the API.
+ * Fetch all cards from the API. When `projectId` is provided, scopes the
+ * result to that project (omitting it preserves the previous, unscoped behavior).
  */
-export async function fetchCards(): Promise<Card[]> {
-  const url = API_ENDPOINTS.cards;
+export async function fetchCards(projectId?: string): Promise<Card[]> {
+  const url = projectId ? `${API_ENDPOINTS.cards}?projectId=${encodeURIComponent(projectId)}` : API_ENDPOINTS.cards;
   const response = await fetch(url);
 
   if (!response.ok) {
@@ -147,7 +148,8 @@ export async function createCard(
   modelImplement: ModelType,
   modelTest: ModelType,
   modelReview: ModelType,
-  baseBranch?: string
+  baseBranch?: string,
+  projectId?: string
 ): Promise<Card> {
   const response = await fetch(API_ENDPOINTS.cards, {
     method: 'POST',
@@ -162,6 +164,7 @@ export async function createCard(
       modelTest,
       modelReview,
       baseBranch,
+      projectId,
     }),
   });
 

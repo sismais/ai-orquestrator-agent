@@ -30,6 +30,8 @@ function App() {
   const [initialExecutions, setInitialExecutions] = useState<Map<string, ExecutionStatus> | undefined>();
   const [initialWorkflowStatuses, setInitialWorkflowStatuses] = useState<Map<string, WorkflowStatus> | undefined>();
   const [currentProject, setCurrentProject] = useState<Project | null>(null);
+  const [currentProjectId, setCurrentProjectId] = useState<string | null>(() => localStorage.getItem('orq.currentProjectId'));
+  const didMountProjectIdEffect = useRef(false);
   const dragStartColumnRef = useRef<ColumnId | null>(null);
 
   // Callback para atualizar cards quando uma execução completar
@@ -155,8 +157,8 @@ function App() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
-        // Load cards
-        const loadedCards = await cardsApi.fetchCards();
+        // Load cards (scoped to the selected project, when one is set)
+        const loadedCards = await cardsApi.fetchCards(currentProjectId ?? undefined);
         setCards(loadedCards);
 
         // Load current project
@@ -268,6 +270,23 @@ function App() {
     };
     loadInitialData();
   }, []);
+
+  // Re-fetch cards (sem reload de página) sempre que o projeto selecionado mudar.
+  // Na primeira montagem, o loadInitialData acima já buscou os cards do projeto
+  // salvo em localStorage, então pulamos o fetch duplicado nesse primeiro disparo.
+  useEffect(() => {
+    if (currentProjectId === null) return;
+    localStorage.setItem('orq.currentProjectId', currentProjectId);
+
+    if (!didMountProjectIdEffect.current) {
+      didMountProjectIdEffect.current = true;
+      return;
+    }
+
+    cardsApi.fetchCards(currentProjectId)
+      .then(setCards)
+      .catch(err => console.error('[App] refetch on project switch failed', err));
+  }, [currentProjectId]);
 
   // Polling para atualizar token stats em tempo real (a cada 2 segundos)
   const hasActiveExecutions = cards.some(c => c.activeExecution?.status === 'running');
@@ -654,6 +673,8 @@ function App() {
             onProjectLoad={setCurrentProject}
             fetchLogsHistory={fetchLogsHistory}
             loadingExpertsCardId={loadingExpertsCardId}
+            currentProjectId={currentProjectId}
+            onProjectIdSwitch={setCurrentProjectId}
           />
         );
 

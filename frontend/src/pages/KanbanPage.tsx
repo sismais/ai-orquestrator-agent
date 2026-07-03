@@ -5,6 +5,7 @@ import { Card } from '../components/Card/Card';
 import { Project } from '../types';
 import { ProjectLoader } from '../components/ProjectLoader/ProjectLoader';
 import { ProjectSwitcher } from '../components/ProjectSwitcher';
+import { ProjectSelectorRegistry } from '../components/ProjectSelectorRegistry/ProjectSelectorRegistry';
 import { AddCard } from '../components/AddCard/AddCard';
 import { LiveModeControl } from '../components/LiveModeControl';
 import styles from './KanbanPage.module.css';
@@ -32,6 +33,8 @@ interface KanbanPageProps {
   onProjectLoad: (project: Project | null) => void;
   fetchLogsHistory?: (cardId: string) => Promise<{ cardId: string; history: any[] } | null>;
   loadingExpertsCardId?: string | null;
+  currentProjectId: string | null;
+  onProjectIdSwitch: (projectId: string) => void;
 }
 
 const KanbanPage = ({
@@ -57,6 +60,8 @@ const KanbanPage = ({
   onProjectLoad,
   fetchLogsHistory,
   loadingExpertsCardId,
+  currentProjectId,
+  onProjectIdSwitch,
 }: KanbanPageProps) => {
   return (
     <div className={styles.kanbanPage}>
@@ -69,7 +74,11 @@ const KanbanPage = ({
         </div>
         <div className={styles.projectActions}>
           <LiveModeControl />
-          <AddCard columnId="backlog" onAdd={onAddCard} />
+          <ProjectSelectorRegistry
+            currentProjectId={currentProjectId}
+            onSwitch={onProjectIdSwitch}
+          />
+          <AddCard columnId="backlog" onAdd={onAddCard} projectId={currentProjectId} />
           <ProjectSwitcher
             currentProject={currentProject}
             onProjectSwitch={onProjectSwitch}

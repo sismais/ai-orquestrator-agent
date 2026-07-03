@@ -8,9 +8,10 @@ import styles from './AddCard.module.css';
 interface AddCardProps {
   columnId: ColumnId;
   onAdd: (title: string, description: string, columnId: ColumnId) => void; // Mantido por compatibilidade
+  projectId?: string | null;
 }
 
-export function AddCard({}: AddCardProps) {
+export function AddCard({ projectId }: AddCardProps) {
   const [isModalOpen, setIsModalOpen] = useState(false);
 
   const handleSubmit = async (cardData: {
@@ -32,7 +33,8 @@ export function AddCard({}: AddCardProps) {
         cardData.modelImplement,
         cardData.modelTest,
         cardData.modelReview,
-        cardData.baseBranch
+        cardData.baseBranch,
+        projectId ?? undefined
       );
 
       // Se houver imagens, fazer upload
