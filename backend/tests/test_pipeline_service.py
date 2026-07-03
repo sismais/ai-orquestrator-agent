@@ -32,7 +32,7 @@ def stub_git(monkeypatch, tmp_path):
         wt.mkdir(exist_ok=True)
         return WorktreeResult(success=True, worktree_path=str(wt), branch_name="agent/test")
 
-    async def fake_commit(self, worktree_path, message):
+    async def fake_commit(self, worktree_path, message, exclude=None):
         return True, "ok"
 
     async def fake_diff(self, worktree_path, base_branch):

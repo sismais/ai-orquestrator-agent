@@ -37,6 +37,8 @@ from ..services.workflow_rules import next_active_column
 
 DEFAULT_MAX_ITERATIONS = 4
 _LOG_FLUSH_CHARS = 800
+# Dirs injetados pelo runner na worktree — nunca entram nos commits da feature.
+_COMMIT_EXCLUDE = [".claude", ".sismais"]
 
 
 class _LogSink:
@@ -236,7 +238,7 @@ async def run_pipeline(
                 if nh:
                     await finish_pause("implement: needs_human", nh)
                     return
-                await gm.commit_all(worktree, f"wip: {card.title[:60]}")
+                await gm.commit_all(worktree, f"wip: {card.title[:60]}", exclude=_COMMIT_EXCLUDE)
                 col = next_active_column(transitions, "implement")
 
             elif col == "review":
@@ -271,7 +273,7 @@ async def run_pipeline(
                     if nh:
                         await finish_pause("fix-loop: needs_human", nh)
                         return
-                    await gm.commit_all(worktree, f"fix: {card.title[:50]} #{iteration}")
+                    await gm.commit_all(worktree, f"fix: {card.title[:50]} #{iteration}", exclude=_COMMIT_EXCLUDE)
                     col = "review"  # re-revisa no topo do laco
                     continue
                 col = next_active_column(transitions, "review")  # -> validate_ci (sem handler) -> para

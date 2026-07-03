@@ -101,7 +101,8 @@ export function PipelineControls({ card }: Props) {
         </button>
       )}
 
-      {(isRunning || logs.length > 0 || status !== 'idle') && card.columnId !== 'backlog' && (
+      {/* Card ja rodou (tem branch) ou esta rodando -> oferecer os logs (lazy-load no clique). */}
+      {(isRunning || logs.length > 0 || status !== 'idle' || !!card.branchName) && card.columnId !== 'backlog' && (
         <button className={styles.logsButton} onClick={handleOpenLogs} title="Ver logs do pipeline">
           {isRunning && <span className={styles.spinner} />}
           Logs

@@ -212,9 +212,17 @@ class GitWorkspaceManager:
 
         return True
 
-    async def commit_all(self, worktree_path: str, message: str) -> tuple[bool, str]:
-        """Faz `add -A` + `commit` dentro da worktree. Nada a commitar tambem conta como sucesso."""
-        await self._run_git_command(["git", "add", "-A"], cwd=worktree_path)
+    async def commit_all(self, worktree_path: str, message: str,
+                         exclude: Optional[List[str]] = None) -> tuple[bool, str]:
+        """Faz `add` + `commit` dentro da worktree. Nada a commitar tambem conta como sucesso.
+
+        `exclude`: pathspecs a NAO commitar (ex.: dirs injetados pelo runner como `.claude`/`.sismais`),
+        para a branch conter so as mudancas da feature. Usa pathspec magic `:(exclude)`.
+        """
+        add_args = ["git", "add", "-A", "--", "."]
+        for ex in (exclude or []):
+            add_args.append(f":(exclude){ex}")
+        await self._run_git_command(add_args, cwd=worktree_path)
         returncode, stdout, stderr = await self._run_git_command(
             ["git", "commit", "-m", message], cwd=worktree_path
         )

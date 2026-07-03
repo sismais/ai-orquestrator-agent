@@ -32,6 +32,31 @@ async def test_commit_all_and_diff_against_base(tmp_path):
     assert "novo.py" in diff
 
 
+async def test_commit_all_excludes_injected_dirs(tmp_path):
+    repo = tmp_path / "repo"
+    repo.mkdir()
+    _git(repo, "init", "-b", "main")
+    _git(repo, "config", "user.email", "t@t.com")
+    _git(repo, "config", "user.name", "T")
+    (repo / "readme.md").write_text("hello")
+    _git(repo, "add", "-A")
+    _git(repo, "commit", "-m", "init")
+
+    gm = GitWorkspaceManager(str(repo))
+    wt = await gm.create_worktree("cardexcl", "main")
+    # arquivo de feature + dir injetado do runner
+    Path(wt.worktree_path, "feature.py").write_text("x = 1\n")
+    injected = Path(wt.worktree_path, ".claude")
+    injected.mkdir()
+    (injected / "skill.md").write_text("nao deve ser commitado")
+
+    ok, _ = await gm.commit_all(wt.worktree_path, "wip", exclude=[".claude", ".sismais"])
+    assert ok
+    diff = await gm.diff_against_base(wt.worktree_path, "main")
+    assert "feature.py" in diff
+    assert ".claude" not in diff  # dir injetado nao entrou no commit
+
+
 async def test_commit_all_nothing_to_commit_is_ok(tmp_path):
     repo = tmp_path / "repo"
     repo.mkdir()
