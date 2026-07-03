@@ -82,6 +82,9 @@ async def lifespan(app: FastAPI):
     await run_light_migrations(_engine)
     print("[Server] Light migrations applied")
 
+    from .services.light_migrations import remap_legacy_columns
+    await remap_legacy_columns(_engine)
+
     from .services.workflow_seed import seed_dev_workflow
     from .database import async_session_maker
     async with async_session_maker() as _s:

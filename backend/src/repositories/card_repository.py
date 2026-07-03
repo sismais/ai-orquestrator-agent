@@ -9,20 +9,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from ..models.card import Card
 from ..models.activity_log import ActivityType
 from ..schemas.card import CardCreate, CardUpdate, ColumnId
-
-
-# Transições permitidas no SDLC
-ALLOWED_TRANSITIONS: dict[str, list[str]] = {
-    "backlog": ["plan", "cancelado"],
-    "plan": ["implement", "cancelado"],
-    "implement": ["test", "cancelado"],
-    "test": ["review", "cancelado"],
-    "review": ["done", "cancelado"],
-    "done": ["completed", "archived", "cancelado"],
-    "completed": ["archived"],
-    "archived": ["done"],
-    "cancelado": [],  # Não permite sair de cancelado
-}
+from ..services.workflow_rules import is_valid_transition
 
 
 class CardRepository:
@@ -123,6 +110,23 @@ class CardRepository:
         await self.session.flush()
         return True
 
+    async def _get_transitions_for_card(self, card) -> dict[str, list[str]]:
+        """Transições do workflow do projeto do card (fallback: workflow dev)."""
+        from ..models.project_registry import Project
+        from ..models.workflow import Workflow
+        from ..services.workflow_seed import DEV_WORKFLOW_ID, DEV_TRANSITIONS
+        workflow_id = DEV_WORKFLOW_ID
+        if card.project_id:
+            proj = (await self.session.execute(
+                select(Project).where(Project.id == card.project_id)
+            )).scalar_one_or_none()
+            if proj and proj.workflow_id:
+                workflow_id = proj.workflow_id
+        wf = (await self.session.execute(
+            select(Workflow).where(Workflow.id == workflow_id)
+        )).scalar_one_or_none()
+        return wf.transitions if wf else DEV_TRANSITIONS
+
     async def move(self, card_id: str, new_column_id: ColumnId) -> tuple[Optional[Card], Optional[str]]:
         """
         Move a card to a new column with SDLC and finalization validation.
@@ -140,10 +144,11 @@ class CardRepository:
 
         current_column = card.column_id
 
-        # Validação SDLC: verificar se a transição é permitida
+        # Validação via config do workflow
         if current_column != new_column_id:
-            allowed = ALLOWED_TRANSITIONS.get(current_column, [])
-            if new_column_id not in allowed:
+            transitions = await self._get_transitions_for_card(card)
+            if not is_valid_transition(transitions, current_column, new_column_id):
+                allowed = transitions.get(current_column, [])
                 return None, f"Invalid transition from '{current_column}' to '{new_column_id}'. Allowed: {allowed}"
 
         # Mover card para nova coluna
@@ -177,25 +182,6 @@ class CardRepository:
             to_column=new_column_id,
             description=f"Card movido de '{current_column}' para '{new_column_id}'"
         )
-
-        # Run database migrations when card reaches "done"
-        if new_column_id == "done":
-            from ..services.migration_service import MigrationService
-            from pathlib import Path
-            try:
-                # Get current project database path
-                claude_db = Path(".claude/database.db")
-                if claude_db.exists():
-                    print(f"[CardRepository] Running migrations for card {card.title} reaching done...")
-                    service = MigrationService(str(claude_db))
-                    success, messages = service.apply_all_pending_migrations()
-                    if success:
-                        print(f"[CardRepository] ✅ Migrations completed: {', '.join(messages)}")
-                    else:
-                        print(f"[CardRepository] ⚠️ Migration warnings: {', '.join(messages)}")
-            except Exception as e:
-                # Don't fail the card move if migrations fail
-                print(f"[CardRepository] ⚠️ Failed to run migrations: {e}")
 
         return card, None
 
