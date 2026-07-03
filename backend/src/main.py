@@ -48,6 +48,7 @@ from .schemas.card import CardUpdate
 from .models.card import Card  # noqa: F401
 from .models.project import ActiveProject  # noqa: F401
 from .models.project_registry import Project  # noqa: F401
+from .models.workflow import Workflow  # noqa: F401
 from .models.orchestrator import Goal, OrchestratorAction, OrchestratorLog  # noqa: F401
 from .models.live import Vote, VotingRound, VotingOption, CompletedProject  # noqa: F401
 
@@ -73,6 +74,12 @@ async def lifespan(app: FastAPI):
     print("[Server] Creating database tables...")
     await create_tables()
     print("[Server] Database tables created successfully")
+
+    from .services.workflow_seed import seed_dev_workflow
+    from .database import async_session_maker
+    async with async_session_maker() as _s:
+        await seed_dev_workflow(_s)
+    print("[Server] Dev workflow seeded")
 
     # Start orchestrator if enabled
     settings = get_settings()
