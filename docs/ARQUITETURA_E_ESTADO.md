@@ -66,8 +66,16 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - **Provado (real, spike-loop-test):** pausou no `plan` (pergunta) → resposta → replanejou → `implement` → pausou de
   novo (`needs_human`) → resposta → implementou → `review` → `validate_ci`. Front: `PipelineControls` mostra a pergunta
   + caixa "Responder e retomar" no card `paused`. Spec: `specs/2026-07-03-panel-interacao-humana-no-card-design.md`.
-- **Próximo (fora deste escopo):** chat ao vivo bidirecional durante a execução + **Stop** no meio (exige sessão
-  persistente `ClaudeSDKClient` em vez do `query()` por etapa).
+### Chat ao vivo — Stop (interromper para corrigir)
+- Cada etapa agora roda numa **sessão `ClaudeSDKClient`** (streaming interrompível), não mais `query()` de tiro único.
+  `services/session_registry.py` guarda a sessão ativa por card; `stage_runner.run_stage` registra/desregistra.
+- `POST /api/projects/{pid}/cards/{cid}/stop` → `client.interrupt()` → o estágio encerra e o pipeline **pausa** o card
+  ("interrompido pelo usuário") → o humano corrige na aba Interação → **retoma** (máquina de pausa/retomada existente).
+  Front: botão **⏹ Stop** só em card de etapa ativa (plan/implement/review) + rodando.
+- `POST .../say` (base pronta) injeta mensagem na sessão ao vivo — **falar sem parar** é o incremento 2 (falta o laço
+  multi-turno + a caixa no painel). Spec: `specs/2026-07-03-panel-chat-ao-vivo-stop-design.md`.
+- **Provado (real, spike-loop-test):** Stop durante o `plan` interrompeu a sessão de verdade → pausou → respondi a
+  correção → retomou plan→implement→review→`validate_ci`. Confirma também que a troca `query()`→client não regrediu o pipeline.
 
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
