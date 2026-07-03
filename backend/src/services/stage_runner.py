@@ -64,11 +64,13 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
     header = f"Voce trabalha no repositorio em `{worktree}` (worktree isolada do card)."
 
     if stage_key == "plan":
+        # Planner e read-only (Read/Glob/Grep): devolve o plano como TEXTO (nao escreve arquivo no repo).
+        # O orquestrador captura o texto e passa pro implement — nada de artefato do runner na branch.
         return (
             f"{header}\n\nTarefa: {task}\n\n"
-            "Produza o conteudo do plano de implementacao e ESCREVA-O em `.sismais/plan.md` "
-            "(crie o diretorio se preciso). Derive do que ja existe no projeto. "
-            "Se uma decisao de arquitetura nao tiver base no projeto, devolva um bloco JSON "
+            "Produza o conteudo do plano de implementacao (abordagem, arquivos afetados, reuso, riscos), "
+            "derivando do que ja existe no projeto. Responda com o plano em markdown. "
+            "Se uma decisao de arquitetura nao tiver base no projeto, devolva tambem um bloco JSON "
             '`{ "pendingQuestions": [ { "question": "...", "context": "..." } ] }` ao final.'
         )
 
@@ -80,8 +82,10 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
                 f"{header}\n\nCorrija EXATAMENTE os achados de review a seguir "
                 f"(nada alem — YAGNI). Edite codigo e testes. NAO faca commit.\n\n{items}"
             )
+        plan = extra.get("plan")
+        plan_block = f"\n\nPlano de referencia (do estagio anterior):\n{plan}\n" if plan else ""
         return (
-            f"{header}\n\nTarefa: {task}\n\n"
+            f"{header}\n\nTarefa: {task}{plan_block}\n\n"
             "Implemente editando o codigo e criando/atualizando testes quando fizer sentido. "
             "Siga o AGENTS.md do projeto se existir. NAO faca commit. "
             "Ao terminar, reporte os arquivos mudados e `status: done` (ou `needs_human` com o motivo)."

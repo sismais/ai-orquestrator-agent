@@ -37,8 +37,6 @@ from ..services.workflow_rules import next_active_column
 
 DEFAULT_MAX_ITERATIONS = 4
 _LOG_FLUSH_CHARS = 800
-# Dirs injetados pelo runner na worktree — nunca entram nos commits da feature.
-_COMMIT_EXCLUDE = [".claude", ".sismais"]
 
 
 class _LogSink:
@@ -200,6 +198,7 @@ async def run_pipeline(
 
         transitions = await repo._get_transitions_for_card(card)
         iteration = 0
+        plan_text: Optional[str] = None
         col = _first_stage(transitions, card.column_id)
 
         # 2) laco de estagios
@@ -219,6 +218,8 @@ async def run_pipeline(
             extra: dict = {}
             if col == "review":
                 extra["diff"] = await gm.diff_against_base(worktree, base_branch)
+            elif col == "implement" and plan_text:
+                extra["plan"] = plan_text
             prompt = build_stage_prompt(col, card.title, card.description or "", worktree, extra)
             res = await stage_fn(col, worktree, prompt, on_log=log)
             await log.flush()
@@ -231,6 +232,7 @@ async def run_pipeline(
                 if parse_pending_questions(res.text):
                     await finish_pause("plan: pendencias de arquitetura", res.text[:1500])
                     return
+                plan_text = res.text
                 col = next_active_column(transitions, "plan")
 
             elif col == "implement":
@@ -238,7 +240,7 @@ async def run_pipeline(
                 if nh:
                     await finish_pause("implement: needs_human", nh)
                     return
-                await gm.commit_all(worktree, f"wip: {card.title[:60]}", exclude=_COMMIT_EXCLUDE)
+                await gm.commit_all(worktree, f"wip: {card.title[:60]}")
                 col = next_active_column(transitions, "implement")
 
             elif col == "review":
@@ -273,7 +275,7 @@ async def run_pipeline(
                     if nh:
                         await finish_pause("fix-loop: needs_human", nh)
                         return
-                    await gm.commit_all(worktree, f"fix: {card.title[:50]} #{iteration}", exclude=_COMMIT_EXCLUDE)
+                    await gm.commit_all(worktree, f"fix: {card.title[:50]} #{iteration}")
                     col = "review"  # re-revisa no topo do laco
                     continue
                 col = next_active_column(transitions, "review")  # -> validate_ci (sem handler) -> para

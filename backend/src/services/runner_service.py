@@ -1,12 +1,12 @@
 """Runner minimo (Fase 3b): executa um agente do DevKit numa git worktree do projeto-alvo.
 
-Para um card: cria worktree isolada do repo do projeto, copia devkit/.claude para dentro
-(mecanismo validado no spike de skill-loading), invoca o SDK com cwd=worktree e as skills
-do DevKit disponiveis (setting_sources=["project"]), coleta os logs/custo, e devolve o resultado.
+Para um card: cria worktree isolada (pristina) do repo do projeto, invoca o SDK com cwd=worktree,
+coleta os logs/custo, e devolve o resultado. O papel de cada estagio vem do system_prompt
+(`stage_runner` le o `.md` do agente de `devkit/.claude/agents`), entao NAO copiamos o DevKit
+pra worktree — ela fica so com o codigo real do projeto (o `.claude` do projeto permanece intacto).
 NAO faz merge, NAO abre PR (isso e 3c). Auth do SDK = login do Claude Code CLI (assinatura Max).
 """
 
-import shutil
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Optional
@@ -41,14 +41,18 @@ def build_prompt(title: str, description: str, worktree: str) -> str:
 
 
 async def prepare_worktree(project_path: str, base_branch: Optional[str], card_id: str) -> WorktreeResult:
-    """Cria a worktree e copia devkit/.claude para dentro. Retorna o WorktreeResult do git_workspace."""
+    """Cria a worktree pristina (checkout do projeto). Retorna o WorktreeResult do git_workspace.
+
+    NAO injeta o DevKit na worktree: o backend e o orquestrador e o papel de cada estagio vem do
+    system_prompt (`stage_runner` le o `.md` do agente direto de `devkit/.claude/agents`). Assim a
+    worktree fica so com os arquivos reais do projeto — o `.claude` do projeto (skills/agentes dele)
+    permanece intacto e e commitado normalmente; o DevKit nunca polui a branch da feature.
+    Para injetar skills-padrao Sismais nos agentes no futuro, usar `plugins=[{type:local,path}]`
+    (provado no spike 2026-07-03), com `skills` filtrado so pro DevKit (evita puxar skills globais do host).
+    """
     gm = GitWorkspaceManager(project_path)
     await gm.recover_state()
-    wt = await gm.create_worktree(card_id, base_branch or None)
-    if wt.success and wt.worktree_path and DEVKIT_CLAUDE.exists():
-        dst = Path(wt.worktree_path) / ".claude"
-        shutil.copytree(DEVKIT_CLAUDE, dst, dirs_exist_ok=True)
-    return wt
+    return await gm.create_worktree(card_id, base_branch or None)
 
 
 async def run_card(title: str, description: str, project_path: str, base_branch: Optional[str],

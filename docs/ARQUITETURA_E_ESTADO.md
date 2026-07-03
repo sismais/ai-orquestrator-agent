@@ -41,7 +41,7 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - **Move validado pelo config** (front `isValidMove`, back `card_repository.move` via `is_valid_transition`).
 
 ### Runner / Pipeline (Fase 3b — completa; 3b-core + 3b-resto provados)
-- `services/runner_service.py` (worktree + copia `devkit/.claude`) · `services/stage_runner.py` (roda **um estágio**
+- `services/runner_service.py` (worktree pristina, sem injetar DevKit) · `services/stage_runner.py` (roda **um estágio**
   do DevKit como `query()` focada: corpo do `.md` do agente vira system prompt, tools do agente = `allowed_tools`) ·
   `services/pipeline_service.py` (**o orquestrador**) · `services/findings.py` (parse de achados/pendências).
 - `POST /api/projects/{pid}/cards/{cid}/execute` dispara o pipeline **em background** (retorna `executionId` na hora);
@@ -50,7 +50,8 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
   propósito). Fluxo por card, **1 worktree reusada**: `plan → implement → review`, cada coluna rodando seu agente de
   estágio; **fix-loop** review→implement (teto `maxIterations=4` → pausa); **Pause-or-Decide** (pendências do plan,
   `needs_human`, não-convergência, exceção → card em `paused`); **avança a coluna** do card (config); o backend **commita**
-  na branch (excluindo os dirs injetados `.claude`/`.sismais`); logs em **lote** → `execution_ws` + `execution_logs`.
+  na branch (worktree pristina → commita só as mudanças reais do projeto, incl. o `.claude` dele); o `plan` devolve o
+  plano como **texto** (passado ao implement, sem arquivo no repo); logs em **lote** → `execution_ws` + `execution_logs`.
   Review limpo → avança pra `validate_ci` e **para** (fronteira 3c).
 - **Provado (real, spike-loop-test):** card percorreu plan→implement→review com **2 voltas de fix-loop** e parou em
   `validate_ci` (~$2 via Max); painel de logs no board renderiza o histórico. Estado/logs nas tabelas `executions`/`execution_logs`.
@@ -59,7 +60,13 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
-  `sismais-ai-plugins-private`. O runner o carrega por-run copiando pra worktree.
+  `sismais-ai-plugins-private`.
+- **Não é injetado na worktree.** O runner **não copia** o DevKit pro repo do projeto: o papel de cada estágio vem do
+  `system_prompt` (`stage_runner` lê o `.md` do agente de `devkit/.claude/agents`), e as skills que o agente usa são as
+  **do próprio projeto** (do checkout na worktree). Assim o `.claude` do projeto fica intacto e é commitado normalmente;
+  o DevKit nunca polui a branch. (Antes copiava — mudou em 2026-07-03; ver `notes/2026-07-03-spike-devkit-plugin-loading.md`.)
+- **Injetar skills-padrão Sismais nos agentes (futuro):** via `plugins=[{type:local,path}]` (provado no spike), com
+  `skills` filtrado só pro DevKit. Hoje YAGNI — o backend orquestra, então não precisamos.
 - Os scripts de estado `.mjs` **não** foram migrados (o backend é o dono do estado). Ver `devkit/README.md`.
 
 ## O que está CORTADO/ADIADO (não usar; remoção final na Fase 3d)
