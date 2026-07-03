@@ -75,3 +75,9 @@ tmp/
 backend/orchestrator.db
 backend/orchestrator.db-wal
 backend/orchestrator.db-shm
+
+# SQLite WAL/SHM/backup artifacts
+*.db-wal
+*.db-shm
+*.db.bak
+backend/.project_data/
