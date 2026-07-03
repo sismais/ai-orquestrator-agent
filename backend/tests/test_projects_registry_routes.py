@@ -1,4 +1,5 @@
 import pytest
+import src.models  # noqa: F401  (registra todos os models no Base.metadata p/ create_all robusto rodando o arquivo sozinho)
 from httpx import AsyncClient, ASGITransport
 from sqlalchemy.ext.asyncio import create_async_engine, AsyncSession, async_sessionmaker
 
