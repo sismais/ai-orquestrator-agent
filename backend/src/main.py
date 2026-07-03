@@ -75,6 +75,11 @@ async def lifespan(app: FastAPI):
     await create_tables()
     print("[Server] Database tables created successfully")
 
+    from .services.light_migrations import run_light_migrations
+    from .database import engine as _engine
+    await run_light_migrations(_engine)
+    print("[Server] Light migrations applied")
+
     from .services.workflow_seed import seed_dev_workflow
     from .database import async_session_maker
     async with async_session_maker() as _s:

@@ -17,6 +17,7 @@ class Card(Base):
     title: Mapped[str] = mapped_column(String(255), nullable=False)
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     column_id: Mapped[str] = mapped_column(String(20), nullable=False, default="backlog")
+    project_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
     spec_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     model_plan: Mapped[str] = mapped_column(String(20), default="opus-4.5", nullable=False)
     model_implement: Mapped[str] = mapped_column(String(20), default="opus-4.5", nullable=False)
