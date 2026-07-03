@@ -70,3 +70,8 @@ npm-debug.log*
 # Temporary image uploads
 /tmp/
 tmp/
+
+# Orchestrator database (banco unico via DATABASE_URL)
+backend/orchestrator.db
+backend/orchestrator.db-wal
+backend/orchestrator.db-shm

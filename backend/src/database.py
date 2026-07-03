@@ -51,19 +51,8 @@ async def create_tables() -> None:
 
 
 def get_session():
-    """
-    Get session factory for current project.
-
-    Returns:
-        Session factory for the current project
-    """
-    from .database_manager import db_manager
-
-    try:
-        return db_manager.get_current_session()
-    except RuntimeError:
-        # Fallback to legacy session if no project loaded
-        return async_session_maker
+    """Session factory unica (banco unico via DATABASE_URL)."""
+    return async_session_maker
 
 
 async def get_db() -> AsyncGenerator[AsyncSession, None]:
