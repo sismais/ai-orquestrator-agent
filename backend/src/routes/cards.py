@@ -56,11 +56,11 @@ def card_to_dict(card: Card) -> dict:
 
 
 @router.get("", response_model=CardsListResponse)
-async def get_all_cards(db: AsyncSession = Depends(get_db)):
-    """Get all cards with active executions and token stats."""
+async def get_all_cards(projectId: str | None = Query(default=None), db: AsyncSession = Depends(get_db)):
+    """Get all cards with active executions and token stats (optionally scoped by project)."""
     repo = CardRepository(db)
     exec_repo = ExecutionRepository(db)
-    cards = await repo.get_all()
+    cards = await repo.get_all(project_id=projectId)
 
     # Para cada card, buscar execução ativa e token stats
     cards_with_execution = []
@@ -147,7 +147,7 @@ async def get_card(card_id: str, db: AsyncSession = Depends(get_db)):
 async def create_card(card_data: CardCreate, db: AsyncSession = Depends(get_db)):
     """Create a new card in the backlog column."""
     repo = CardRepository(db)
-    card = await repo.create(card_data)
+    card = await repo.create(card_data, project_id=card_data.project_id)
 
     # Broadcast the new card via WebSocket
     from ..services.card_ws import card_ws_manager

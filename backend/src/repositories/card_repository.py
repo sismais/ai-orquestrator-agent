@@ -31,9 +31,12 @@ class CardRepository:
     def __init__(self, session: AsyncSession):
         self.session = session
 
-    async def get_all(self, include_archived: bool = True) -> list[Card]:
-        """Get all cards ordered by creation date."""
-        query = select(Card).order_by(Card.created_at)
+    async def get_all(self, project_id: Optional[str] = None, include_archived: bool = True) -> list[Card]:
+        """Get all cards ordered by creation date, optionally scoped by project."""
+        query = select(Card)
+        if project_id is not None:
+            query = query.where(Card.project_id == project_id)
+        query = query.order_by(Card.created_at)
         result = await self.session.execute(query)
         return list(result.scalars().all())
 
@@ -44,10 +47,11 @@ class CardRepository:
         )
         return result.scalar_one_or_none()
 
-    async def create(self, card_data: CardCreate) -> Card:
+    async def create(self, card_data: CardCreate, project_id: Optional[str] = None) -> Card:
         """Create a new card in the backlog column."""
         card = Card(
             id=str(uuid4()),
+            project_id=project_id if project_id is not None else getattr(card_data, "project_id", None),
             title=card_data.title,
             description=card_data.description,
             column_id="backlog",

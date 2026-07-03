@@ -97,6 +97,7 @@ class CardCreate(CardBase):
     test_error_context: Optional[str] = Field(None, alias="testErrorContext")
     base_branch: Optional[str] = Field(None, alias="baseBranch")  # Branch base para o worktree
     dependencies: Optional[List[str]] = Field(default_factory=list)  # Card IDs this card depends on
+    project_id: Optional[str] = Field(None, alias="projectId")
 
     class Config:
         populate_by_name = True
