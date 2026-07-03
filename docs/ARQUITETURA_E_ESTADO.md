@@ -58,6 +58,17 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - **Ainda NÃO faz:** push/PR/CI/ready-to-merge (**3c**); trilha SDD completa no `plan` (hoje só planner); model-por-etapa;
   auto-cleanup completo de worktree (helper existe; hoje mantém a worktree p/ 3c/inspeção).
 
+### Interação humana no card (Pause-or-Decide fechado)
+- Ao **pausar**, a pergunta do agente vira **comentário no card** (`activity_logs`, `COMMENTED`, autor em `user_id`
+  = `agent`/`human`). `POST /api/projects/{pid}/cards/{cid}/answer` grava o comentário do humano e **retoma o pipeline
+  automaticamente** (`run_pipeline(resume_stage, human_answer)`), reusando a worktree e injetando a resposta no prompt
+  da etapa. Etapa de retomada: `plan`→`plan`, `implement`→`implement`, `review`(não-convergência)→`implement`.
+- **Provado (real, spike-loop-test):** pausou no `plan` (pergunta) → resposta → replanejou → `implement` → pausou de
+  novo (`needs_human`) → resposta → implementou → `review` → `validate_ci`. Front: `PipelineControls` mostra a pergunta
+  + caixa "Responder e retomar" no card `paused`. Spec: `specs/2026-07-03-panel-interacao-humana-no-card-design.md`.
+- **Próximo (fora deste escopo):** chat ao vivo bidirecional durante a execução + **Stop** no meio (exige sessão
+  persistente `ClaudeSDKClient` em vez do `query()` por etapa).
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
