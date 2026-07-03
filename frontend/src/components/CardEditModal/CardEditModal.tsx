@@ -8,9 +8,10 @@ import {
 } from '../../utils/imageHandler';
 import { API_ENDPOINTS } from '../../api/config';
 import { GitDiffViewer } from '../GitDiffViewer';
+import { CardInteraction } from '../CardInteraction';
 import styles from './CardEditModal.module.css';
 
-type TabId = 'details' | 'images' | 'changes';
+type TabId = 'details' | 'images' | 'changes' | 'interacao';
 
 interface CardEditModalProps {
   isOpen: boolean;
@@ -28,9 +29,11 @@ export function CardEditModal({ isOpen, onClose, card, onUpdateCard }: CardEditM
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
-  // Show Changes tab by default if card is in review/done and has diff stats
+  // Aba default: card pausado abre em Interacao; review/done com diff abre em Changes.
   useEffect(() => {
-    if ((card.columnId === 'review' || card.columnId === 'done') && card.diffStats) {
+    if (card.columnId === 'paused') {
+      setActiveTab('interacao');
+    } else if ((card.columnId === 'review' || card.columnId === 'done') && card.diffStats) {
       setActiveTab('changes');
     } else {
       setActiveTab('details');
@@ -181,6 +184,15 @@ export function CardEditModal({ isOpen, onClose, card, onUpdateCard }: CardEditM
               )}
             </button>
           )}
+          {(card.columnId === 'paused' || !!card.branchName) && (
+            <button
+              className={`${styles.tab} ${activeTab === 'interacao' ? styles.tabActive : ''}`}
+              onClick={() => setActiveTab('interacao')}
+            >
+              Interação
+              {card.columnId === 'paused' && <span className={styles.tabBadgeWaiting}>⏸ aguardando</span>}
+            </button>
+          )}
         </div>
 
         <div className={styles.content}>
@@ -285,6 +297,11 @@ export function CardEditModal({ isOpen, onClose, card, onUpdateCard }: CardEditM
             <div className={styles.changesTab}>
               <GitDiffViewer diffStats={card.diffStats} />
             </div>
+          )}
+
+          {/* Interacao Tab (interacao humana: pergunta do agente <-> resposta) */}
+          {activeTab === 'interacao' && (
+            <CardInteraction card={card} />
           )}
         </div>
 

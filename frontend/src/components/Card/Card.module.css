@@ -28,6 +28,31 @@
   opacity: 0.9;
 }
 
+/* Card aguardando resposta humana (pausado) — destaque ambar */
+.paused {
+  border-color: var(--accent-warning, #d9a441);
+  box-shadow: 0 0 0 1px var(--accent-warning, #d9a441), var(--shadow-card);
+}
+
+.pausedBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  align-self: flex-start;
+  padding: 6px 10px;
+  border: 1px solid var(--accent-warning, #d9a441);
+  border-radius: var(--radius-sm, 6px);
+  background: color-mix(in srgb, var(--accent-warning, #d9a441) 15%, transparent);
+  color: var(--accent-warning, #d9a441);
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.pausedBadge:hover {
+  background: color-mix(in srgb, var(--accent-warning, #d9a441) 25%, transparent);
+}
+
 /* Fix Badge */
 .fixCard {
   border-color: var(--accent-danger);

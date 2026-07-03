@@ -177,7 +177,7 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
       <div
         ref={setNodeRef}
         style={style}
-        className={`${styles.card} ${isDragging ? styles.dragging : ''} ${getStatusClass()} ${card.isFixCard ? styles.fixCard : ''}`}
+        className={`${styles.card} ${isDragging ? styles.dragging : ''} ${getStatusClass()} ${card.isFixCard ? styles.fixCard : ''} ${card.columnId === 'paused' ? styles.paused : ''}`}
         {...listeners}
         {...attributes}
       >
@@ -306,6 +306,16 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
             </div>
           )}
         </div>
+        {/* Card pausado: selo ambar que abre o modal na aba Interacao */}
+        {card.columnId === 'paused' && (
+          <button
+            className={styles.pausedBadge}
+            onClick={(e) => { e.stopPropagation(); setIsEditOpen(true); }}
+            title="Responder para retomar o trabalho"
+          >
+            ⏸ Aguardando você — responder
+          </button>
+        )}
         {/* Fase 3b-resto: execucao via pipeline orquestrado no backend */}
         <PipelineControls card={card} />
         {card.columnId === 'done' && (

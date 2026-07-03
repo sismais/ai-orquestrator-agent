@@ -403,6 +403,19 @@
   border-color: var(--accent-cyan);
 }
 
+.tabBadgeWaiting {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  padding: 2px 8px;
+  background: color-mix(in srgb, var(--accent-warning, #d9a441) 18%, transparent);
+  color: var(--accent-warning, #d9a441);
+  font-size: 0.7rem;
+  font-weight: 700;
+  border-radius: 6px;
+  border: 1px solid var(--accent-warning, #d9a441);
+}
+
 /* Changes Tab */
 .changesTab {
   min-height: 400px;
