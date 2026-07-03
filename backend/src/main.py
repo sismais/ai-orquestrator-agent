@@ -47,6 +47,7 @@ from .schemas.card import CardUpdate
 # Import models to register them with SQLAlchemy
 from .models.card import Card  # noqa: F401
 from .models.project import ActiveProject  # noqa: F401
+from .models.project_registry import Project  # noqa: F401
 from .models.orchestrator import Goal, OrchestratorAction, OrchestratorLog  # noqa: F401
 from .models.live import Vote, VotingRound, VotingOption, CompletedProject  # noqa: F401
 
