@@ -23,6 +23,26 @@
   color: var(--text, #e6e6ef);
 }
 
+.stopButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  margin-right: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--accent-danger, #e5484d);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  cursor: pointer;
+  background: color-mix(in srgb, var(--accent-danger, #e5484d) 15%, transparent);
+  color: var(--accent-danger, #e5484d);
+}
+
+.stopButton:hover {
+  background: color-mix(in srgb, var(--accent-danger, #e5484d) 25%, transparent);
+}
+
 .runButton:hover:not(:disabled),
 .logsButton:hover {
   opacity: 0.9;

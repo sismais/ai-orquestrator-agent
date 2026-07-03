@@ -257,9 +257,15 @@ async def run_pipeline(
                 extra["human_answer"] = pending_answer
                 pending_answer = None
             prompt = build_stage_prompt(col, card.title, card.description or "", worktree, extra)
-            res = await stage_fn(col, worktree, prompt, on_log=log)
+            res = await stage_fn(col, worktree, prompt, card_id=card_id, on_log=log)
             await log.flush()
             await account(res)
+            if res.interrupted:
+                await finish_pause(
+                    "interrompido pelo usuario", "O usuario parou a execucao para corrigir o rumo.",
+                    question="Você interrompeu o agente. O que devo ajustar ou fazer diferente?",
+                )
+                return
             if not res.ok:
                 await finish_pause(f"erro no estagio {col}", res.error)
                 return
@@ -310,9 +316,15 @@ async def run_pipeline(
                     fix_prompt = build_stage_prompt(
                         "implement", card.title, card.description or "", worktree, {"findings": f},
                     )
-                    fix_res = await stage_fn("implement", worktree, fix_prompt, on_log=log)
+                    fix_res = await stage_fn("implement", worktree, fix_prompt, card_id=card_id, on_log=log)
                     await log.flush()
                     await account(fix_res)
+                    if fix_res.interrupted:
+                        await finish_pause(
+                            "interrompido pelo usuario", "O usuario parou a correcao.",
+                            question="Você interrompeu. O que devo ajustar?",
+                        )
+                        return
                     if not fix_res.ok:
                         await finish_pause("erro no fix-loop", fix_res.error)
                         return

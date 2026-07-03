@@ -12,6 +12,7 @@ from ..models.execution import Execution, ExecutionLog, ExecutionStatus
 from ..models.project_registry import Project
 from ..repositories.activity_repository import ActivityRepository
 from ..repositories.card_repository import CardRepository
+from ..services import session_registry as sessions
 from ..services.pipeline_service import create_execution, run_pipeline
 
 router = APIRouter(prefix="/api/projects/{project_id}/cards", tags=["runner"])
@@ -79,6 +80,28 @@ async def answer_card(project_id: str, card_id: str, body: AnswerRequest,
         resume_stage=resume_stage, human_answer=message,
     ))
     return {"success": True, "executionId": execution_id, "resumeStage": resume_stage}
+
+
+@router.post("/{card_id}/stop")
+async def stop_card(project_id: str, card_id: str):
+    """Interrompe (Stop) o agente da etapa em execucao. O pipeline pausa o card para correcao."""
+    ok = await sessions.interrupt(card_id)
+    if not ok:
+        raise HTTPException(status_code=409, detail="Nenhuma execucao ativa para interromper")
+    return {"success": True, "interrupted": True}
+
+
+@router.post("/{card_id}/say")
+async def say_card(project_id: str, card_id: str, body: AnswerRequest, db: AsyncSession = Depends(get_db)):
+    """Fala com o agente ao vivo durante a execucao (injeta a mensagem na sessao). Incremento 2."""
+    message = (body.message or "").strip()
+    if not message:
+        raise HTTPException(status_code=400, detail="Mensagem vazia")
+    ok = await sessions.say(card_id, message)
+    if not ok:
+        raise HTTPException(status_code=409, detail="Nenhuma execucao ativa")
+    await ActivityRepository(db).add_comment(card_id, "human", message)
+    return {"success": True}
 
 
 @router.get("/{card_id}/execution")

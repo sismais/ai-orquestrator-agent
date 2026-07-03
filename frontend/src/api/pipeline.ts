@@ -43,6 +43,15 @@ export interface CardComment {
   timestamp: string;
 }
 
+/** Interrompe (Stop) o agente da etapa em execução; o pipeline pausa o card para correção. */
+export async function stopPipeline(projectId: string, cardId: string): Promise<void> {
+  const response = await fetch(`${base(projectId, cardId)}/stop`, { method: 'POST' });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || `Falha ao interromper: ${response.statusText}`);
+  }
+}
+
 /** Responde a pausa do card e RETOMA o pipeline automaticamente. */
 export async function answerPipeline(projectId: string, cardId: string, message: string): Promise<{ executionId: string }> {
   const response = await fetch(`${base(projectId, cardId)}/answer`, {

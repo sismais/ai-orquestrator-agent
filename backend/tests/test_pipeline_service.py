@@ -47,7 +47,7 @@ def make_stage_fn(script):
     """script: {stage_key: [texts...]} — devolvidos por chamada; default benigno."""
     counts: dict[str, int] = {}
 
-    async def fake(stage_key, worktree, prompt, on_log=None):
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None):
         if on_log:
             r = on_log(f"[{stage_key}] trabalhando...\n")
             if inspect.isawaitable(r):
@@ -143,7 +143,7 @@ async def test_resume_starts_at_stage_with_answer(maker):
         await s.commit()
     seen: dict[str, list] = {}
 
-    async def fake(stage_key, worktree, prompt, on_log=None):
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None):
         seen.setdefault(stage_key, []).append(prompt)
         text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
         return StageResult(ok=True, text=text, cost_usd=0.0)
@@ -156,6 +156,21 @@ async def test_resume_starts_at_stage_with_answer(maker):
     assert seen.get("implement")                    # comecou no implement
     assert "use a lib X" in seen["implement"][0]    # resposta humana injetada no prompt
     assert await _card_column(maker, card_id) == "validate_ci"
+
+
+async def test_interrupt_pauses_card(maker):
+    card_id = await _make_project_card(maker)
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None):
+        # simula Stop no implement
+        if stage_key == "implement":
+            return StageResult(ok=True, text="", interrupted=True)
+        return StageResult(ok=True, text=f"{stage_key} ok")
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "paused"
+    ex = await _last_execution(maker, card_id)
+    assert ex.status.value == "paused"
 
 
 async def test_pause_writes_agent_comment(maker):

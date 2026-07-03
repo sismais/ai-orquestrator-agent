@@ -12,13 +12,14 @@ from pathlib import Path
 from typing import Optional
 
 from claude_agent_sdk import (
-    query,
     ClaudeAgentOptions,
+    ClaudeSDKClient,
     AssistantMessage,
     TextBlock,
     ResultMessage,
 )
 
+from . import session_registry as sessions
 from .runner_service import DEVKIT_CLAUDE
 
 DEVKIT_AGENTS = DEVKIT_CLAUDE / "agents"
@@ -127,10 +128,16 @@ class StageResult:
     text: str = ""
     cost_usd: Optional[float] = None
     error: Optional[str] = None
+    interrupted: bool = False
 
 
-async def run_stage(stage_key: str, worktree: str, prompt: str, on_log=None) -> StageResult:
-    """Roda um estagio: query focada com o role do agente e as tools dele. on_log(str) opcional."""
+async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optional[str] = None,
+                    on_log=None) -> StageResult:
+    """Roda um estagio numa sessao streaming (ClaudeSDKClient) — interrompivel (Stop) via registry.
+
+    Registra a sessao em `session_registry[card_id]` enquanto roda, para a camada HTTP conseguir
+    `interrupt()`/`say()`. on_log(str) opcional (sync ou async).
+    """
     body, tools = load_stage_agent(stage_key)
     options = ClaudeAgentOptions(
         cwd=worktree,
@@ -142,8 +149,13 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, on_log=None) -> 
 
     texts: list[str] = []
     cost = None
+    client = ClaudeSDKClient(options)
     try:
-        async for message in query(prompt=prompt, options=options):
+        await client.connect()
+        if card_id:
+            sessions.register(card_id, client)
+        await client.query(prompt)
+        async for message in client.receive_response():
             if isinstance(message, AssistantMessage):
                 for block in message.content:
                     if isinstance(block, TextBlock) and block.text:
@@ -155,6 +167,20 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, on_log=None) -> 
             elif isinstance(message, ResultMessage):
                 cost = getattr(message, "total_cost_usd", None)
     except Exception as e:  # noqa: BLE001
-        return StageResult(ok=False, text="\n".join(texts), cost_usd=cost, error=str(e))
+        interrupted = bool(card_id and sessions.was_interrupted(card_id))
+        return StageResult(
+            ok=interrupted, text="\n".join(texts), cost_usd=cost,
+            error=None if interrupted else str(e), interrupted=interrupted,
+        )
+    finally:
+        if card_id:
+            sessions.unregister(card_id)
+        try:
+            await client.disconnect()
+        except Exception:  # noqa: BLE001
+            pass
 
-    return StageResult(ok=True, text="\n".join(texts), cost_usd=cost)
+    interrupted = bool(card_id and sessions.was_interrupted(card_id))
+    if card_id:
+        sessions.clear_interrupt(card_id)
+    return StageResult(ok=True, text="\n".join(texts), cost_usd=cost, interrupted=interrupted)

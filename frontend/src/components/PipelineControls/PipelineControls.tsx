@@ -1,11 +1,13 @@
-import { useCallback, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useExecutionWebSocket } from '../../hooks/useExecutionWebSocket';
-import { runPipeline, getExecution } from '../../api/pipeline';
+import { runPipeline, getExecution, stopPipeline } from '../../api/pipeline';
 import { LogsModal } from '../LogsModal';
 import type { Card as CardType, ExecutionLog } from '../../types';
 import styles from './PipelineControls.module.css';
 
 type RawStatus = 'idle' | 'running' | 'success' | 'error' | 'paused';
+
+const ACTIVE_STAGE_COLUMNS = ['plan', 'implement', 'review'];
 
 interface Props {
   card: CardType;
@@ -38,6 +40,27 @@ export function PipelineControls({ card }: Props) {
   }, []);
 
   useExecutionWebSocket(wsCardId, onComplete, onLog);
+
+  // Card numa etapa ativa (plan/implement/review): se ha execucao rodando, liga o Stop + logs ao vivo.
+  useEffect(() => {
+    if (status !== 'idle' || !projectId || !ACTIVE_STAGE_COLUMNS.includes(card.columnId)) return;
+    let alive = true;
+    getExecution(projectId, card.id).then(state => {
+      if (alive && state.execution?.isActive && state.execution.status === 'running') {
+        setStatus('running');
+        setWsCardId(card.id);
+      }
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [card.columnId, card.id, projectId, status]);
+
+  const handleStop = useCallback(async (e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (!projectId) return;
+    try {
+      await stopPipeline(projectId, card.id);
+    } catch { /* 409 = nada rodando; ignore */ }
+  }, [projectId, card.id]);
 
   const handleRun = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -96,6 +119,12 @@ export function PipelineControls({ card }: Props) {
             ? <span className={styles.spinner} />
             : <svg width="15" height="15" viewBox="0 0 16 16" fill="currentColor"><path d="M4 2l10 6-10 6V2z" /></svg>}
           {isRunning ? 'Executando...' : 'Run'}
+        </button>
+      )}
+
+      {isRunning && (
+        <button className={styles.stopButton} onClick={handleStop} title="Interromper o agente para corrigir">
+          ⏹ Stop
         </button>
       )}
 
