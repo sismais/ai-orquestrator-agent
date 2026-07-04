@@ -38,7 +38,11 @@ def stub_git(monkeypatch, tmp_path):
     async def fake_diff(self, worktree_path, base_branch):
         return "diff --git a/x b/x\n+mudou"
 
+    async def fake_validate_ci(**kwargs):
+        return {"status": "ok", "pr_url": "http://pr/1"}
+
     monkeypatch.setattr(pipeline_service, "prepare_worktree", fake_prepare)
+    monkeypatch.setattr(pipeline_service, "run_validate_ci", fake_validate_ci)
     monkeypatch.setattr(GitWorkspaceManager, "commit_all", fake_commit)
     monkeypatch.setattr(GitWorkspaceManager, "diff_against_base", fake_diff)
 
@@ -89,7 +93,7 @@ async def test_happy_path_lands_on_validate_ci(maker):
     fake, counts = make_stage_fn({"review": ['{"blocks":[],"fixNow":[],"suggestions":[]}']})
     await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
 
-    assert await _card_column(maker, card_id) == "validate_ci"
+    assert await _card_column(maker, card_id) == "ready_to_merge"
     ex = await _last_execution(maker, card_id)
     assert ex.status.value == "success"
     assert counts.get("plan") == 1 and counts.get("implement") == 1 and counts.get("review") == 1
@@ -103,7 +107,7 @@ async def test_fix_loop_runs_implement_twice(maker):
     ]})
     await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
 
-    assert await _card_column(maker, card_id) == "validate_ci"
+    assert await _card_column(maker, card_id) == "ready_to_merge"
     assert counts.get("implement") == 2 and counts.get("review") == 2
 
 
@@ -155,7 +159,7 @@ async def test_resume_starts_at_stage_with_answer(maker):
     assert "plan" not in seen                       # retomou sem refazer o plan
     assert seen.get("implement")                    # comecou no implement
     assert "use a lib X" in seen["implement"][0]    # resposta humana injetada no prompt
-    assert await _card_column(maker, card_id) == "validate_ci"
+    assert await _card_column(maker, card_id) == "ready_to_merge"
 
 
 async def test_interrupt_pauses_card(maker):

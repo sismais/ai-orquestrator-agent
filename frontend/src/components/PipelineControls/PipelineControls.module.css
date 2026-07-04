@@ -43,6 +43,25 @@
   background: color-mix(in srgb, var(--accent-danger, #e5484d) 25%, transparent);
 }
 
+.prLink {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  padding: 6px 12px;
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 700;
+  text-decoration: none;
+  background: color-mix(in srgb, var(--accent-primary, #6d5efc) 15%, transparent);
+  color: var(--accent-primary, #6d5efc);
+  border: 1px solid var(--accent-primary, #6d5efc);
+}
+
+.prLink:hover {
+  background: color-mix(in srgb, var(--accent-primary, #6d5efc) 25%, transparent);
+}
+
 .runButton:hover:not(:disabled),
 .logsButton:hover {
   opacity: 0.9;

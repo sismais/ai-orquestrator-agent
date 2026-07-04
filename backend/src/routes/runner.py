@@ -125,6 +125,7 @@ async def get_card_execution(project_id: str, card_id: str, db: AsyncSession = D
             "status": execution.status.value if execution.status else None,
             "workflowStage": execution.workflow_stage,
             "workflowError": execution.workflow_error,
+            "prUrl": execution.result if (execution.result or "").startswith("http") else None,
             "costUsd": float(execution.execution_cost) if execution.execution_cost else None,
             "isActive": execution.is_active,
             "startedAt": execution.started_at.isoformat() if execution.started_at else None,

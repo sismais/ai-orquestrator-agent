@@ -11,6 +11,7 @@ export interface PipelineExecution {
   status: 'idle' | 'running' | 'success' | 'error' | 'paused' | null;
   workflowStage?: string | null;
   workflowError?: string | null;
+  prUrl?: string | null;
   costUsd?: number | null;
   isActive?: boolean;
   startedAt?: string | null;

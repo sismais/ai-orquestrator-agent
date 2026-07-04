@@ -32,13 +32,20 @@ from ..services.findings import (
 from ..services.runner_service import prepare_worktree
 from ..services.stage_runner import (
     build_stage_prompt,
-    has_stage,
     run_stage as _default_run_stage,
 )
+from ..services.validate_ci_stage import run_validate_ci
 from ..services.workflow_rules import next_active_column
 
 DEFAULT_MAX_ITERATIONS = 4
 _LOG_FLUSH_CHARS = 800
+
+# Colunas que o pipeline executa: estagios de agente + validate_ci (git/gh, tratado a parte).
+_AGENT_STAGES = ("plan", "implement", "review")
+
+
+def _pipeline_handles(col: Optional[str]) -> bool:
+    return col in _AGENT_STAGES or col == "validate_ci"
 
 
 class _LogSink:
@@ -100,8 +107,8 @@ def _format_questions(pend: list) -> str:
 
 
 def _first_stage(transitions: dict, current: str) -> Optional[str]:
-    """Onde comecar: a propria coluna se ja e um estagio, senao a proxima ativa."""
-    if has_stage(current):
+    """Onde comecar: a propria coluna se o pipeline a trata, senao a proxima ativa."""
+    if _pipeline_handles(current):
         return current
     return next_active_column(transitions, current)
 
@@ -235,7 +242,7 @@ async def run_pipeline(
         col = resume_stage or _first_stage(transitions, card.column_id)
 
         # 2) laco de estagios
-        while col and has_stage(col):
+        while col and _pipeline_handles(col):
             prev = card.column_id
             moved, err = await repo.move(card_id, col)
             await s.commit()
@@ -246,6 +253,23 @@ async def run_pipeline(
             await _broadcast_moved(card, prev, col)
             execution.workflow_stage = col
             await s.commit()
+
+            # validate_ci: push -> PR draft -> espera CI -> ready_to_merge (git/gh, nao um agente)
+            if col == "validate_ci":
+                await log.event("── estagio: validate_ci ──")
+                vres = await run_validate_ci(
+                    worktree=worktree, branch=card.branch_name or "", base_branch=base_branch,
+                    card=card, project=project, gm=gm, log=log, stage_fn=stage_fn,
+                    max_iterations=max_iterations,
+                )
+                if vres["status"] == "pause":
+                    await finish_pause(vres["reason"], vres.get("context"), question=vres.get("question"))
+                    return
+                if vres.get("pr_url"):
+                    execution.result = vres["pr_url"]
+                    await s.commit()
+                col = next_active_column(transitions, "validate_ci")  # -> ready_to_merge (para)
+                continue
             await log.event(f"── estagio: {col} ──")
 
             extra: dict = {}
@@ -335,10 +359,10 @@ async def run_pipeline(
                     await gm.commit_all(worktree, f"fix: {card.title[:50]} #{iteration}")
                     col = "review"  # re-revisa no topo do laco
                     continue
-                col = next_active_column(transitions, "review")  # -> validate_ci (sem handler) -> para
+                col = next_active_column(transitions, "review")  # -> validate_ci
 
-        # 3) parada limpa na fronteira (ex.: validate_ci = handoff 3c): avanca e encerra
-        if col and not has_stage(col) and card.column_id != col:
+        # 3) parada limpa na fronteira (ex.: ready_to_merge): avanca e encerra
+        if col and not _pipeline_handles(col) and card.column_id != col:
             prev = card.column_id
             moved, err = await repo.move(card_id, col)
             await s.commit()

@@ -29,6 +29,7 @@ STAGE_AGENTS: dict[str, tuple[str, list[str]]] = {
     "plan": ("sismais-dev-planner", ["Read", "Glob", "Grep"]),
     "implement": ("sismais-dev-implementer", ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]),
     "review": ("sismais-dev-reviewer", ["Read", "Glob", "Grep", "Bash"]),
+    "ci-triage": ("sismais-dev-ci-triage", ["Read", "Glob", "Grep", "Bash"]),
 }
 
 
@@ -104,6 +105,15 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
             "Leia o codigo real, nao confie em relatos. Devolva SO o JSON de achados "
             "(`blocks`/`fixNow`/`suggestions`), sem prosa fora dele.\n\n"
             f"```diff\n{diff}\n```"
+        )
+
+    if stage_key == "ci-triage":
+        ci_log = extra.get("ci_log") or "(sem log)"
+        diff = extra.get("diff") or "(diff vazio)"
+        return (
+            f"{header}\n\nUma check de CI falhou. Julgue se a falha e causada pelo diff. "
+            'Devolva SO o JSON `{ "verdict": "related" | "unrelated", "porque": "..." }`.\n\n'
+            f"Log da CI:\n```\n{ci_log}\n```\n\nDiff do PR:\n```diff\n{diff}\n```"
         )
 
     # fallback generico

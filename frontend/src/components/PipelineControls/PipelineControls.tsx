@@ -26,6 +26,7 @@ export function PipelineControls({ card }: Props) {
   const [startedAt, setStartedAt] = useState<string | undefined>();
   const [completedAt, setCompletedAt] = useState<string | undefined>();
   const [wsCardId, setWsCardId] = useState<string | null>(null);
+  const [prUrl, setPrUrl] = useState<string | null>(null);
 
   const onLog = useCallback((msg: { logType: string; content: string; timestamp: string }) => {
     const type: ExecutionLog['type'] = msg.logType === 'error'
@@ -62,6 +63,16 @@ export function PipelineControls({ card }: Props) {
       setWsCardId(null);
     }
   }, [isActiveStage, status]);
+
+  // Busca o link do PR quando o card chega no ready_to_merge (Fase 3c).
+  useEffect(() => {
+    if (card.columnId !== 'ready_to_merge' || !projectId || prUrl) return;
+    let alive = true;
+    getExecution(projectId, card.id).then(state => {
+      if (alive && state.execution?.prUrl) setPrUrl(state.execution.prUrl);
+    }).catch(() => {});
+    return () => { alive = false; };
+  }, [card.columnId, card.id, projectId, prUrl]);
 
   const handleStop = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -135,6 +146,19 @@ export function PipelineControls({ card }: Props) {
         <button className={styles.stopButton} onClick={handleStop} title="Interromper o agente para corrigir">
           ⏹ Stop
         </button>
+      )}
+
+      {prUrl && (
+        <a
+          className={styles.prLink}
+          href={prUrl}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={(e) => e.stopPropagation()}
+          title="Abrir o Pull Request (draft) no GitHub"
+        >
+          🔗 Ver PR
+        </a>
       )}
 
       {(isRunning || logs.length > 0 || status !== 'idle' || !!card.branchName) && card.columnId !== 'backlog' && (

@@ -90,6 +90,20 @@ def parse_pending_questions(text: str) -> list:
     return _as_list(obj.get("pendingQuestions"))
 
 
+def parse_ci_verdict(text: str) -> dict:
+    """Extrai {verdict, porque} do ci-triage. Default conservador: 'related' se nao parsear
+    (assim o orquestrador tenta corrigir em vez de ignorar uma falha real)."""
+    if text:
+        obj = _last_matching(text, lambda o: "verdict" in o)
+        if obj is not None:
+            v = str(obj.get("verdict", "")).lower()
+            return {
+                "verdict": "unrelated" if v == "unrelated" else "related",
+                "porque": obj.get("porque") or obj.get("why") or "",
+            }
+    return {"verdict": "related", "porque": ""}
+
+
 _NEEDS_HUMAN_RE = re.compile(
     r'(?:"?status"?\s*[:=]\s*"?needs_human"?|needs[_\s-]?human)',
     re.IGNORECASE,
