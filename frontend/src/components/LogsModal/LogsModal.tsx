@@ -1,4 +1,4 @@
-import { useEffect, useRef, useMemo } from 'react';
+import { useEffect, useRef, useMemo, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { ExecutionLog, ExecutionHistory, CostStats } from '../../types';
 import { formatCost } from '../../utils/costCalculator';
@@ -14,6 +14,7 @@ interface LogsModalProps {
   completedAt?: string;
   history?: ExecutionHistory[]; // Histórico completo de execuções
   costStats?: CostStats; // Estatísticas de custo
+  onSay?: (message: string) => Promise<void>; // falar com o agente ao vivo (quando rodando)
 }
 
 export function LogsModal({
@@ -25,9 +26,25 @@ export function LogsModal({
   startedAt,
   completedAt,
   history,
-  costStats
+  costStats,
+  onSay
 }: LogsModalProps) {
   const logsEndRef = useRef<HTMLDivElement>(null);
+  const [sayText, setSayText] = useState('');
+  const [saying, setSaying] = useState(false);
+
+  const handleSay = async () => {
+    const msg = sayText.trim();
+    if (!msg || !onSay || saying) return;
+    setSaying(true);
+    try {
+      await onSay(msg);
+      setSayText('');
+    } catch { /* erro exibido via logs */ }
+    finally {
+      setSaying(false);
+    }
+  };
   const scrollPositionRef = useRef(0);
 
   // Scroll to bottom when new logs arrive
@@ -384,6 +401,22 @@ export function LogsModal({
             </div>
           )}
         </div>
+
+        {onSay && status === 'running' && (
+          <div className={styles.sayRow}>
+            <input
+              className={styles.sayInput}
+              value={sayText}
+              onChange={(e) => setSayText(e.target.value)}
+              onKeyDown={(e) => { if (e.key === 'Enter') handleSay(); }}
+              placeholder="Falar com o agente ao vivo (ele considera sem parar)…"
+              disabled={saying}
+            />
+            <button className={styles.sayButton} onClick={handleSay} disabled={saying || !sayText.trim()}>
+              {saying ? '…' : 'Enviar'}
+            </button>
+          </div>
+        )}
       </div>
     </div>,
     portalRoot

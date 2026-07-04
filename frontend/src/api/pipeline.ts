@@ -53,6 +53,19 @@ export async function stopPipeline(projectId: string, cardId: string): Promise<v
   }
 }
 
+/** Fala com o agente AO VIVO durante a execução (injeta a mensagem na sessão, sem parar). */
+export async function sayToPipeline(projectId: string, cardId: string, message: string): Promise<void> {
+  const response = await fetch(`${base(projectId, cardId)}/say`, {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    body: JSON.stringify({ message }),
+  });
+  if (!response.ok) {
+    const err = await response.json().catch(() => ({}));
+    throw new Error(err.detail || `Falha ao falar com o agente: ${response.statusText}`);
+  }
+}
+
 /** Responde a pausa do card e RETOMA o pipeline automaticamente. */
 export async function answerPipeline(projectId: string, cardId: string, message: string): Promise<{ executionId: string }> {
   const response = await fetch(`${base(projectId, cardId)}/answer`, {

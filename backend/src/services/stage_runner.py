@@ -165,17 +165,27 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optiona
         if card_id:
             sessions.register(card_id, client)
         await client.query(prompt)
-        async for message in client.receive_response():
-            if isinstance(message, AssistantMessage):
-                for block in message.content:
-                    if isinstance(block, TextBlock) and block.text:
-                        texts.append(block.text)
-                        if on_log:
-                            r = on_log(block.text)
-                            if inspect.isawaitable(r):
-                                await r
-            elif isinstance(message, ResultMessage):
-                cost = getattr(message, "total_cost_usd", None)
+        # Laco multi-turno: alem do turno inicial, recebe as respostas de mensagens injetadas
+        # ao vivo pelo humano (/say). Encerra quando nao ha mais mensagem pendente (ou no Stop).
+        while True:
+            async for message in client.receive_response():
+                if isinstance(message, AssistantMessage):
+                    for block in message.content:
+                        if isinstance(block, TextBlock) and block.text:
+                            texts.append(block.text)
+                            if on_log:
+                                r = on_log(block.text)
+                                if inspect.isawaitable(r):
+                                    await r
+                elif isinstance(message, ResultMessage):
+                    c = getattr(message, "total_cost_usd", None)
+                    if c is not None:
+                        cost = c
+            if card_id and sessions.was_interrupted(card_id):
+                break
+            if card_id and sessions.take_say(card_id):
+                continue  # o humano falou no meio -> recebe a resposta do agente
+            break
     except Exception as e:  # noqa: BLE001
         interrupted = bool(card_id and sessions.was_interrupted(card_id))
         return StageResult(

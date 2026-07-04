@@ -10,15 +10,27 @@ from typing import Optional
 # card_id -> ClaudeSDKClient (tipado como object p/ nao acoplar o import do SDK aqui)
 _active: dict[str, object] = {}
 _interrupted: dict[str, bool] = {}
+_pending_says: dict[str, int] = {}  # mensagens do humano injetadas aguardando resposta do agente
 
 
 def register(card_id: str, client: object) -> None:
     _active[card_id] = client
     _interrupted.pop(card_id, None)
+    _pending_says.pop(card_id, None)
 
 
 def unregister(card_id: str) -> None:
     _active.pop(card_id, None)
+    _pending_says.pop(card_id, None)
+
+
+def take_say(card_id: str) -> bool:
+    """Consome uma mensagem pendente (True se havia) — o runner recebe a resposta dela."""
+    n = _pending_says.get(card_id, 0)
+    if n > 0:
+        _pending_says[card_id] = n - 1
+        return True
+    return False
 
 
 def is_active(card_id: str) -> bool:
@@ -53,6 +65,7 @@ async def say(card_id: str, message: str) -> bool:
         return False
     try:
         await client.query(message)  # type: ignore[attr-defined]
+        _pending_says[card_id] = _pending_says.get(card_id, 0) + 1
         return True
     except Exception:  # noqa: BLE001
         return False
