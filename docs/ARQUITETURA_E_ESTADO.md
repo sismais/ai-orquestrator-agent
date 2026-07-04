@@ -55,8 +55,21 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
   Review limpo → avança pra `validate_ci` e **para** (fronteira 3c).
 - **Provado (real, spike-loop-test):** card percorreu plan→implement→review com **2 voltas de fix-loop** e parou em
   `validate_ci` (~$2 via Max); painel de logs no board renderiza o histórico. Estado/logs nas tabelas `executions`/`execution_logs`.
-- **Ainda NÃO faz:** push/PR/CI/ready-to-merge (**3c**); trilha SDD completa no `plan` (hoje só planner); model-por-etapa;
-  auto-cleanup completo de worktree (helper existe; hoje mantém a worktree p/ 3c/inspeção).
+- **Ainda NÃO faz:** trilha SDD completa no `plan` (hoje só planner); model-por-etapa; auto-cleanup de worktree.
+
+### validate_ci → PR draft → espera CI → ready_to_merge (Fase 3c — provada)
+- Coluna `validate_ci` ganhou handler próprio (git/gh, não um agente): `services/validate_ci_stage.run_validate_ci` +
+  `services/pr_service.py` (push/PR/CI via `gh`). O dispatcher do pipeline roteia `plan|implement|review`→agente,
+  `validate_ci`→`run_validate_ci`.
+- Fluxo: **valida local** (se `project.validateCommand`, com fix-loop) → **push** da branch → **`gh pr create --draft`**
+  (idempotente; URL na `Execution.result`, exposta em `GET .../execution` como `prUrl`) → **espera CI** (poll de
+  `gh pr view --json statusCheckRollup`; sem checks = verde) → verde → card em **`ready_to_merge`** e run `success`.
+  CI vermelha → **ci-triage** (`sismais-dev-ci-triage`): `related`→implementer corrige→push→re-espera; `unrelated`→segue;
+  teto→pausa. **Nunca faz merge nem promove o PR a ready** — para no ready_to_merge (decisão do humano).
+- Front: link **🔗 Ver PR** no card em ready_to_merge.
+- **Provado (real):** `pr_service` fez push + abriu **PR draft #2** no spike-loop-test (draft/OPEN, idempotente),
+  check_status leu `none` (sem CI → verde). Orquestração coberta por 43 testes unitários. Spec:
+  `specs/2026-07-03-panel-fase3c-pr-ci-design.md`. (PR de teste fechado/branch apagada após o smoke.)
 
 ### Interação humana no card (Pause-or-Decide fechado)
 - Ao **pausar**, a pergunta do agente vira **comentário no card** (`activity_logs`, `COMMENTED`, autor em `user_id`
@@ -108,7 +121,7 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 | 3a | Board dirigido por config (colunas + move por config); auto-run desligado | ✅ |
 | **3b-core** | **Runner executa agente real em worktree do projeto** | ✅ **provado** |
 | **3b-resto** | Sequenciar colunas, streaming de logs pro board (WS+lote), fix-loop, Pause-or-Decide, avançar coluna, commit pelo backend | ✅ **provado** |
-| 3c | push → `gh pr create --draft` → espera-CI (`ci-triage`) → **para no ready-to-merge** | ⏳ |
+| **3c** | push → `gh pr create --draft` → espera-CI (`ci-triage`) → **para no ready-to-merge** | ✅ **provado** |
 | 3d | Remover `ActiveProject`/`database_manager`/ativo-global; cortar Live/Orchestrator/Gemini; consolidar os 2 controles de projeto | ⏳ |
 
 ## Design/planos versionados (superpowers) — começar por aqui ao retomar
