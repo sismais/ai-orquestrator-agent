@@ -2,12 +2,8 @@ import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
 import { Card as CardType, Column, ColumnId, ExecutionStatus, WorkflowStatus } from '../types';
 import { Board } from '../components/Board/Board';
 import { Card } from '../components/Card/Card';
-import { Project } from '../types';
-import { ProjectLoader } from '../components/ProjectLoader/ProjectLoader';
-import { ProjectSwitcher } from '../components/ProjectSwitcher';
 import { ProjectSelectorRegistry } from '../components/ProjectSelectorRegistry/ProjectSelectorRegistry';
 import { AddCard } from '../components/AddCard/AddCard';
-import { LiveModeControl } from '../components/LiveModeControl';
 import styles from './KanbanPage.module.css';
 
 interface KanbanPageProps {
@@ -28,9 +24,6 @@ interface KanbanPageProps {
   onToggleArchivedCollapse: () => void;
   isCanceladoCollapsed: boolean;
   onToggleCanceladoCollapse: () => void;
-  currentProject: Project | null;
-  onProjectSwitch: (project: Project | null) => void;
-  onProjectLoad: (project: Project | null) => void;
   fetchLogsHistory?: (cardId: string) => Promise<{ cardId: string; history: any[] } | null>;
   loadingExpertsCardId?: string | null;
   currentProjectId: string | null;
@@ -55,9 +48,6 @@ const KanbanPage = ({
   onToggleArchivedCollapse,
   isCanceladoCollapsed,
   onToggleCanceladoCollapse,
-  currentProject,
-  onProjectSwitch,
-  onProjectLoad,
   fetchLogsHistory,
   loadingExpertsCardId,
   currentProjectId,
@@ -73,20 +63,11 @@ const KanbanPage = ({
           </p>
         </div>
         <div className={styles.projectActions}>
-          <LiveModeControl />
           <ProjectSelectorRegistry
             currentProjectId={currentProjectId}
             onSwitch={onProjectIdSwitch}
           />
           <AddCard columnId="backlog" onAdd={onAddCard} projectId={currentProjectId} />
-          <ProjectSwitcher
-            currentProject={currentProject}
-            onProjectSwitch={onProjectSwitch}
-          />
-          <ProjectLoader
-            currentProject={currentProject}
-            onProjectLoad={onProjectLoad}
-          />
         </div>
       </div>
 

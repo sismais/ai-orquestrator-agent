@@ -1,13 +1,12 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { Card as CardType, Column, ColumnId, ExecutionStatus, Project, WorkflowStatus, WorkflowStage } from './types';
+import { Card as CardType, Column, ColumnId, ExecutionStatus, WorkflowStatus, WorkflowStage } from './types';
 import { useAgentExecution } from './hooks/useAgentExecution';
 import { useWorkflowAutomation } from './hooks/useWorkflowAutomation';
 import { useChat } from './hooks/useChat';
 import { useViewPersistence } from './hooks/useViewPersistence';
 import { useCardWebSocket, CardMovedMessage, CardUpdatedMessage, CardCreatedMessage } from './hooks/useCardWebSocket';
 import * as cardsApi from './api/cards';
-import { getCurrentProject } from './api/projects';
 import WorkspaceLayout, { ModuleType } from './layouts/WorkspaceLayout';
 import HomePage from './pages/HomePage';
 import KanbanPage from './pages/KanbanPage';
@@ -32,7 +31,6 @@ function App() {
   const [isCanceladoCollapsed, setIsCanceladoCollapsed] = useState(false);
   const [initialExecutions, setInitialExecutions] = useState<Map<string, ExecutionStatus> | undefined>();
   const [initialWorkflowStatuses, setInitialWorkflowStatuses] = useState<Map<string, WorkflowStatus> | undefined>();
-  const [currentProject, setCurrentProject] = useState<Project | null>(null);
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(() => localStorage.getItem('orq.currentProjectId'));
   const [boardColumns, setBoardColumns] = useState<Column[]>([]);
   const [boardTransitions, setBoardTransitions] = useState<Record<string, string[]>>({});
@@ -179,20 +177,6 @@ function App() {
         // Load cards (scoped to the selected project, when one is set)
         const loadedCards = await cardsApi.fetchCards(currentProjectId ?? undefined);
         setCards(loadedCards);
-
-        // Load current project
-        try {
-          const project = await getCurrentProject();
-          if (project) {
-            setCurrentProject(project);
-          }
-        } catch (error) {
-          console.warn('[App] Failed to load current project:', error);
-          // Ignorar erro se o backend não estiver disponível
-          if (error instanceof Error && error.message.includes('Backend não está rodando')) {
-            console.info('[App] Backend não disponível - funcionalidade de projetos desabilitada');
-          }
-        }
 
         // Construir mapa de execuções ativas e workflow statuses
         // IMPORTANTE: Incluir cards em "done" para manter histórico de logs acessível
@@ -691,9 +675,6 @@ function App() {
             onToggleArchivedCollapse={() => setIsArchivedCollapsed(!isArchivedCollapsed)}
             isCanceladoCollapsed={isCanceladoCollapsed}
             onToggleCanceladoCollapse={() => setIsCanceladoCollapsed(!isCanceladoCollapsed)}
-            currentProject={currentProject}
-            onProjectSwitch={setCurrentProject}
-            onProjectLoad={setCurrentProject}
             fetchLogsHistory={fetchLogsHistory}
             loadingExpertsCardId={loadingExpertsCardId}
             currentProjectId={currentProjectId}
