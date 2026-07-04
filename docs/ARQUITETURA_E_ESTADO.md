@@ -110,6 +110,14 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
   substituído/deduplicado pelo runner; hoje o board **não** dispara mais o auto-run no drag
   (`AUTO_RUN_ON_DRAG = false` em `App.tsx`).
 
+> **3d — remoção do legado de backend está ADIADA (entrelaçamento real, mapeado em 2026-07-03):**
+> `chat_service.py` (feature **Chat**, ativa) importa `agent.py` **e** `orchestrator_service`; `agent.py`
+> importa `live_broadcast_service`; `orchestrator_service`/`voting_service` importam `live`. E `metrics` tem
+> **FK para `ActiveProject`**. Ou seja, arrancar agent.py/orchestrator/live/ActiveProject **quebra o Chat e o
+> metrics**. Cortar isso com segurança = untangle do Chat + migração de metrics — esforço dedicado à parte, não
+> um "corte limpo". Enquanto isso: código desligado, sem causar bug. **A consolidação do header (a dor real de
+> UX) já foi feita.**
+
 ## Estado das fases
 
 | Fase | O quê | Status |
@@ -122,7 +130,8 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 | **3b-core** | **Runner executa agente real em worktree do projeto** | ✅ **provado** |
 | **3b-resto** | Sequenciar colunas, streaming de logs pro board (WS+lote), fix-loop, Pause-or-Decide, avançar coluna, commit pelo backend | ✅ **provado** |
 | **3c** | push → `gh pr create --draft` → espera-CI (`ci-triage`) → **para no ready-to-merge** | ✅ **provado** |
-| 3d | Remover `ActiveProject`/`database_manager`/ativo-global; cortar Live/Orchestrator/Gemini; consolidar os 2 controles de projeto | ⏳ |
+| 3d | Consolidar os 2 controles de projeto no header | ✅ **feito** |
+| 3d-resto | Remover `ActiveProject`/`database_manager`/ativo-global; cortar Live/Orchestrator/Gemini/agent.py | ⚠️ **adiado (entrelaçado)** |
 
 ## Design/planos versionados (superpowers) — começar por aqui ao retomar
 
