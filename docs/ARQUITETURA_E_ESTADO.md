@@ -85,8 +85,10 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - `POST /api/projects/{pid}/cards/{cid}/stop` → `client.interrupt()` → o estágio encerra e o pipeline **pausa** o card
   ("interrompido pelo usuário") → o humano corrige na aba Interação → **retoma** (máquina de pausa/retomada existente).
   Front: botão **⏹ Stop** só em card de etapa ativa (plan/implement/review) + rodando.
-- `POST .../say` (base pronta) injeta mensagem na sessão ao vivo — **falar sem parar** é o incremento 2 (falta o laço
-  multi-turno + a caixa no painel). Spec: `specs/2026-07-03-panel-chat-ao-vivo-stop-design.md`.
+- **`/say` (falar sem parar) — TENTADO E REVERTIDO (2026-07-05):** o laço multi-turno **pendura a etapa** quando o SDK
+  absorve a mensagem injetada no turno atual (o `receive_response()` seguinte bloqueia pra sempre). Modelo do SDK é
+  turn-based. Revertido pro single-turn seguro; a intervenção robusta é o **Stop→corrige→retoma**. `/say` correto
+  exigiria `receive_response` com timeout no 1º chunk — trabalho futuro. Spec: `specs/2026-07-03-panel-chat-ao-vivo-stop-design.md`.
 - **Provado (real, spike-loop-test):** Stop durante o `plan` interrompeu a sessão de verdade → pausou → respondi a
   correção → retomou plan→implement→review→`validate_ci`. Confirma também que a troca `query()`→client não regrediu o pipeline.
 
@@ -103,20 +105,19 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 
 ## O que está CORTADO/ADIADO (não usar; remoção final na Fase 3d)
 - **Qdrant + embeddings** (memória vetorial): serviços ainda no disco, sem uso; `docker-compose` removido.
-- **Orchestrator autônomo** (`orchestrator_service.py`): desligado no boot (`ORCHESTRATOR_ENABLED=false`).
-- **Página `/live` + votação**; **caminho Gemini** (`agent.py` dual-provider, `gemini_*`): entrelaçados,
-  adiados. Board só usa Claude.
-- **`agent.py` (~2600 linhas)**: caminho legado de execução (`/plan`,`/implement` etc.). Será
-  substituído/deduplicado pelo runner; hoje o board **não** dispara mais o auto-run no drag
-  (`AUTO_RUN_ON_DRAG = false` em `App.tsx`).
+- **REMOVIDO na 3d-resto (2026-07-05, ~8.600 linhas):** `agent.py` (execução legada `/plan`,`/implement` + Gemini
+  dual-provider), orchestrator autônomo (`orchestrator_service`, `orchestrator_logger`, `orchestrator_repository`,
+  `memory_service`, `routes/orchestrator`, `models/orchestrator`, `schemas/orchestrator`), página **/live** + votação
+  (`live_broadcast_service`, `voting_service`, `routes/live`, `models/live`, `schemas/live`), `agent_persistence.py`,
+  e os endpoints `/api/execute-*` + expert-triage no `main.py`. **Chat preservado** (usa `agent_chat.py`, desacoplado
+  do orchestrator). Board só usa Claude; boot OK; testes só com as falhas de baseline.
 
-> **3d — remoção do legado de backend está ADIADA (entrelaçamento real, mapeado em 2026-07-03):**
-> `chat_service.py` (feature **Chat**, ativa) importa `agent.py` **e** `orchestrator_service`; `agent.py`
-> importa `live_broadcast_service`; `orchestrator_service`/`voting_service` importam `live`. E `metrics` tem
-> **FK para `ActiveProject`**. Ou seja, arrancar agent.py/orchestrator/live/ActiveProject **quebra o Chat e o
-> metrics**. Cortar isso com segurança = untangle do Chat + migração de metrics — esforço dedicado à parte, não
-> um "corte limpo". Enquanto isso: código desligado, sem causar bug. **A consolidação do header (a dor real de
-> UX) já foi feita.**
+> **3d-resto — falta só o `ActiveProject` (2026-07-05):** ele continua **acoplado ao Chat que foi mantido** —
+> `agent_chat.py` lê `ActiveProject.path` como cwd do agente do chat — **e** ao `metrics` (FK `metrics.project_id →
+> active_project.id`), além do fluxo antigo em `routes/projects.py` e do `database_manager`. Removê-lo exige
+> re-acoplar o cwd do `agent_chat` (ao Project registry ou a um default) + migrar o FK do `metrics` — passo delicado
+> separado, adiado pra não arriscar o Chat/metrics. **Dívida frontend:** `useAgentExecution` + a UI de execução legada
+> no `Card` ainda chamam `/api/execute-*` (agora 404) — inertes (nada dispara), limpar quando mexer no Card.
 
 ## Estado das fases
 
@@ -131,7 +132,8 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 | **3b-resto** | Sequenciar colunas, streaming de logs pro board (WS+lote), fix-loop, Pause-or-Decide, avançar coluna, commit pelo backend | ✅ **provado** |
 | **3c** | push → `gh pr create --draft` → espera-CI (`ci-triage`) → **para no ready-to-merge** | ✅ **provado** |
 | 3d | Consolidar os 2 controles de projeto no header | ✅ **feito** |
-| 3d-resto | Remover `ActiveProject`/`database_manager`/ativo-global; cortar Live/Orchestrator/Gemini/agent.py | ⚠️ **adiado (entrelaçado)** |
+| 3d-resto | Cortar agent.py/orchestrator/live/gemini (mantendo o Chat) — ~8.600 linhas | ✅ **feito** |
+| 3d-final | Remover `ActiveProject` (re-acoplar cwd do `agent_chat` + migrar FK do `metrics`) + `database_manager` | ⚠️ **falta (acoplado ao Chat/metrics)** |
 
 ## Design/planos versionados (superpowers) — começar por aqui ao retomar
 
