@@ -23,7 +23,7 @@ class ChatService:
         self.sessions: Dict[str, List[dict]] = {}
         self.claude_agent = get_claude_agent()
         self.goal_classifier = get_goal_classifier_service()
-        self._orchestrator_enabled = True  # Can be toggled
+        self._orchestrator_enabled = False  # orchestrator legado removido na 3d (Chat = so streaming via agent_chat)
 
     def create_session(self) -> dict:
         """
@@ -196,22 +196,8 @@ class ChatService:
         goal_description: str,
         session_id: str
     ) -> Optional[dict]:
-        """Submit a goal to the orchestrator."""
-        try:
-            from .orchestrator_service import get_orchestrator_service
-
-            async with async_session_maker() as session:
-                orchestrator = get_orchestrator_service(session)
-                result = await orchestrator.submit_goal(
-                    description=goal_description,
-                    source="chat",
-                    source_id=session_id,
-                )
-                await session.commit()
-                return result
-        except Exception as e:
-            print(f"[ChatService] Error submitting goal: {e}")
-            return None
+        """No-op: o orchestrator legado foi removido na 3d (o ramo que chamava isto esta desligado)."""
+        return None
 
     async def send_message(
         self,
