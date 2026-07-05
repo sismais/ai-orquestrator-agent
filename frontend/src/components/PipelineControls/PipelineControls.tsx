@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useExecutionWebSocket } from '../../hooks/useExecutionWebSocket';
-import { runPipeline, getExecution, stopPipeline, sayToPipeline } from '../../api/pipeline';
+import { runPipeline, getExecution, stopPipeline } from '../../api/pipeline';
 import { LogsModal } from '../LogsModal';
 import type { Card as CardType, ExecutionLog } from '../../types';
 import styles from './PipelineControls.module.css';
@@ -176,7 +176,6 @@ export function PipelineControls({ card }: Props) {
         logs={logs}
         startedAt={startedAt}
         completedAt={completedAt}
-        onSay={projectId ? (msg) => sayToPipeline(projectId, card.id, msg) : undefined}
       />
     </>
   );
