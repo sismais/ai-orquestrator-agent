@@ -11,17 +11,11 @@ from sqlalchemy import update, select
 from typing import List
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from .agent import execute_plan, execute_implement, execute_test_implementation, execute_review, execute_expert_triage, get_execution, get_all_executions
 from .git_workspace import GitWorkspaceManager
 from .database import create_tables
 from .repositories.execution_repository import ExecutionRepository
 from .models.execution import Execution
 from .execution import (
-    ExecutePlanRequest,
-    ExecutePlanResponse,
-    ExecuteImplementRequest,
-    ExecuteImplementResponse,
-    ExecutionsResponse,
     HealthResponse,
     LogsResponse,
 )
@@ -38,11 +32,8 @@ from .routes.activities import router as activities_router
 from .routes.metrics import router as metrics_router
 from .routes.settings import router as settings_router
 from .routes.experts import router as experts_router
-from .routes.orchestrator import router as orchestrator_router
-from .routes.live import router as live_router
 from .routes.workflows import router as workflows_router
 from .routes.runner import router as runner_router
-from .config.settings import get_settings
 from .database import get_db, async_session_maker
 from .repositories.card_repository import CardRepository
 from .schemas.card import CardUpdate
@@ -52,8 +43,6 @@ from .models.card import Card  # noqa: F401
 from .models.project import ActiveProject  # noqa: F401
 from .models.project_registry import Project  # noqa: F401
 from .models.workflow import Workflow  # noqa: F401
-from .models.orchestrator import Goal, OrchestratorAction, OrchestratorLog  # noqa: F401
-from .models.live import Vote, VotingRound, VotingOption, CompletedProject  # noqa: F401
 
 
 # Schema for workflow state update
@@ -62,17 +51,9 @@ class WorkflowStateUpdate(BaseModel):
     error: Optional[str] = None
 
 
-import asyncio
-
-# Global reference to orchestrator task
-_orchestrator_task: Optional[asyncio.Task] = None
-
-
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     """Application lifespan handler."""
-    global _orchestrator_task
-
     # Startup: Create database tables
     print("[Server] Creating database tables...")
     await create_tables()
@@ -92,53 +73,10 @@ async def lifespan(app: FastAPI):
         await seed_dev_workflow(_s)
     print("[Server] Dev workflow seeded")
 
-    # Start orchestrator if enabled
-    settings = get_settings()
-    if settings.orchestrator_enabled:
-        print("[Server] Starting orchestrator background task...")
-        _orchestrator_task = asyncio.create_task(_run_orchestrator())
-        print("[Server] Orchestrator started")
-
     yield
 
-    # Shutdown: stop orchestrator and cleanup
+    # Shutdown
     print("[Server] Shutting down...")
-    if _orchestrator_task:
-        print("[Server] Stopping orchestrator...")
-        _orchestrator_task.cancel()
-        try:
-            await _orchestrator_task
-        except asyncio.CancelledError:
-            pass
-        print("[Server] Orchestrator stopped")
-
-
-async def _run_orchestrator():
-    """Run the orchestrator loop as a background task."""
-    from .services.orchestrator_service import get_orchestrator_service
-    from .services.orchestrator_logger import get_orchestrator_logger
-
-    settings = get_settings()
-    orch_logger = get_orchestrator_logger(settings.orchestrator_log_file)
-
-    await orch_logger.log_info("Orchestrator background task started")
-
-    # Get the singleton orchestrator service (manages its own sessions)
-    orchestrator = get_orchestrator_service()
-
-    while True:
-        try:
-            await orchestrator._execute_cycle()
-
-        except asyncio.CancelledError:
-            await orch_logger.log_info("Orchestrator cancelled")
-            raise
-        except Exception as e:
-            print(f"[Orchestrator] Error in cycle: {e}")
-            await orch_logger.log_error(f"Cycle error: {e}")
-
-        # Wait for next cycle
-        await asyncio.sleep(settings.orchestrator_loop_interval_seconds)
 
 
 app = FastAPI(
@@ -169,8 +107,6 @@ app.include_router(activities_router)
 app.include_router(metrics_router)
 app.include_router(settings_router)
 app.include_router(experts_router)
-app.include_router(orchestrator_router)
-app.include_router(live_router)
 app.include_router(workflows_router)
 app.include_router(runner_router)
 
@@ -182,359 +118,6 @@ async def health_check():
         status="ok",
         timestamp=datetime.now().isoformat(),
     )
-
-
-@app.post("/api/execute-plan", response_model=ExecutePlanResponse)
-async def execute_plan_endpoint(request: ExecutePlanRequest):
-    """Execute a plan."""
-    # Validate request
-    if not request.card_id or not request.title:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required fields: cardId and title are required",
-        )
-
-    print(f"[Server] Received plan request for card: {request.card_id}")
-    print(f"[Server] Title: {request.title}")
-    print(f"[Server] Description: {request.description or '(none)'}")
-
-    try:
-        # Use the currently loaded project's directory as working directory
-        cwd = get_project_manager().get_working_directory()
-
-        # Buscar card do banco para obter o modelo configurado e imagens
-        async with async_session_maker() as session:
-            repo = CardRepository(session)
-            card = await repo.get_by_id(request.card_id)
-            model = card.model_plan if card else "opus-4.5"
-            images = card.images if card else None
-            # Use experts from request or from card
-            experts = request.experts or (card.experts if card else None)
-
-        # Passar db_session para persistir logs
-        async with async_session_maker() as db_session:
-            result = await execute_plan(
-                card_id=request.card_id,
-                title=request.title,
-                description=request.description or "",
-                cwd=cwd,
-                model=model,
-                images=images,
-                db_session=db_session,
-                experts=experts,
-            )
-
-        if result.success:
-            # Save spec_path to database if available
-            if result.spec_path:
-                async with async_session_maker() as session:
-                    repo = CardRepository(session)
-                    await repo.update_spec_path(request.card_id, result.spec_path)
-                    await session.commit()
-
-            return ExecutePlanResponse(
-                success=True,
-                cardId=request.card_id,
-                result=result.result,
-                logs=result.logs,
-                specPath=result.spec_path,
-            )
-        else:
-            error_response = ExecutePlanResponse(
-                success=False,
-                cardId=request.card_id,
-                error=result.error,
-                logs=result.logs,
-            )
-            return JSONResponse(
-                status_code=500,
-                content=error_response.model_dump(by_alias=True),
-            )
-
-    except Exception as e:
-        error_message = str(e)
-        print(f"[Server] Error: {error_message}")
-        error_response = ExecutePlanResponse(
-            success=False,
-            cardId=request.card_id,
-            error=error_message,
-            logs=[],
-        )
-        return JSONResponse(
-            status_code=500,
-            content=error_response.model_dump(by_alias=True),
-        )
-
-
-@app.post("/api/execute-implement", response_model=ExecuteImplementResponse)
-async def execute_implement_endpoint(request: ExecuteImplementRequest):
-    """Execute /implement command with spec path."""
-    # Validate request
-    if not request.card_id or not request.spec_path:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required fields: cardId and specPath are required",
-        )
-
-    print(f"[Server] Received implement request for card: {request.card_id}")
-    print(f"[Server] Spec path: {request.spec_path}")
-
-    try:
-        # Use the currently loaded project's directory as working directory
-        cwd = get_project_manager().get_working_directory()
-
-        # Buscar card do banco para obter o modelo configurado e imagens
-        # Mantém sessão aberta para passar ao execute_implement
-        async with async_session_maker() as session:
-            repo = CardRepository(session)
-            card = await repo.get_by_id(request.card_id)
-            model = card.model_implement if card else "opus-4.5"
-            images = card.images if card else None
-
-            result = await execute_implement(
-                card_id=request.card_id,
-                spec_path=request.spec_path,
-                cwd=cwd,
-                model=model,
-                images=images,
-                db_session=session,
-            )
-
-        if result.success:
-            return ExecuteImplementResponse(
-                success=True,
-                cardId=request.card_id,
-                result=result.result,
-                logs=result.logs,
-            )
-        else:
-            error_response = ExecuteImplementResponse(
-                success=False,
-                cardId=request.card_id,
-                error=result.error,
-                logs=result.logs,
-            )
-            return JSONResponse(
-                status_code=500,
-                content=error_response.model_dump(by_alias=True),
-            )
-
-    except Exception as e:
-        error_message = str(e)
-        print(f"[Server] Error: {error_message}")
-        error_response = ExecuteImplementResponse(
-            success=False,
-            cardId=request.card_id,
-            error=error_message,
-            logs=[],
-        )
-        return JSONResponse(
-            status_code=500,
-            content=error_response.model_dump(by_alias=True),
-        )
-
-
-@app.post("/api/execute-test", response_model=ExecuteImplementResponse)
-async def execute_test_endpoint(request: ExecuteImplementRequest):
-    """Execute /test-implementation command with spec path."""
-    if not request.card_id or not request.spec_path:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required fields: cardId and specPath are required",
-        )
-
-    print(f"[Server] Received test request for card: {request.card_id}")
-    print(f"[Server] Spec path: {request.spec_path}")
-
-    try:
-        cwd = get_project_manager().get_working_directory()
-
-        # Buscar card do banco para obter o modelo configurado e imagens
-        # Mantém sessão aberta para passar ao execute_test_implementation
-        async with async_session_maker() as session:
-            repo = CardRepository(session)
-            card = await repo.get_by_id(request.card_id)
-            model = card.model_test if card else "opus-4.5"
-            images = card.images if card else None
-
-            result = await execute_test_implementation(
-                card_id=request.card_id,
-                spec_path=request.spec_path,
-                cwd=cwd,
-                model=model,
-                images=images,
-                db_session=session,
-            )
-
-        if result.success:
-            return ExecuteImplementResponse(
-                success=True,
-                cardId=request.card_id,
-                result=result.result,
-                logs=result.logs,
-            )
-        else:
-            error_response = ExecuteImplementResponse(
-                success=False,
-                cardId=request.card_id,
-                error=result.error,
-                logs=result.logs,
-            )
-            return JSONResponse(
-                status_code=500,
-                content=error_response.model_dump(by_alias=True),
-            )
-
-    except Exception as e:
-        error_message = str(e)
-        print(f"[Server] Error: {error_message}")
-        error_response = ExecuteImplementResponse(
-            success=False,
-            cardId=request.card_id,
-            error=error_message,
-            logs=[],
-        )
-        return JSONResponse(
-            status_code=500,
-            content=error_response.model_dump(by_alias=True),
-        )
-
-
-@app.post("/api/execute-review", response_model=ExecuteImplementResponse)
-async def execute_review_endpoint(request: ExecuteImplementRequest):
-    """Execute /review command with spec path."""
-    if not request.card_id or not request.spec_path:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required fields: cardId and specPath are required",
-        )
-
-    print(f"[Server] Received review request for card: {request.card_id}")
-    print(f"[Server] Spec path: {request.spec_path}")
-
-    try:
-        cwd = get_project_manager().get_working_directory()
-
-        # Buscar card do banco para obter o modelo configurado e imagens
-        # Mantém sessão aberta para passar ao execute_review
-        async with async_session_maker() as session:
-            repo = CardRepository(session)
-            card = await repo.get_by_id(request.card_id)
-            model = card.model_review if card else "opus-4.5"
-            images = card.images if card else None
-
-            result = await execute_review(
-                card_id=request.card_id,
-                spec_path=request.spec_path,
-                cwd=cwd,
-                model=model,
-                images=images,
-                db_session=session,
-            )
-
-        if result.success:
-            return ExecuteImplementResponse(
-                success=True,
-                cardId=request.card_id,
-                result=result.result,
-                logs=result.logs,
-            )
-        else:
-            error_response = ExecuteImplementResponse(
-                success=False,
-                cardId=request.card_id,
-                error=result.error,
-                logs=result.logs,
-            )
-            return JSONResponse(
-                status_code=500,
-                content=error_response.model_dump(by_alias=True),
-            )
-
-    except Exception as e:
-        error_message = str(e)
-        print(f"[Server] Error: {error_message}")
-        error_response = ExecuteImplementResponse(
-            success=False,
-            cardId=request.card_id,
-            error=error_message,
-            logs=[],
-        )
-        return JSONResponse(
-            status_code=500,
-            content=error_response.model_dump(by_alias=True),
-        )
-
-
-# Schema for expert triage request
-class ExpertTriageRequest(BaseModel):
-    card_id: str
-    title: str
-    description: Optional[str] = None
-
-    class Config:
-        populate_by_name = True
-
-
-@app.post("/api/execute-expert-triage")
-async def execute_expert_triage_endpoint(request: ExpertTriageRequest):
-    """Execute AI-powered expert triage for a card."""
-    if not request.card_id or not request.title:
-        raise HTTPException(
-            status_code=400,
-            detail="Missing required fields: card_id and title are required",
-        )
-
-    print(f"[Server] Received expert triage request for card: {request.card_id}")
-    print(f"[Server] Title: {request.title}")
-
-    try:
-        cwd = get_project_manager().get_working_directory()
-
-        async with async_session_maker() as db_session:
-            result = await execute_expert_triage(
-                card_id=request.card_id,
-                title=request.title,
-                description=request.description or "",
-                cwd=cwd,
-                db_session=db_session,
-            )
-
-            # Save experts to card if identified
-            if result.get("success") and result.get("experts"):
-                repo = CardRepository(db_session)
-                await repo.update_experts(request.card_id, result["experts"])
-                await db_session.commit()
-
-        if result.get("success"):
-            return {
-                "success": True,
-                "cardId": request.card_id,
-                "experts": result.get("experts", {}),
-            }
-        else:
-            return JSONResponse(
-                status_code=500,
-                content={
-                    "success": False,
-                    "cardId": request.card_id,
-                    "error": result.get("error", "Unknown error"),
-                    "experts": {},
-                },
-            )
-
-    except Exception as e:
-        error_message = str(e)
-        print(f"[Server] Error: {error_message}")
-        return JSONResponse(
-            status_code=500,
-            content={
-                "success": False,
-                "cardId": request.card_id,
-                "error": error_message,
-                "experts": {},
-            },
-        )
 
 
 @app.patch("/api/cards/{card_id}/workflow-state")
@@ -578,13 +161,10 @@ async def get_logs_endpoint(card_id: str, db: AsyncSession = Depends(get_db)):
     execution = await repo.get_execution_with_logs(card_id)
 
     if not execution:
-        # Fallback para memória se não houver no banco
-        execution = await get_execution(card_id)
-        if not execution:
-            return LogsResponse(
-                success=False,
-                error="No execution found for this card",
-            )
+        return LogsResponse(
+            success=False,
+            error="No execution found for this card",
+        )
 
     return LogsResponse(
         success=True,
