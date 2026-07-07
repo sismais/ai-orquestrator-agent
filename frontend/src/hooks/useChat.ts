@@ -175,7 +175,9 @@ export function useChat(projectId: string | null) {
 
   const { isConnected, send, reconnect } = useWebSocketBase({
     url: WS_ENDPOINTS.chat(sessionId ?? ''),
-    enabled: !!sessionId && state.isOpen, // Só conecta com sessão criada e chat aberto
+    // Conecta quando a sessão do projeto existe. O Chat é uma página (só visível
+    // na aba Chat), então o antigo gate `state.isOpen` (widget flutuante) não se aplica.
+    enabled: !!sessionId,
     onMessage: handleMessage,
     onOpen: handleOpen,
     onClose: handleClose,
