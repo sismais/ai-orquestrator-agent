@@ -102,8 +102,7 @@ ORCHESTRATOR_EXPERTS: Dict[str, ExpertConfig] = {
             "backend/src/config/",
             "backend/src/main.py",
             "backend/src/agent",
-            "backend/src/execution.py",
-            "backend/src/project_manager.py"
+            "backend/src/execution.py"
         ]
     },
     "chat": {

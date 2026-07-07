@@ -68,20 +68,3 @@ async def get_db() -> AsyncGenerator[AsyncSession, None]:
             raise
         finally:
             await session.close()
-
-
-async def get_history_db() -> AsyncGenerator[AsyncSession, None]:
-    """Dependency to get database session for project history."""
-    from .database_manager import db_manager
-
-    session_factory = db_manager.get_history_session()
-
-    async with session_factory() as session:
-        try:
-            yield session
-            await session.commit()
-        except Exception:
-            await session.rollback()
-            raise
-        finally:
-            await session.close()
