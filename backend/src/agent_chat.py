@@ -106,34 +106,6 @@ class ClaudeAgentChat:
             print(f"[ClaudeAgentChat] {error_msg}")
             raise RuntimeError(error_msg)
 
-    async def get_single_response(
-        self,
-        messages: list[dict],
-        model: str = "sonnet-5",
-        system_prompt: str | None = None
-    ) -> str:
-        """
-        Get a complete response from Claude (non-streaming).
-
-        Args:
-            messages: List of conversation messages
-            model: AI model to use
-            system_prompt: Optional system prompt
-
-        Returns:
-            str: The complete response text
-        """
-        try:
-            full_response = ""
-            async for chunk in self.stream_response(messages, model, system_prompt):
-                full_response += chunk
-            return full_response
-
-        except Exception as e:
-            error_msg = f"Error in Claude Agent SDK: {str(e)}"
-            print(f"[ClaudeAgentChat] {error_msg}")
-            raise RuntimeError(error_msg)
-
 
 # Default system prompt for the chat assistant
 DEFAULT_SYSTEM_PROMPT = """You are a helpful AI assistant integrated into a Kanban board application.
