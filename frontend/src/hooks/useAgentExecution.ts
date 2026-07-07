@@ -51,7 +51,7 @@ export function useAgentExecution(props?: UseAgentExecutionProps | Map<string, E
   const initialExecutions = props instanceof Map ? props : props?.initialExecutions;
   const onExecutionComplete = props instanceof Map ? undefined : props?.onExecutionComplete;
   const [executions, setExecutions] = useState<Map<string, ExecutionStatus>>(new Map());
-  const pollingIntervalsRef = useRef<Map<string, NodeJS.Timeout>>(new Map());
+  const pollingIntervalsRef = useRef<Map<string, ReturnType<typeof setTimeout>>>(new Map());
   // Callbacks to be called when an execution completes (for workflow recovery)
   const completionCallbacksRef = useRef<Map<string, ExecutionCompletionCallback>>(new Map());
   // Track executions that completed while waiting for callback registration

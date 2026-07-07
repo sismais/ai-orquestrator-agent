@@ -15,8 +15,8 @@ export function useTooltip(options: UseTooltipOptions = {}) {
 
   const [isVisible, setIsVisible] = useState(false);
   const [position, setPosition] = useState({ x: 0, y: 0 });
-  const timeoutRef = useRef<NodeJS.Timeout>();
-  const closeTimeoutRef = useRef<NodeJS.Timeout>();
+  const timeoutRef = useRef<ReturnType<typeof setTimeout>>();
+  const closeTimeoutRef = useRef<ReturnType<typeof setTimeout>>();
 
   const show = useCallback((event?: React.MouseEvent) => {
     clearTimeout(closeTimeoutRef.current);
