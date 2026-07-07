@@ -65,7 +65,7 @@ class ExecutePlanRequest(CamelCaseModel):
     card_id: str = Field(alias="cardId")
     title: str
     description: Optional[str] = None
-    model: Optional[str] = "opus-4.5"
+    model: Optional[str] = "opus-4.8"
     experts: Optional[dict] = None  # Experts identified via expert-triage
 
 
@@ -97,7 +97,7 @@ class ExecutePlanResponse(CamelCaseModel):
 class ExecuteImplementRequest(CamelCaseModel):
     card_id: str = Field(alias="cardId")
     spec_path: str = Field(alias="specPath")
-    model: Optional[str] = "opus-4.5"
+    model: Optional[str] = "opus-4.8"
 
 
 class ExecuteImplementResponse(CamelCaseModel):
@@ -111,7 +111,7 @@ class ExecuteImplementResponse(CamelCaseModel):
 class ExecuteTestRequest(CamelCaseModel):
     card_id: str = Field(alias="cardId")
     spec_path: str = Field(alias="specPath")
-    model: Optional[str] = "opus-4.5"
+    model: Optional[str] = "opus-4.8"
 
 
 class ExecuteTestResponse(CamelCaseModel):
@@ -127,7 +127,7 @@ class ExecuteTestResponse(CamelCaseModel):
 class ExecuteReviewRequest(CamelCaseModel):
     card_id: str = Field(alias="cardId")
     spec_path: str = Field(alias="specPath")
-    model: Optional[str] = "opus-4.5"
+    model: Optional[str] = "opus-4.8"
 
 
 class ExecuteReviewResponse(CamelCaseModel):

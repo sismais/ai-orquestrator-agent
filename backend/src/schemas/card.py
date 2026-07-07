@@ -30,8 +30,8 @@ class DiffStats(BaseModel):
 # A validação de coluna/transição é responsabilidade do config (is_valid_transition), não do schema.
 ColumnId = str
 ModelType = Literal[
-    "opus-4.5", "sonnet-4.5", "haiku-4.5",  # Claude models
-    "gemini-3-pro", "gemini-3-flash"  # Gemini models
+    "opus-4.8", "sonnet-5", "haiku-4.5",  # Claude
+    "fable-5",  # Claude (beta, desabilitado nos pickers)
 ]
 MergeStatus = Literal["none", "merging", "resolving", "merged", "failed"]
 
@@ -81,10 +81,10 @@ class CardBase(BaseModel):
 
     title: str = Field(..., min_length=1, max_length=255)
     description: Optional[str] = None
-    model_plan: ModelType = Field(default="opus-4.5", alias="modelPlan")
-    model_implement: ModelType = Field(default="opus-4.5", alias="modelImplement")
-    model_test: ModelType = Field(default="opus-4.5", alias="modelTest")
-    model_review: ModelType = Field(default="opus-4.5", alias="modelReview")
+    model_plan: ModelType = Field(default="opus-4.8", alias="modelPlan")
+    model_implement: ModelType = Field(default="opus-4.8", alias="modelImplement")
+    model_test: ModelType = Field(default="opus-4.8", alias="modelTest")
+    model_review: ModelType = Field(default="opus-4.8", alias="modelReview")
     images: Optional[List[CardImage]] = None
 
     class Config:

@@ -35,7 +35,7 @@ class CreateSessionResponse(BaseModel):
 class SendMessageRequest(BaseModel):
     """Request to send a message"""
     content: str
-    model: Optional[str] = 'sonnet-4.5'
+    model: Optional[str] = 'sonnet-5'
 
 
 class StreamChunk(BaseModel):
