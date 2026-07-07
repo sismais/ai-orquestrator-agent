@@ -70,6 +70,9 @@ async def lifespan(app: FastAPI):
     from .services.light_migrations import remap_legacy_model_aliases
     await remap_legacy_model_aliases(_engine)
 
+    from .services.light_migrations import migrate_metrics_fk_target
+    await migrate_metrics_fk_target(_engine)
+
     from .services.workflow_seed import seed_dev_workflow
     from .database import async_session_maker
     async with async_session_maker() as _s:

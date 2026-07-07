@@ -50,3 +50,30 @@ async def remap_legacy_model_aliases(engine: AsyncEngine) -> None:
                     text(f"UPDATE cards SET {col} = :new WHERE {col} = :old"),
                     {"new": new, "old": old},
                 )
+
+
+async def migrate_metrics_fk_target(engine: AsyncEngine) -> None:
+    """Repointa o FK de project_metrics/execution_metrics de active_project -> projects.
+
+    SQLite nao faz ALTER de FK; como as tabelas de metrics estao vazias em DEV, o
+    caminho seguro e dropar (se ainda apontam pra active_project e estao vazias) e
+    deixar o create_all recriar com o FK novo. Idempotente.
+    """
+    from ..database import Base
+    async with engine.begin() as conn:
+        for table in ("project_metrics", "execution_metrics"):
+            exists = (await conn.execute(text(
+                "SELECT name FROM sqlite_master WHERE type='table' AND name=:t"
+            ), {"t": table})).first()
+            if not exists:
+                continue
+            fks = (await conn.execute(text(f"PRAGMA foreign_key_list({table})"))).fetchall()
+            targets = {row[2] for row in fks}
+            if "active_project" not in targets:
+                continue  # ja migrado
+            count = (await conn.execute(text(f"SELECT COUNT(*) FROM {table}"))).scalar()
+            if count and count > 0:
+                print(f"[light_migrations] {table} tem {count} linhas; FK nao repontado automaticamente")
+                continue
+            await conn.execute(text(f"DROP TABLE {table}"))
+        await conn.run_sync(Base.metadata.create_all)

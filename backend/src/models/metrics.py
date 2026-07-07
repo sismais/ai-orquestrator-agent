@@ -13,7 +13,7 @@ class ProjectMetrics(Base):
     __tablename__ = "project_metrics"
 
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
-    project_id = Column(String, ForeignKey("active_project.id"), nullable=False)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=False)
 
     # Métricas de Tokens
     total_input_tokens = Column(Integer, default=0)
@@ -75,7 +75,7 @@ class ExecutionMetrics(Base):
     id = Column(String, primary_key=True, default=lambda: str(uuid.uuid4()))
     execution_id = Column(String, ForeignKey("executions.id"), nullable=False)
     card_id = Column(String, ForeignKey("cards.id"), nullable=False)
-    project_id = Column(String, ForeignKey("active_project.id"), nullable=False)
+    project_id = Column(String, ForeignKey("projects.id"), nullable=False)
 
     # Detalhes da Execução
     command = Column(String)  # /plan, /implement, /test, /review
