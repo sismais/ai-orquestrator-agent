@@ -208,10 +208,14 @@ async def create_card_workspace(
 ):
     """Cria worktree isolado para o card."""
 
-    # Obter projeto ativo
-    project = await get_active_project(db)
+    # Obter projeto pelo registry (project_id enviado no body)
+    project_id = (request_body or {}).get("projectId")
+    if not project_id:
+        raise HTTPException(status_code=400, detail="projectId obrigatorio")
+    from .repositories.project_repository import ProjectRepository
+    project = await ProjectRepository(db).get_by_id(project_id)
     if not project:
-        raise HTTPException(status_code=400, detail="No active project")
+        raise HTTPException(status_code=404, detail="Projeto nao encontrado")
 
     # Verificar se projeto eh um repo git
     git_dir = Path(project.path) / ".git"
@@ -257,12 +261,15 @@ async def create_card_workspace(
 
 
 @app.get("/api/branches")
-async def list_active_branches(db: AsyncSession = Depends(get_db)):
+async def list_active_branches(project_id: str | None = None, db: AsyncSession = Depends(get_db)):
     """Lista todas as branches/worktrees ativos."""
 
-    project = await get_active_project(db)
+    if not project_id:
+        return {"branches": []}
+    from .repositories.project_repository import ProjectRepository
+    project = await ProjectRepository(db).get_by_id(project_id)
     if not project:
-        raise HTTPException(status_code=400, detail="No active project")
+        return {"branches": []}
 
     git_manager = GitWorkspaceManager(project.path)
     worktrees = await git_manager.list_active_worktrees()
@@ -292,12 +299,15 @@ async def list_active_branches(db: AsyncSession = Depends(get_db)):
 
 
 @app.post("/api/cleanup-orphan-worktrees")
-async def cleanup_orphan_worktrees(db: AsyncSession = Depends(get_db)):
+async def cleanup_orphan_worktrees(project_id: str | None = None, db: AsyncSession = Depends(get_db)):
     """Remove worktrees orfaos."""
 
-    project = await get_active_project(db)
+    if not project_id:
+        raise HTTPException(status_code=400, detail="projectId obrigatorio")
+    from .repositories.project_repository import ProjectRepository
+    project = await ProjectRepository(db).get_by_id(project_id)
     if not project:
-        raise HTTPException(status_code=400, detail="No active project")
+        raise HTTPException(status_code=404, detail="Projeto nao encontrado")
 
     # Obter IDs de cards ativos
     result = await db.execute(select(Card.id))
@@ -310,35 +320,27 @@ async def cleanup_orphan_worktrees(db: AsyncSession = Depends(get_db)):
 
 
 @app.get("/api/git/branches")
-async def list_git_branches():
-    """Lista todas as branches do repositório git."""
+async def list_git_branches(project_id: str | None = None, db: AsyncSession = Depends(get_db)):
+    """Lista as branches do repo do projeto selecionado (registry)."""
+    project_path = None
+    if project_id:
+        from .repositories.project_repository import ProjectRepository
+        project = await ProjectRepository(db).get_by_id(project_id)
+        if project:
+            project_path = project.path
+    if not project_path:
+        return {"success": True, "branches": [], "defaultBranch": "main"}
 
-    # Buscar projeto ativo do banco auth.db (onde é salvo)
-    async with async_session_maker() as session:
-        result = await session.execute(
-            select(ActiveProject).order_by(ActiveProject.loaded_at.desc()).limit(1)
-        )
-        project = result.scalar_one_or_none()
-
-    # Se não houver projeto ativo, usar diretório raiz
-    if project:
-        project_path = project.path
-    else:
-        # Fallback: diretório raiz (2 níveis acima do backend/src)
-        project_path = str(Path(__file__).parent.parent.parent)
-
-    # Verificar se é repositório git
     git_dir = Path(project_path) / ".git"
     if not git_dir.exists():
         return {"success": True, "branches": [], "defaultBranch": "main"}
 
     git_manager = GitWorkspaceManager(project_path)
     branches = await git_manager.list_all_branches()
-
     return {
         "success": True,
         "branches": branches,
-        "defaultBranch": await git_manager._get_default_branch()
+        "defaultBranch": await git_manager._get_default_branch(),
     }
 
 
