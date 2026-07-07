@@ -1,4 +1,4 @@
-from pydantic import BaseModel
+from pydantic import BaseModel, Field
 from typing import Literal, Optional
 from datetime import datetime
 
@@ -22,8 +22,11 @@ class ChatSessionSchema(BaseModel):
 
 
 class CreateSessionRequest(BaseModel):
-    """Request to create a new chat session"""
-    pass
+    """Request to create a new chat session, escopada a um projeto"""
+    project_id: str = Field(alias="projectId")
+
+    class Config:
+        populate_by_name = True
 
 
 class CreateSessionResponse(BaseModel):

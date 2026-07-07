@@ -1,11 +1,12 @@
 """
 Chat API routes for WebSocket-based real-time chat.
 """
-from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException
+from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.responses import JSONResponse
 import json
 from ..services.chat_service import get_chat_service
 from ..schemas.chat import (
+    CreateSessionRequest,
     CreateSessionResponse,
     SessionHistoryResponse,
     MessageSchema,
@@ -16,15 +17,15 @@ router = APIRouter(prefix="/api/chat", tags=["chat"])
 
 
 @router.post("/sessions", response_model=CreateSessionResponse)
-async def create_chat_session():
+async def create_chat_session(body: CreateSessionRequest):
     """
-    Create a new chat session.
+    Create a new chat session, escopada a um projeto.
 
     Returns:
         CreateSessionResponse: Session ID and creation timestamp
     """
     chat_service = get_chat_service()
-    session_data = chat_service.create_session()
+    session_data = await chat_service.create_session(project_id=body.project_id)
 
     return CreateSessionResponse(
         sessionId=session_data["sessionId"],
@@ -47,7 +48,7 @@ async def get_chat_history(session_id: str):
         HTTPException: 404 if session not found
     """
     chat_service = get_chat_service()
-    session = chat_service.get_session(session_id)
+    session = await chat_service.get_session(session_id)
 
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -59,6 +60,7 @@ async def get_chat_history(session_id: str):
             role=msg["role"],
             content=msg["content"],
             timestamp=msg["timestamp"],
+            model=msg.get("model"),
         )
         for idx, msg in enumerate(session["messages"])
     ]
@@ -84,7 +86,7 @@ async def delete_chat_session(session_id: str):
         HTTPException: 404 if session not found
     """
     chat_service = get_chat_service()
-    success = chat_service.delete_session(session_id)
+    success = await chat_service.delete_session(session_id)
 
     if not success:
         raise HTTPException(status_code=404, detail="Session not found")
@@ -180,19 +182,29 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
 
 
 @router.get("/sessions")
-async def list_sessions():
+async def list_sessions(project_id: str = Query(..., alias="projectId")):
     """
-    List all active chat sessions (for debugging/admin purposes).
+    List chat sessions de um projeto.
+
+    Args:
+        project_id: The project to list sessions for
 
     Returns:
-        JSON: List of session IDs and count
+        JSON: List of sessions and count
     """
     chat_service = get_chat_service()
-    sessions = chat_service.list_sessions()
+    sessions = await chat_service.list_sessions(project_id)
 
     return JSONResponse(
         content={
-            "sessions": sessions,
+            "sessions": [
+                {
+                    "sessionId": s.id,
+                    "title": s.title,
+                    "createdAt": s.created_at.isoformat(),
+                }
+                for s in sessions
+            ],
             "count": len(sessions),
         },
         status_code=200,
