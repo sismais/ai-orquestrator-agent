@@ -31,7 +31,7 @@ class ClaudeAgentChat:
         cwd: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
-        Stream response from Claude or Gemini using Agent SDK directly
+        Stream response from Claude using Agent SDK directly
         without predefined commands like /question
 
         Args:
