@@ -14,8 +14,9 @@ export interface BranchesResponse {
   defaultBranch: string;
 }
 
-export async function fetchGitBranches(): Promise<BranchesResponse> {
-  const response = await fetch(`${API_CONFIG.BASE_URL}/api/git/branches`);
+export async function fetchGitBranches(projectId: string | null): Promise<BranchesResponse> {
+  const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+  const response = await fetch(`${API_CONFIG.BASE_URL}/api/git/branches${qs}`);
 
   if (!response.ok) {
     throw new Error(`Failed to fetch branches: ${response.statusText}`);

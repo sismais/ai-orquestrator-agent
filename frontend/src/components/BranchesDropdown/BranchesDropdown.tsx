@@ -26,7 +26,9 @@ export const BranchesDropdown: React.FC = () => {
 
   const fetchBranches = async () => {
     try {
-      const response = await fetch(API_ENDPOINTS.branches);
+      const projectId = typeof window !== 'undefined' ? localStorage.getItem('orq.currentProjectId') : null;
+      const qs = projectId ? `?project_id=${encodeURIComponent(projectId)}` : '';
+      const response = await fetch(`${API_ENDPOINTS.branches}${qs}`);
       const data = await response.json();
       setBranches(data.branches || []);
     } catch (error) {

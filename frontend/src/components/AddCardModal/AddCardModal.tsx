@@ -161,7 +161,8 @@ export function AddCardModal({ isOpen, onClose, onSubmit, title: modalTitle, sub
   const loadBranches = async () => {
     setLoadingBranches(true);
     try {
-      const response = await fetchGitBranches();
+      const projectId = typeof window !== 'undefined' ? localStorage.getItem('orq.currentProjectId') : null;
+      const response = await fetchGitBranches(projectId);
       setAvailableBranches(response.branches);
       setDefaultBranch(response.defaultBranch);
       setBaseBranch(response.defaultBranch);
