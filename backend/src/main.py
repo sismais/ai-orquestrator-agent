@@ -38,7 +38,6 @@ from .schemas.card import CardUpdate
 
 # Import models to register them with SQLAlchemy
 from .models.card import Card  # noqa: F401
-from .models.project import ActiveProject  # noqa: F401
 from .models.project_registry import Project  # noqa: F401
 from .models.workflow import Workflow  # noqa: F401
 
@@ -191,14 +190,6 @@ async def get_logs_history_endpoint(card_id: str, db: AsyncSession = Depends(get
 # ============================================================================
 # Git Worktree Isolation Endpoints
 # ============================================================================
-
-async def get_active_project(db: AsyncSession):
-    """Helper to get the currently active project."""
-    result = await db.execute(
-        select(ActiveProject).order_by(ActiveProject.loaded_at.desc()).limit(1)
-    )
-    return result.scalar_one_or_none()
-
 
 @app.post("/api/cards/{card_id}/workspace")
 async def create_card_workspace(
