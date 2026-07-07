@@ -72,7 +72,7 @@ function App() {
 
   // Estado para controlar loading de experts
   const [loadingExpertsCardId, setLoadingExpertsCardId] = useState<string | null>(null);
-  const { state: chatState, sendMessage, handleModelChange, createNewSession } = useChat();
+  const { state: chatState, sendMessage, handleModelChange, createNewSession } = useChat(currentProjectId);
 
   // Define moveCard and updateCardSpecPath BEFORE useWorkflowAutomation
   const moveCard = (cardId: string, newColumnId: ColumnId) => {
@@ -692,6 +692,7 @@ function App() {
             selectedModel={chatState.selectedModel}
             onModelChange={handleModelChange}
             onNewChat={createNewSession}
+            currentProjectId={currentProjectId}
           />
         );
 

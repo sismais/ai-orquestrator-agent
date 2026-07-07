@@ -14,6 +14,7 @@ interface ChatPageProps {
   selectedModel: string;
   onModelChange: (model: string) => void;
   onNewChat?: () => void;
+  currentProjectId: string | null;
 }
 
 const ChatPage = ({
@@ -24,6 +25,7 @@ const ChatPage = ({
   selectedModel,
   onModelChange,
   onNewChat,
+  currentProjectId,
 }: ChatPageProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
 
@@ -47,7 +49,7 @@ const ChatPage = ({
               className={styles.newChatButton}
               onClick={onNewChat}
               title="Start new chat session"
-              disabled={isLoading}
+              disabled={isLoading || !currentProjectId}
             >
               <MessageSquarePlus size={18} />
               <span>New Chat</span>
@@ -66,65 +68,81 @@ const ChatPage = ({
       </div>
 
       <div className={styles.chatContainer}>
-        <div className={styles.messagesArea}>
-          <div className={styles.messagesContainer}>
-            {messages.length === 0 ? (
+        {!currentProjectId ? (
+          <div className={styles.messagesArea}>
+            <div className={styles.messagesContainer}>
               <div className={styles.emptyState}>
-                <div className={styles.emptyIcon}>💬</div>
-                <h2 className={styles.emptyTitle}>Bem-vindo ao AI Assistant</h2>
+                <div className={styles.emptyIcon}>📁</div>
+                <h2 className={styles.emptyTitle}>Selecione um projeto</h2>
                 <p className={styles.emptyText}>
-                  Inicie uma conversa com seu assistente de IA
+                  Escolha um projeto no topo da tela para conversar com o assistente.
                 </p>
-                <p className={styles.emptySubtext}>
-                  Faça perguntas sobre seu projeto, peça ajuda com código, ou explore ideias!
-                </p>
-                <div className={styles.suggestions}>
-                  <h3 className={styles.suggestionsTitle}>Sugestões:</h3>
-                  <button
-                    className={styles.suggestionButton}
-                    onClick={() => onSendMessage("Como posso melhorar meu código?")}
-                  >
-                    Como posso melhorar meu código?
-                  </button>
-                  <button
-                    className={styles.suggestionButton}
-                    onClick={() => onSendMessage("Explique o padrão SDLC")}
-                  >
-                    Explique o padrão SDLC
-                  </button>
-                  <button
-                    className={styles.suggestionButton}
-                    onClick={() => onSendMessage("Ajude-me a organizar minhas tarefas")}
-                  >
-                    Ajude-me a organizar minhas tarefas
-                  </button>
-                </div>
               </div>
-            ) : (
-              messages.map((message) => (
-                <ChatMessage key={message.id} message={message} />
-              ))
-            )}
-            {isLoading && (
-              <div className={styles.typingIndicator}>
-                <span></span>
-                <span></span>
-                <span></span>
-              </div>
-            )}
-            {error && (
-              <div className={styles.errorMessage}>
-                <span className={styles.errorIcon}>⚠️</span>
-                {error}
-              </div>
-            )}
-            <div ref={messagesEndRef} />
+            </div>
           </div>
-        </div>
+        ) : (
+          <>
+            <div className={styles.messagesArea}>
+              <div className={styles.messagesContainer}>
+                {messages.length === 0 ? (
+                  <div className={styles.emptyState}>
+                    <div className={styles.emptyIcon}>💬</div>
+                    <h2 className={styles.emptyTitle}>Bem-vindo ao AI Assistant</h2>
+                    <p className={styles.emptyText}>
+                      Inicie uma conversa com seu assistente de IA
+                    </p>
+                    <p className={styles.emptySubtext}>
+                      Faça perguntas sobre seu projeto, peça ajuda com código, ou explore ideias!
+                    </p>
+                    <div className={styles.suggestions}>
+                      <h3 className={styles.suggestionsTitle}>Sugestões:</h3>
+                      <button
+                        className={styles.suggestionButton}
+                        onClick={() => onSendMessage("Como posso melhorar meu código?")}
+                      >
+                        Como posso melhorar meu código?
+                      </button>
+                      <button
+                        className={styles.suggestionButton}
+                        onClick={() => onSendMessage("Explique o padrão SDLC")}
+                      >
+                        Explique o padrão SDLC
+                      </button>
+                      <button
+                        className={styles.suggestionButton}
+                        onClick={() => onSendMessage("Ajude-me a organizar minhas tarefas")}
+                      >
+                        Ajude-me a organizar minhas tarefas
+                      </button>
+                    </div>
+                  </div>
+                ) : (
+                  messages.map((message) => (
+                    <ChatMessage key={message.id} message={message} />
+                  ))
+                )}
+                {isLoading && (
+                  <div className={styles.typingIndicator}>
+                    <span></span>
+                    <span></span>
+                    <span></span>
+                  </div>
+                )}
+                {error && (
+                  <div className={styles.errorMessage}>
+                    <span className={styles.errorIcon}>⚠️</span>
+                    {error}
+                  </div>
+                )}
+                <div ref={messagesEndRef} />
+              </div>
+            </div>
 
-        <div className={styles.inputArea}>
-          <ChatInput onSend={onSendMessage} disabled={isLoading} />
-        </div>
+            <div className={styles.inputArea}>
+              <ChatInput onSend={onSendMessage} disabled={isLoading} />
+            </div>
+          </>
+        )}
       </div>
     </div>
   );

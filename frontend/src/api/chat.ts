@@ -15,14 +15,15 @@ export interface SessionHistoryResponse {
 }
 
 /**
- * Create a new chat session
+ * Create a new chat session scoped to a project
  */
-export async function createChatSession(): Promise<CreateSessionResponse> {
+export async function createChatSession(projectId: string): Promise<CreateSessionResponse> {
   const response = await fetch(`${API_URL}/api/chat/sessions`, {
     method: 'POST',
     headers: {
       'Content-Type': 'application/json',
     },
+    body: JSON.stringify({ projectId }),
   });
 
   if (!response.ok) {
