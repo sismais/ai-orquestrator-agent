@@ -21,6 +21,7 @@ from claude_agent_sdk import (
 
 from . import session_registry as sessions
 from .runner_service import DEVKIT_CLAUDE
+from ..config.model_ids import resolve_model_id
 
 DEVKIT_AGENTS = DEVKIT_CLAUDE / "agents"
 
@@ -142,20 +143,24 @@ class StageResult:
 
 
 async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optional[str] = None,
-                    on_log=None) -> StageResult:
+                    on_log=None, model: Optional[str] = None) -> StageResult:
     """Roda um estagio numa sessao streaming (ClaudeSDKClient) — interrompivel (Stop) via registry.
 
     Registra a sessao em `session_registry[card_id]` enquanto roda, para a camada HTTP conseguir
-    `interrupt()`/`say()`. on_log(str) opcional (sync ou async).
+    `interrupt()`/`say()`. on_log(str) opcional (sync ou async). `model` (alias de UI, ex.: "opus-4.8")
+    e opcional — quando ausente, mantem o comportamento atual (sem `model=` no SDK, usa default do CLI).
     """
     body, tools = load_stage_agent(stage_key)
-    options = ClaudeAgentOptions(
+    options_kwargs = dict(
         cwd=worktree,
         setting_sources=["project"],
         system_prompt={"type": "preset", "preset": "claude_code", "append": body},
         allowed_tools=tools,
         permission_mode="acceptEdits",
     )
+    if model:
+        options_kwargs["model"] = resolve_model_id(model)
+    options = ClaudeAgentOptions(**options_kwargs)
 
     texts: list[str] = []
     cost = None

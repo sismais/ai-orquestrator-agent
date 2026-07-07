@@ -43,9 +43,18 @@ _LOG_FLUSH_CHARS = 800
 # Colunas que o pipeline executa: estagios de agente + validate_ci (git/gh, tratado a parte).
 _AGENT_STAGES = ("plan", "implement", "review")
 
+# coluna -> campo do card com o alias de modelo escolhido para a etapa.
+_STAGE_MODEL_FIELD = {"plan": "model_plan", "implement": "model_implement", "review": "model_review"}
+
 
 def _pipeline_handles(col: Optional[str]) -> bool:
     return col in _AGENT_STAGES or col == "validate_ci"
+
+
+def stage_model_for_column(col: str, card) -> "str | None":
+    """Alias do modelo escolhido para a etapa (coluna) corrente, ou None se a coluna nao executa agente por-modelo."""
+    field = _STAGE_MODEL_FIELD.get(col)
+    return getattr(card, field, None) if field else None
 
 
 class _LogSink:
@@ -281,7 +290,8 @@ async def run_pipeline(
                 extra["human_answer"] = pending_answer
                 pending_answer = None
             prompt = build_stage_prompt(col, card.title, card.description or "", worktree, extra)
-            res = await stage_fn(col, worktree, prompt, card_id=card_id, on_log=log)
+            res = await stage_fn(col, worktree, prompt, card_id=card_id, on_log=log,
+                                 model=stage_model_for_column(col, card))
             await log.flush()
             await account(res)
             if res.interrupted:
@@ -340,7 +350,8 @@ async def run_pipeline(
                     fix_prompt = build_stage_prompt(
                         "implement", card.title, card.description or "", worktree, {"findings": f},
                     )
-                    fix_res = await stage_fn("implement", worktree, fix_prompt, card_id=card_id, on_log=log)
+                    fix_res = await stage_fn("implement", worktree, fix_prompt, card_id=card_id, on_log=log,
+                                             model=stage_model_for_column("implement", card))
                     await log.flush()
                     await account(fix_res)
                     if fix_res.interrupted:

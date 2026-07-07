@@ -51,7 +51,7 @@ def make_stage_fn(script):
     """script: {stage_key: [texts...]} — devolvidos por chamada; default benigno."""
     counts: dict[str, int] = {}
 
-    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None):
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
         if on_log:
             r = on_log(f"[{stage_key}] trabalhando...\n")
             if inspect.isawaitable(r):
@@ -147,7 +147,7 @@ async def test_resume_starts_at_stage_with_answer(maker):
         await s.commit()
     seen: dict[str, list] = {}
 
-    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None):
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
         seen.setdefault(stage_key, []).append(prompt)
         text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
         return StageResult(ok=True, text=text, cost_usd=0.0)
@@ -165,7 +165,7 @@ async def test_resume_starts_at_stage_with_answer(maker):
 async def test_interrupt_pauses_card(maker):
     card_id = await _make_project_card(maker)
 
-    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None):
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
         # simula Stop no implement
         if stage_key == "implement":
             return StageResult(ok=True, text="", interrupted=True)
