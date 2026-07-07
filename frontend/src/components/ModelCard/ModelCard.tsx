@@ -4,13 +4,14 @@ import styles from './ModelCard.module.css';
 export interface ModelCardData {
   value: ModelType;
   label: string;
-  provider: 'anthropic' | 'google';
+  provider: 'anthropic';
   tagline: string;
   performance: string;
   icon: string;
   accent: string;
   description?: string;
   maxTokens?: number;
+  disabled?: boolean; // Modelo em beta, aparece na lista mas não é selecionável
 }
 
 interface ModelCardProps {
@@ -70,12 +71,17 @@ const CheckIcon = () => (
 export const ModelCard = ({ model, selected, onSelect, compact = false }: ModelCardProps) => {
   return (
     <div
-      className={`${styles.modelCard} ${styles[model.accent]} ${selected ? styles.selected : ''} ${compact ? styles.compact : ''}`}
-      onClick={onSelect}
+      className={`${styles.modelCard} ${styles[model.accent]} ${selected ? styles.selected : ''} ${compact ? styles.compact : ''} ${model.disabled ? styles.disabled : ''}`}
+      onClick={() => {
+        if (model.disabled) return;
+        onSelect();
+      }}
       role="button"
-      tabIndex={0}
+      tabIndex={model.disabled ? -1 : 0}
       aria-selected={selected}
+      aria-disabled={model.disabled}
       onKeyDown={(e) => {
+        if (model.disabled) return;
         if (e.key === 'Enter' || e.key === ' ') {
           e.preventDefault();
           onSelect();

@@ -30,8 +30,8 @@ interface AddCardModalProps {
 
 const MODEL_CARDS: ModelCardData[] = [
   {
-    value: 'opus-4.5',
-    label: 'Opus 4.5',
+    value: 'opus-4.8',
+    label: 'Opus 4.8',
     provider: 'anthropic',
     tagline: 'Maximum intelligence',
     performance: 'Highest Quality',
@@ -39,8 +39,8 @@ const MODEL_CARDS: ModelCardData[] = [
     accent: 'opus'
   },
   {
-    value: 'sonnet-4.5',
-    label: 'Sonnet 4.5',
+    value: 'sonnet-5',
+    label: 'Sonnet 5',
     provider: 'anthropic',
     tagline: 'Balanced performance',
     performance: 'Fast & Smart',
@@ -57,22 +57,14 @@ const MODEL_CARDS: ModelCardData[] = [
     accent: 'haiku'
   },
   {
-    value: 'gemini-3-pro',
-    label: 'Gemini Pro',
-    provider: 'google',
-    tagline: 'Advanced reasoning',
-    performance: 'High Performance',
-    icon: '🔷',
-    accent: 'gemini-pro'
-  },
-  {
-    value: 'gemini-3-flash',
-    label: 'Gemini Flash',
-    provider: 'google',
-    tagline: 'Fast responses',
-    performance: 'Quick & Efficient',
-    icon: '⚡',
-    accent: 'gemini-flash'
+    value: 'fable-5',
+    label: 'Fable 5',
+    provider: 'anthropic',
+    tagline: 'Creative and narrative tasks',
+    performance: 'Beta',
+    icon: '📖',
+    accent: 'fable',
+    disabled: true
   }
 ];
 
@@ -106,10 +98,10 @@ const WORKFLOW_STAGES = [
 export function AddCardModal({ isOpen, onClose, onSubmit, title: modalTitle, submitButtonText }: AddCardModalProps) {
   const [title, setTitle] = useState('');
   const [description, setDescription] = useState('');
-  const [modelPlan, setModelPlan] = useState<ModelType>('opus-4.5');
-  const [modelImplement, setModelImplement] = useState<ModelType>('opus-4.5');
-  const [modelTest, setModelTest] = useState<ModelType>('opus-4.5');
-  const [modelReview, setModelReview] = useState<ModelType>('opus-4.5');
+  const [modelPlan, setModelPlan] = useState<ModelType>('opus-4.8');
+  const [modelImplement, setModelImplement] = useState<ModelType>('opus-4.8');
+  const [modelTest, setModelTest] = useState<ModelType>('opus-4.8');
+  const [modelReview, setModelReview] = useState<ModelType>('opus-4.8');
   const [previewImages, setPreviewImages] = useState<Array<{
     id: string;
     file: File | null;
@@ -188,10 +180,10 @@ export function AddCardModal({ isOpen, onClose, onSubmit, title: modalTitle, sub
       if (!showDraftNotification) {
         setTitle('');
         setDescription('');
-        setModelPlan('opus-4.5');
-        setModelImplement('opus-4.5');
-        setModelTest('opus-4.5');
-        setModelReview('opus-4.5');
+        setModelPlan('opus-4.8');
+        setModelImplement('opus-4.8');
+        setModelTest('opus-4.8');
+        setModelReview('opus-4.8');
         setPreviewImages([]);
         setUploadError(null);
       }
@@ -379,7 +371,7 @@ export function AddCardModal({ isOpen, onClose, onSubmit, title: modalTitle, sub
       case 'modelReview':
         return modelReview;
       default:
-        return 'opus-4.5';
+        return 'opus-4.8';
     }
   };
 

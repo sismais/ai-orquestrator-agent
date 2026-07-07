@@ -7,65 +7,54 @@ import styles from './ModelSelector.module.css';
  * Lista de modelos disponíveis com informações detalhadas
  */
 export const AVAILABLE_MODELS: AIModel[] = [
-  // Claude 4.5 Models
+  // Claude Models
   {
-    id: 'opus-4.5',
-    name: 'Claude 4.5 Opus',
-    displayName: 'Opus 4.5',
+    id: 'opus-4.8',
+    name: 'Claude Opus 4.8',
+    displayName: 'Opus 4.8',
     provider: 'anthropic',
-    maxTokens: 200000,
+    maxTokens: 1000000,
     description: 'Most capable for complex tasks',
     performance: 'powerful',
     icon: '🧠',
-    accent: 'anthropic',
+    accent: 'opus',
     badge: 'Most Capable'
   },
   {
-    id: 'sonnet-4.5',
-    name: 'Claude 4.5 Sonnet',
-    displayName: 'Sonnet 4.5',
+    id: 'sonnet-5',
+    name: 'Claude Sonnet 5',
+    displayName: 'Sonnet 5',
     provider: 'anthropic',
-    maxTokens: 200000,
+    maxTokens: 1000000,
     description: 'Balanced performance',
     performance: 'balanced',
     icon: '⚡',
-    accent: 'anthropic',
+    accent: 'sonnet',
     badge: 'Best Value'
   },
   {
     id: 'haiku-4.5',
-    name: 'Claude 4.5 Haiku',
+    name: 'Claude Haiku 4.5',
     displayName: 'Haiku 4.5',
     provider: 'anthropic',
     maxTokens: 200000,
     description: 'Fast and efficient',
     performance: 'fastest',
     icon: '🚀',
-    accent: 'anthropic'
+    accent: 'haiku'
   },
-  // Google Gemini 3 Models
   {
-    id: 'gemini-3-pro',
-    name: 'Gemini 3 Pro',
-    displayName: 'Gemini 3 Pro',
-    provider: 'google',
+    id: 'fable-5',
+    name: 'Claude Fable 5',
+    displayName: 'Fable 5',
+    provider: 'anthropic',
     maxTokens: 1000000,
-    description: 'Advanced multimodal capabilities',
+    description: 'Beta model for creative and narrative tasks',
     performance: 'powerful',
-    icon: '🧠',
-    accent: 'google',
-    badge: 'Multimodal'
-  },
-  {
-    id: 'gemini-3-flash',
-    name: 'Gemini 3 Flash',
-    displayName: 'Gemini 3 Flash',
-    provider: 'google',
-    maxTokens: 1000000,
-    description: 'Lightning fast',
-    performance: 'fastest',
-    icon: '⚡',
-    accent: 'google'
+    icon: '📖',
+    accent: 'fable',
+    badge: 'Beta',
+    disabled: true
   }
 ];
 
@@ -161,11 +150,14 @@ export function ModelSelector({ selectedModel, onModelChange, disabled = false }
                 key={model.id}
                 className={`${styles.modelCard} ${model.id === selectedModel ? styles.selectedCard : ''}`}
                 onClick={() => {
+                  if (model.disabled) return;
                   onModelChange(model.id);
                   setIsOpen(false);
                 }}
+                disabled={model.disabled}
                 role="option"
                 aria-selected={model.id === selectedModel}
+                aria-disabled={model.disabled}
               >
                 <div className={styles.modelHeader}>
                   <span className={styles.modelCardIcon}>{model.icon}</span>

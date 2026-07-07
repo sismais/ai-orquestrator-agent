@@ -16,14 +16,14 @@ export interface CardExperts {
 }
 
 export type ModelType =
-  | 'opus-4.5' | 'sonnet-4.5' | 'haiku-4.5'  // Claude models
-  | 'gemini-3-pro' | 'gemini-3-flash';  // Gemini models
+  | 'opus-4.8' | 'sonnet-5' | 'haiku-4.5'  // Claude
+  | 'fable-5';  // Claude (beta, desabilitado)
 
 // Status de merge - IA resolve conflitos automaticamente
 export type MergeStatus = 'none' | 'merging' | 'resolving' | 'merged' | 'failed';
 
 // Provider info para UI
-export type ModelProvider = 'anthropic' | 'google';
+export type ModelProvider = 'anthropic';
 
 export interface ModelInfo {
   value: ModelType;

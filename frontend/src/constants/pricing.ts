@@ -12,26 +12,21 @@ export interface ModelPricing {
 
 export const MODEL_PRICING: Record<ModelType, ModelPricing> = {
   // Claude Models
-  'opus-4.5': {
-    inputPricePerMillion: 15.00,
-    outputPricePerMillion: 75.00,
+  'opus-4.8': {
+    inputPricePerMillion: 5.00,
+    outputPricePerMillion: 25.00,
   },
-  'sonnet-4.5': {
+  'sonnet-5': {
     inputPricePerMillion: 3.00,
     outputPricePerMillion: 15.00,
   },
   'haiku-4.5': {
-    inputPricePerMillion: 0.25,
-    outputPricePerMillion: 1.25,
-  },
-  // Gemini Models
-  'gemini-3-pro': {
-    inputPricePerMillion: 1.25,
+    inputPricePerMillion: 1.00,
     outputPricePerMillion: 5.00,
   },
-  'gemini-3-flash': {
-    inputPricePerMillion: 0.075,
-    outputPricePerMillion: 0.30,
+  'fable-5': {
+    inputPricePerMillion: 10.00,
+    outputPricePerMillion: 50.00,
   },
 };
 

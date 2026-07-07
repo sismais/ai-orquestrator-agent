@@ -253,24 +253,19 @@
   background: radial-gradient(circle, rgba(139, 92, 246, 1) 0%, transparent 70%);
 }
 
-.modelCard.gemini-pro,
-.modelCard[class*="gemini-pro"] {
-  --model-accent: 59, 130, 246;
+.modelCard.fable {
+  --model-accent: 217, 70, 239;
 }
 
-.modelCard.gemini-pro .cardGlow,
-.modelCard[class*="gemini-pro"] .cardGlow {
-  background: radial-gradient(circle, rgba(59, 130, 246, 1) 0%, transparent 70%);
+.modelCard.fable .cardGlow {
+  background: radial-gradient(circle, rgba(217, 70, 239, 1) 0%, transparent 70%);
 }
 
-.modelCard.gemini-flash,
-.modelCard[class*="gemini-flash"] {
-  --model-accent: 234, 179, 8;
-}
-
-.modelCard.gemini-flash .cardGlow,
-.modelCard[class*="gemini-flash"] .cardGlow {
-  background: radial-gradient(circle, rgba(234, 179, 8, 1) 0%, transparent 70%);
+/* Beta / não-selecionável */
+.modelCard.disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
 }
 
 /* Responsive adjustments */

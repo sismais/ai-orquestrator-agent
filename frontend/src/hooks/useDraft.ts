@@ -66,10 +66,10 @@ export function useDraft(options: UseDraftOptions = {}) {
       const draft: CardDraft = {
         title: data.title || '',
         description: data.description || '',
-        modelPlan: data.modelPlan || 'opus-4.5',
-        modelImplement: data.modelImplement || 'opus-4.5',
-        modelTest: data.modelTest || 'opus-4.5',
-        modelReview: data.modelReview || 'opus-4.5',
+        modelPlan: data.modelPlan || 'opus-4.8',
+        modelImplement: data.modelImplement || 'opus-4.8',
+        modelTest: data.modelTest || 'opus-4.8',
+        modelReview: data.modelReview || 'opus-4.8',
         previewImages: data.previewImages || [],
         savedAt: new Date().toISOString(),
         version: 1

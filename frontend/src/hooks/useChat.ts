@@ -17,7 +17,7 @@ export function useChat() {
     session: null,
     isLoading: false,
     error: null,
-    selectedModel: 'sonnet-4.5',
+    selectedModel: 'sonnet-5',
     unreadCount: 0,
   });
 
