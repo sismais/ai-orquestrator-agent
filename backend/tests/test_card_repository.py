@@ -46,10 +46,10 @@ class TestCardRepository:
         card_data = CardCreate(
             title="Test Card",
             description="Test Description",
-            model_plan="opus-4.5",
-            model_implement="sonnet-4.5",
+            model_plan="opus-4.8",
+            model_implement="sonnet-5",
             model_test="haiku-4.5",
-            model_review="opus-4.5"
+            model_review="opus-4.8"
         )
 
         card = await repo.create(card_data)
@@ -70,10 +70,10 @@ class TestCardRepository:
         parent_data = CardCreate(
             title="Parent Card",
             description="Parent Description",
-            model_plan="opus-4.5",
-            model_implement="opus-4.5",
-            model_test="opus-4.5",
-            model_review="opus-4.5"
+            model_plan="opus-4.8",
+            model_implement="opus-4.8",
+            model_test="opus-4.8",
+            model_review="opus-4.8"
         )
 
         parent_card = await repo.create(parent_data)
@@ -83,10 +83,10 @@ class TestCardRepository:
         fix_data = CardCreate(
             title="[FIX] Parent Card",
             description="Fix for test failures",
-            model_plan="opus-4.5",
-            model_implement="opus-4.5",
-            model_test="opus-4.5",
-            model_review="opus-4.5",
+            model_plan="opus-4.8",
+            model_implement="opus-4.8",
+            model_test="opus-4.8",
+            model_review="opus-4.8",
             parent_card_id=parent_card.id,
             is_fix_card=True,
             test_error_context='{"error_type": "test_failure"}'
@@ -107,10 +107,10 @@ class TestCardRepository:
         parent_data = CardCreate(
             title="Parent Card",
             description="Parent Description",
-            model_plan="opus-4.5",
-            model_implement="opus-4.5",
-            model_test="opus-4.5",
-            model_review="opus-4.5"
+            model_plan="opus-4.8",
+            model_implement="opus-4.8",
+            model_test="opus-4.8",
+            model_review="opus-4.8"
         )
 
         parent_card = await repo.create(parent_data)
@@ -124,10 +124,10 @@ class TestCardRepository:
         fix_data = CardCreate(
             title="[FIX] Parent Card",
             description="Fix for test failures",
-            model_plan="opus-4.5",
-            model_implement="opus-4.5",
-            model_test="opus-4.5",
-            model_review="opus-4.5",
+            model_plan="opus-4.8",
+            model_implement="opus-4.8",
+            model_test="opus-4.8",
+            model_review="opus-4.8",
             parent_card_id=parent_card.id,
             is_fix_card=True
         )
@@ -148,10 +148,10 @@ class TestCardRepository:
         parent_data = CardCreate(
             title="Parent Card",
             description="Parent Description",
-            model_plan="opus-4.5",
-            model_implement="opus-4.5",
-            model_test="opus-4.5",
-            model_review="opus-4.5"
+            model_plan="opus-4.8",
+            model_implement="opus-4.8",
+            model_test="opus-4.8",
+            model_review="opus-4.8"
         )
 
         parent_card = await repo.create(parent_data)
@@ -185,10 +185,10 @@ class TestCardRepository:
         parent_data = CardCreate(
             title="Parent Card",
             description="Parent Description",
-            model_plan="sonnet-4.5",
+            model_plan="sonnet-5",
             model_implement="haiku-4.5",
-            model_test="opus-4.5",
-            model_review="sonnet-4.5"
+            model_test="opus-4.8",
+            model_review="sonnet-5"
         )
 
         parent_card = await repo.create(parent_data)
@@ -218,10 +218,10 @@ class TestCardRepository:
             card_data = CardCreate(
                 title=f"Card {i}",
                 description=f"Description {i}",
-                model_plan="opus-4.5",
-                model_implement="opus-4.5",
-                model_test="opus-4.5",
-                model_review="opus-4.5"
+                model_plan="opus-4.8",
+                model_implement="opus-4.8",
+                model_test="opus-4.8",
+                model_review="opus-4.8"
             )
             await repo.create(card_data)
 
@@ -241,10 +241,10 @@ class TestCardRepository:
         parent_data = CardCreate(
             title="Parent Card",
             description="Parent Description",
-            model_plan="opus-4.5",
-            model_implement="opus-4.5",
-            model_test="opus-4.5",
-            model_review="opus-4.5"
+            model_plan="opus-4.8",
+            model_implement="opus-4.8",
+            model_test="opus-4.8",
+            model_review="opus-4.8"
         )
 
         parent_card = await repo.create(parent_data)
@@ -254,10 +254,10 @@ class TestCardRepository:
         fix_data = CardCreate(
             title="[FIX] Parent Card",
             description="Fix for test failures",
-            model_plan="opus-4.5",
-            model_implement="opus-4.5",
-            model_test="opus-4.5",
-            model_review="opus-4.5",
+            model_plan="opus-4.8",
+            model_implement="opus-4.8",
+            model_test="opus-4.8",
+            model_review="opus-4.8",
             parent_card_id=parent_card.id,
             is_fix_card=True,
             test_error_context='{"error_type": "test_failure"}'

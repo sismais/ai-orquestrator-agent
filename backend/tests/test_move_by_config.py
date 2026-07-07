@@ -46,7 +46,7 @@ async def test_remap_legacy_columns(session_and_engine):
     insert_sql = text(
         "INSERT INTO cards (id, title, column_id, model_plan, model_implement, model_test, model_review, "
         "archived, created_at, updated_at, is_fix_card) "
-        "VALUES (:i, :title, :column_id, 'opus-4.5', 'opus-4.5', 'opus-4.5', 'opus-4.5', 0, "
+        "VALUES (:i, :title, :column_id, 'opus-4.8', 'opus-4.8', 'opus-4.8', 'opus-4.8', 0, "
         "CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, 0)"
     )
     async with maker() as s:
