@@ -98,18 +98,23 @@
   letter-spacing: 0.05em;
 }
 
-.providerBadge.anthropic {
-  background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
+.providerBadge.opus {
+  background: linear-gradient(135deg, #6D28D9 0%, #7C3AED 100%);
   color: white;
 }
 
-.providerBadge.openai {
-  background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+.providerBadge.sonnet {
+  background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);
   color: white;
 }
 
-.providerBadge.google {
-  background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
+.providerBadge.haiku {
+  background: linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%);
+  color: white;
+}
+
+.providerBadge.fable {
+  background: linear-gradient(135deg, #C026D3 0%, #D946EF 100%);
   color: white;
 }
 
@@ -342,18 +347,23 @@
   font-size: 0.65rem;
 }
 
-.provider.anthropic {
-  background: linear-gradient(135deg, #D97706 0%, #F59E0B 100%);
+.provider.opus {
+  background: linear-gradient(135deg, #6D28D9 0%, #7C3AED 100%);
   color: white;
 }
 
-.provider.openai {
-  background: linear-gradient(135deg, #059669 0%, #10B981 100%);
+.provider.sonnet {
+  background: linear-gradient(135deg, #4F46E5 0%, #6366F1 100%);
   color: white;
 }
 
-.provider.google {
-  background: linear-gradient(135deg, #2563EB 0%, #3B82F6 100%);
+.provider.haiku {
+  background: linear-gradient(135deg, #7C3AED 0%, #8B5CF6 100%);
+  color: white;
+}
+
+.provider.fable {
+  background: linear-gradient(135deg, #C026D3 0%, #D946EF 100%);
   color: white;
 }
 

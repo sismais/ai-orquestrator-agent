@@ -33,6 +33,29 @@ export async function createChatSession(projectId: string): Promise<CreateSessio
   return response.json();
 }
 
+export interface ChatSessionSummary {
+  sessionId: string;
+  title: string | null;
+  createdAt: string;
+}
+
+/**
+ * List chat sessions for a project (most recent first).
+ */
+export async function listChatSessions(projectId: string): Promise<ChatSessionSummary[]> {
+  const response = await fetch(
+    `${API_URL}/api/chat/sessions?projectId=${encodeURIComponent(projectId)}`,
+    { method: 'GET', headers: { 'Content-Type': 'application/json' } },
+  );
+
+  if (!response.ok) {
+    throw new Error('Failed to list chat sessions');
+  }
+
+  const data = await response.json();
+  return data.sessions ?? [];
+}
+
 /**
  * Get chat session history
  */

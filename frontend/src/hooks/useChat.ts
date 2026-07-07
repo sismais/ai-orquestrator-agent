@@ -3,7 +3,7 @@ import { ChatState, Message } from '../types/chat';
 import { v4 as uuidv4 } from 'uuid';
 import { useWebSocketBase } from './useWebSocketBase';
 import { WS_ENDPOINTS } from '../api/config';
-import { createChatSession } from '../api/chat';
+import { createChatSession, listChatSessions, getChatHistory } from '../api/chat';
 
 interface ChatWebSocketMessage {
   type: 'chunk' | 'end' | 'error';
@@ -28,8 +28,9 @@ export function useChat(projectId: string | null) {
   const currentMessageId = useRef<string | null>(null);
   const pendingMessage = useRef<string | null>(null);
 
-  // Cria a sessão de chat no backend sempre que o projeto selecionado mudar.
-  // Sem projeto: nao ha sessao, nao ha conexao WS (empty state fica a cargo da UI).
+  // Ao trocar de projeto: reusa a sessao mais recente do projeto (carregando o
+  // historico), ou cria a primeira se nao houver nenhuma. Evita acumular sessoes
+  // vazias a cada reload/troca. Sem projeto: nao ha sessao/WS (empty state na UI).
   useEffect(() => {
     let cancelled = false;
 
@@ -43,28 +44,58 @@ export function useChat(projectId: string | null) {
 
     setState((prev) => ({ ...prev, isLoading: true, error: null }));
 
-    createChatSession(projectId)
-      .then((res) => {
+    (async () => {
+      try {
+        const sessions = await listChatSessions(projectId);
         if (cancelled) return;
-        setSessionId(res.sessionId);
-        setState((prev) => ({
-          ...prev,
-          session: {
-            id: res.sessionId,
-            messages: [],
-            createdAt: res.createdAt,
-            updatedAt: res.createdAt,
-            model: prev.selectedModel,
-          },
-          isLoading: false,
-          error: null,
-        }));
-      })
-      .catch((err) => {
+
+        if (sessions.length > 0) {
+          const latest = sessions[0]; // backend ordena por updated_at desc
+          const history = await getChatHistory(latest.sessionId);
+          if (cancelled) return;
+          const messages: Message[] = history.messages.map((m) => ({
+            id: uuidv4(),
+            role: m.role,
+            content: m.content,
+            timestamp: m.timestamp,
+            isStreaming: false,
+          }));
+          setSessionId(latest.sessionId);
+          setState((prev) => ({
+            ...prev,
+            session: {
+              id: latest.sessionId,
+              messages,
+              createdAt: latest.createdAt,
+              updatedAt: latest.createdAt,
+              model: prev.selectedModel,
+            },
+            isLoading: false,
+            error: null,
+          }));
+        } else {
+          const res = await createChatSession(projectId);
+          if (cancelled) return;
+          setSessionId(res.sessionId);
+          setState((prev) => ({
+            ...prev,
+            session: {
+              id: res.sessionId,
+              messages: [],
+              createdAt: res.createdAt,
+              updatedAt: res.createdAt,
+              model: prev.selectedModel,
+            },
+            isLoading: false,
+            error: null,
+          }));
+        }
+      } catch (err) {
         if (cancelled) return;
-        console.error('[useChat] Failed to create chat session:', err);
+        console.error('[useChat] Failed to init chat session:', err);
         setState((prev) => ({ ...prev, isLoading: false, error: 'Falha ao iniciar sessao de chat.' }));
-      });
+      }
+    })();
 
     return () => {
       cancelled = true;
@@ -245,34 +276,10 @@ export function useChat(projectId: string | null) {
   }, []);
 
   const handleModelChange = useCallback((model: string) => {
+    // O modelo vai por mensagem (payload do send); trocar de modelo apenas atualiza
+    // o selecionado, sem reiniciar a conversa nem criar sessao nova.
     setState((prev) => ({ ...prev, selectedModel: model }));
-
-    if (!projectId) return;
-
-    // Reset session when model changes (nova sessão no backend, escopada ao projeto)
-    currentMessageId.current = null;
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-    createChatSession(projectId)
-      .then((res) => {
-        setSessionId(res.sessionId);
-        setState((prev) => ({
-          ...prev,
-          session: {
-            id: res.sessionId,
-            messages: [],
-            createdAt: res.createdAt,
-            updatedAt: res.createdAt,
-            model,
-          },
-          isLoading: false,
-        }));
-      })
-      .catch((err) => {
-        console.error('[useChat] Failed to reset session on model change:', err);
-        setState((prev) => ({ ...prev, isLoading: false, error: 'Falha ao trocar de modelo.' }));
-      });
-  }, [projectId]);
+  }, []);
 
   const createNewSession = useCallback(() => {
     if (!projectId) return;
