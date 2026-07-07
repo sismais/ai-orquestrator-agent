@@ -27,7 +27,8 @@ class ClaudeAgentChat:
         self,
         messages: list[dict],
         model: str = "sonnet-5",
-        system_prompt: str | None = None
+        system_prompt: str | None = None,
+        cwd: str | None = None,
     ) -> AsyncGenerator[str, None]:
         """
         Stream response from Claude or Gemini using Agent SDK directly
@@ -37,6 +38,7 @@ class ClaudeAgentChat:
             messages: List of conversation messages in format [{"role": "user/assistant", "content": "..."}]
             model: AI model to use (e.g., "opus-4.8", "sonnet-5", "haiku-4.5")
             system_prompt: Optional system prompt to set context
+            cwd: Working directory for the agent (defaults to the process cwd)
 
         Yields:
             str: Chunks of the response text as they arrive
@@ -44,19 +46,7 @@ class ClaudeAgentChat:
         print(f"[ClaudeAgentChat] stream_response called with model: {model}")
 
         try:
-            # Get current working directory from active project in database
-            from .database import async_session_maker
-            from .models.project import ActiveProject
-            from sqlalchemy import select
-
-            cwd = Path.cwd()
-            async with async_session_maker() as session:
-                result = await session.execute(
-                    select(ActiveProject).order_by(ActiveProject.loaded_at.desc()).limit(1)
-                )
-                active_project = result.scalar_one_or_none()
-                if active_project:
-                    cwd = Path(active_project.path)
+            resolved_cwd = Path(cwd) if cwd else Path.cwd()
 
             agent_model = resolve_model_id(model)
 
@@ -82,7 +72,7 @@ class ClaudeAgentChat:
 
             # Configure Claude Agent SDK Options - same as /plan but with appropriate tools
             options = ClaudeAgentOptions(
-                cwd=cwd,  # Use project root
+                cwd=resolved_cwd,  # Use project root
                 setting_sources=["user", "project"],
                 allowed_tools=[
                     "Read",      # Read files
