@@ -26,7 +26,7 @@ class ClaudeAgentChat:
     async def stream_response(
         self,
         messages: list[dict],
-        model: str = "sonnet-4.5",
+        model: str = "sonnet-5",
         system_prompt: str | None = None
     ) -> AsyncGenerator[str, None]:
         """
@@ -35,7 +35,7 @@ class ClaudeAgentChat:
 
         Args:
             messages: List of conversation messages in format [{"role": "user/assistant", "content": "..."}]
-            model: AI model to use (e.g., "opus-4.5", "sonnet-4.5", "haiku-4.5", "gemini-3-pro", "gemini-3-flash")
+            model: AI model to use (e.g., "opus-4.8", "sonnet-5", "haiku-4.5")
             system_prompt: Optional system prompt to set context
 
         Yields:
@@ -119,7 +119,7 @@ class ClaudeAgentChat:
     async def get_single_response(
         self,
         messages: list[dict],
-        model: str = "sonnet-4.5",
+        model: str = "sonnet-5",
         system_prompt: str | None = None
     ) -> str:
         """
@@ -173,22 +173,21 @@ curl -s -X POST http://localhost:3001/api/cards \
   -d '{
     "title": "TITULO_AQUI",
     "description": "DESCRICAO_AQUI",
-    "modelPlan": "opus-4.5",
-    "modelImplement": "sonnet-4.5",
+    "modelPlan": "opus-4.8",
+    "modelImplement": "sonnet-5",
     "modelTest": "haiku-4.5",
     "modelReview": "haiku-4.5"
   }'
 ```
 
 ### Model defaults (use unless user specifies otherwise):
-- Plan: opus-4.5 (best for planning)
-- Implement: sonnet-4.5 (good balance)
+- Plan: opus-4.8 (best for planning)
+- Implement: sonnet-5 (good balance)
 - Test: haiku-4.5 (fast for tests)
 - Review: haiku-4.5 (fast for review)
 
 ### Available models:
-- Claude: opus-4.5, sonnet-4.5, haiku-4.5
-- Gemini: gemini-3-pro, gemini-3-flash
+- Claude: opus-4.8, sonnet-5, haiku-4.5
 
 If user specifies a model (e.g., "use sonnet for everything"), adjust accordingly.
 

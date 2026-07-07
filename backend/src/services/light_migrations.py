@@ -34,3 +34,19 @@ async def remap_legacy_columns(engine: AsyncEngine) -> None:
                 text("UPDATE cards SET column_id = :new WHERE column_id = :old"),
                 {"new": new, "old": old},
             )
+
+
+# Remap de aliases de modelo legados -> aliases atuais (idempotente)
+_MODEL_ALIAS_REMAP = {"opus-4.5": "opus-4.8", "sonnet-4.5": "sonnet-5"}
+_MODEL_COLUMNS = ("model_plan", "model_implement", "model_test", "model_review")
+
+
+async def remap_legacy_model_aliases(engine: AsyncEngine) -> None:
+    """Remapeia aliases de modelo antigos nos cards para os atuais (idempotente)."""
+    async with engine.begin() as conn:
+        for col in _MODEL_COLUMNS:
+            for old, new in _MODEL_ALIAS_REMAP.items():
+                await conn.execute(
+                    text(f"UPDATE cards SET {col} = :new WHERE {col} = :old"),
+                    {"new": new, "old": old},
+                )

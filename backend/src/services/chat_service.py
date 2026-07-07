@@ -203,7 +203,7 @@ class ChatService:
         self,
         session_id: str,
         message: str,
-        model: str = "sonnet-4.5"
+        model: str = "sonnet-5"
     ) -> AsyncGenerator[dict, None]:
         """
         Send a message and stream the response from Claude.

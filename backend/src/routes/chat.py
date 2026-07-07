@@ -104,7 +104,7 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
     {
         "type": "message",
         "content": "user message text",
-        "model": "sonnet-4.5" (optional, defaults to sonnet-4.5)
+        "model": "sonnet-5" (optional, defaults to sonnet-5)
     }
 
     And sends back JSON responses:
@@ -133,7 +133,7 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
                 message_data = json.loads(data)
                 message_type = message_data.get("type")
                 message_content = message_data.get("content")
-                message_model = message_data.get("model", "sonnet-4.5")
+                message_model = message_data.get("model", "sonnet-5")
 
                 if message_type != "message" or not message_content:
                     await websocket.send_text(
