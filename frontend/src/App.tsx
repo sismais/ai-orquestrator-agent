@@ -715,7 +715,12 @@ function App() {
   }
 
   return (
-    <WorkspaceLayout currentModule={currentView} onNavigate={handleNavigate}>
+    <WorkspaceLayout
+      currentModule={currentView}
+      onNavigate={handleNavigate}
+      currentProjectId={currentProjectId}
+      onProjectSwitch={setCurrentProjectId}
+    >
       {renderView()}
       <div id="modal-root" />
     </WorkspaceLayout>

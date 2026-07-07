@@ -8,12 +8,19 @@ interface WorkspaceLayoutProps {
   children: ReactNode;
   currentModule: ModuleType;
   onNavigate: (module: ModuleType) => void;
+  currentProjectId: string | null;
+  onProjectSwitch: (projectId: string) => void;
 }
 
-const WorkspaceLayout = ({ children, currentModule, onNavigate }: WorkspaceLayoutProps) => {
+const WorkspaceLayout = ({ children, currentModule, onNavigate, currentProjectId, onProjectSwitch }: WorkspaceLayoutProps) => {
   return (
     <div className={styles.workspace}>
-      <TopNav currentModule={currentModule} onNavigate={onNavigate} />
+      <TopNav
+        currentModule={currentModule}
+        onNavigate={onNavigate}
+        currentProjectId={currentProjectId}
+        onProjectSwitch={onProjectSwitch}
+      />
       <main className={styles.content}>
         {children}
       </main>

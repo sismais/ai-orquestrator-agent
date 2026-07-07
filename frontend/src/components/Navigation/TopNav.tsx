@@ -1,9 +1,12 @@
 import { ModuleType } from '../../layouts/WorkspaceLayout';
 import styles from './TopNav.module.css';
+import { ProjectSelectorRegistry } from '../ProjectSelectorRegistry/ProjectSelectorRegistry';
 
 interface TopNavProps {
   currentModule: ModuleType;
   onNavigate: (module: ModuleType) => void;
+  currentProjectId: string | null;
+  onProjectSwitch: (projectId: string) => void;
 }
 
 const navItems: { id: ModuleType; label: string }[] = [
@@ -13,7 +16,7 @@ const navItems: { id: ModuleType; label: string }[] = [
   { id: 'settings', label: 'Settings' },
 ];
 
-const TopNav = ({ currentModule, onNavigate }: TopNavProps) => {
+const TopNav = ({ currentModule, onNavigate, currentProjectId, onProjectSwitch }: TopNavProps) => {
   return (
     <nav className={styles.topnav}>
       <div className={styles.logo}>
@@ -38,6 +41,7 @@ const TopNav = ({ currentModule, onNavigate }: TopNavProps) => {
       </div>
 
       <div className={styles.navRight}>
+        <ProjectSelectorRegistry currentProjectId={currentProjectId} onSwitch={onProjectSwitch} />
         <button className={styles.iconBtn} title="Search — ⌘K">
           <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="2">
             <circle cx="11" cy="11" r="8"/>

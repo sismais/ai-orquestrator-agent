@@ -2,7 +2,6 @@ import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
 import { Card as CardType, Column, ColumnId, ExecutionStatus, WorkflowStatus } from '../types';
 import { Board } from '../components/Board/Board';
 import { Card } from '../components/Card/Card';
-import { ProjectSelectorRegistry } from '../components/ProjectSelectorRegistry/ProjectSelectorRegistry';
 import { AddCard } from '../components/AddCard/AddCard';
 import styles from './KanbanPage.module.css';
 
@@ -51,7 +50,7 @@ const KanbanPage = ({
   fetchLogsHistory,
   loadingExpertsCardId,
   currentProjectId,
-  onProjectIdSwitch,
+  onProjectIdSwitch: _onProjectIdSwitch,
 }: KanbanPageProps) => {
   return (
     <div className={styles.kanbanPage}>
@@ -63,10 +62,6 @@ const KanbanPage = ({
           </p>
         </div>
         <div className={styles.projectActions}>
-          <ProjectSelectorRegistry
-            currentProjectId={currentProjectId}
-            onSwitch={onProjectIdSwitch}
-          />
           <AddCard columnId="backlog" onAdd={onAddCard} projectId={currentProjectId} />
         </div>
       </div>
