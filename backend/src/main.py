@@ -21,10 +21,8 @@ from .execution import (
 )
 from pydantic import BaseModel
 from .routes.cards import router as cards_router
-from .routes.projects import get_project_manager
 from .routes.cards_ws import router as cards_ws_router
 from .routes.images import router as images_router
-from .routes.projects import router as projects_router
 from .routes.projects_registry import router as projects_registry_router
 from .routes.chat import router as chat_router
 from .routes.execution_ws import router as execution_ws_router
@@ -105,7 +103,6 @@ app.add_middleware(
 app.include_router(cards_router)
 app.include_router(cards_ws_router)
 app.include_router(images_router)
-app.include_router(projects_router)
 app.include_router(projects_registry_router)
 app.include_router(chat_router)
 app.include_router(execution_ws_router)
