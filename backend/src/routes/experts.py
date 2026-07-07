@@ -250,9 +250,15 @@ async def expert_triage_endpoint(
     - Com projeto carregado: usa experts do projeto (pode ser vazio)
     """
     try:
-        # Obter contexto do projeto
-        manager = get_project_manager()
-        project_path = str(manager.current_project) if manager.current_project else None
+        # Resolve o projeto pelo card (registry), nao mais pelo ProjectManager.
+        card_repo = CardRepository(db)
+        card = await card_repo.get_by_id(request.card_id)
+        project_path = None
+        if card and card.project_id:
+            from ..repositories.project_repository import ProjectRepository
+            project = await ProjectRepository(db).get_by_id(card.project_id)
+            if project:
+                project_path = project.path
 
         # cwd é onde os knowledge files estão
         cwd = project_path if project_path else str(Path.cwd().parent)
@@ -267,13 +273,12 @@ async def expert_triage_endpoint(
 
         # Save experts to the card in database
         if experts:
-            repo = CardRepository(db)
             # Convert ExpertMatch objects to dict for JSON storage
             experts_dict = {
                 expert_id: match.model_dump()
                 for expert_id, match in experts.items()
             }
-            await repo.update_experts(request.card_id, experts_dict)
+            await card_repo.update_experts(request.card_id, experts_dict)
             await db.commit()
 
         return ExpertTriageResponse(
