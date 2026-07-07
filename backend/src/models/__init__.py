@@ -8,9 +8,11 @@ from .project import ActiveProject
 from .project_registry import Project
 from .workflow import Workflow
 from .metrics import ProjectMetrics, ExecutionMetrics
+from .chat import ChatSession, ChatMessage
 
 __all__ = [
     "User", "Card", "Execution", "ExecutionLog", "ExecutionStatus",
     "ActivityLog", "ActivityType", "ActiveProject", "Project", "Workflow",
     "ProjectMetrics", "ExecutionMetrics",
+    "ChatSession", "ChatMessage",
 ]
