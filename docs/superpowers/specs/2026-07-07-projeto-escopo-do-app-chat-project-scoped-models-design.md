@@ -12,8 +12,11 @@ seletor de projeto sobe pra o nível do app, então o cwd do agente de chat pass
    `WorkspaceLayout`), escopando **todos** os módulos (Kanban, Chat, Dashboard).
 2. **Chat project-scoped e persistido:** cada projeto tem suas conversas; as sessões passam a viver em DB (hoje é um
    dict em memória) com `project_id`; o cwd do agente de chat vem do `Project.path` selecionado.
-3. **Remover o `ActiveProject`:** sem função após (2). Migrar o FK do `metrics` pra `projects.id`; remover o fluxo
-   antigo em `routes/projects.py` e o `database_manager`.
+3. **Remover o subsistema legado de "projeto ativo" (remoção completa — decidido):** sem função após (2). Migrar os
+   endpoints de worktree/git (`main.py`) pra usarem o `Project` do registry; migrar o experts **vivo** (`expert-triage`)
+   pra resolver o projeto pelo `card.project_id`; **remover** `ActiveProject`, `database_manager`, `project_history`,
+   `project_manager`, `routes/projects.py` e o **`ExpertsModal` órfão** + seus 4 endpoints de modal. Migrar o FK do
+   `metrics` pra `projects.id`.
 4. **Atualizar modelos LLM:** opus-4.8, sonnet-5, haiku-4.5, +fable-5 (desabilitado), −gemini; **1M de contexto** em
    opus/sonnet; e **ligar o modelo-por-etapa** no pipeline (o `card.model_*` passa a controlar a execução).
 
@@ -23,6 +26,12 @@ seletor de projeto sobe pra o nível do app, então o cwd do agente de chat pass
 - **Chat sem projeto selecionado:** exige projeto (mostra "selecione um projeto"; não roda sem um).
 - **FK do metrics:** repontar `project_metrics.project_id`/`execution_metrics.project_id` de `active_project.id` →
   `projects.id` (migração leve; dados de dev, volume baixo).
+- **Escopo da Fase C = remoção completa (decidido em duas etapas):** (a) migrar worktree/git do `main.py` pro registry;
+  (b) **incluir** a limpeza do `database_manager`/`project_manager`/`project_history`/`routes/projects.py`.
+- **Experts:** migrar o **vivo** (`expert-triage` resolve `project_path` via `card.project_id → Project.path`) e
+  **remover** o modal órfão (`ExpertsModal.tsx` não é montado por ninguém) + seus 4 endpoints
+  (`analyze`/`create`/`status`/`delete`) e os imports mortos de `config/experts.py` no `experts.py`. `expert-sync` e
+  `PATCH /cards/{id}/experts` não usam projeto — ficam como estão.
 - **Modelo-por-etapa no pipeline:** além de atualizar versões, o `run_stage` passa a receber e usar o `card.model_*`.
 - **fable-5 desabilitado:** aparece nos tipos/pricing/mapa e **no picker porém `disabled`** (visível, não selecionável —
   sinaliza que está por vir) — beta + provável cobrança por créditos fora da assinatura.
@@ -72,13 +81,34 @@ seletor de projeto sobe pra o nível do app, então o cwd do agente de chat pass
 - **Frontend chat** (`useChat`/`api/chat`/ChatPage): usa `currentProjectId`; ao trocar de projeto, recarrega as
   conversas daquele projeto; sem projeto → empty state.
 
-### Fase C — Remover ActiveProject + migrar FK do metrics (backend)
-- **Migração leve** (`light_migrations.py`): repontar `project_metrics.project_id`/`execution_metrics.project_id` de
-  `active_project.id` → `projects.id`. Em SQLite (sem FK enforcement por padrão + tabelas ~vazias), a mudança é no
-  **model** (`ForeignKey("projects.id")`) + um passo idempotente que garante o schema. Descrever o passo exato no plano.
-- Remover `models/project.py::ActiveProject`, o fluxo antigo em `routes/projects.py` (endpoints load/current/recent que
-  setavam ActiveProject) + `get_active_project` remanescente, e `database_manager.py` (multi-arquivo legado). Verificar
-  boot + Chat + testes após.
+### Fase C — Remoção completa do subsistema legado + FK do metrics (backend + front)
+
+Ordem interna: C1 (migrar worktree/git) → C2 (FK metrics) → C3 (migrar experts vivo) → C4 (dropar tudo). FK do SQLite
+**não é enforçado** (nenhum `PRAGMA foreign_keys=ON`) e as tabelas `active_project`/`project_metrics`/`execution_metrics`
+estão **vazias** — não há dado a migrar.
+
+- **C1 — Worktree/git → registry:** os 4 endpoints em `main.py` (`POST /api/cards/{card_id}/workspace`, `GET
+  /api/branches`, `POST /api/cleanup-orphan-worktrees`, `GET /api/git/branches`) resolvem o repo por `ActiveProject` (via
+  `get_active_project`). Migrar pro padrão do runner: receber `project_id` e resolver `Project` via
+  `ProjectRepository.get_by_id(project_id)`, instanciando `GitWorkspaceManager(project.path)` (o manager já recebe o path
+  no `__init__` — nada mais muda). Front: `api/git.ts::fetchGitBranches` e `BranchesDropdown` (`API_ENDPOINTS.branches`)
+  passam a mandar `project_id` (lido de `localStorage 'orq.currentProjectId'`, padrão do `PipelineControls`);
+  `AddCardModal` idem. `cleanup-orphan-worktrees` não tem caller no front (endpoint sem UI).
+- **C2 — FK do metrics:** trocar `ForeignKey("active_project.id")` → `ForeignKey("projects.id")` em `ProjectMetrics` e
+  `ExecutionMetrics` (`models/metrics.py:16,78`). DB novo nasce certo via `create_all`; DB legado com tabelas vazias:
+  `DROP TABLE IF EXISTS execution_metrics/project_metrics` + `create_all` (idempotente, seguro porque vazias — confirmar
+  0 linhas), no padrão `light_migrations.py`.
+- **C3 — Experts vivo:** `expert-triage` (`routes/experts.py`) resolve `project_path` via `card.project_id → Project.path`
+  (tem `db` + `card_id`) em vez de `manager.current_project`. `expert-sync` e `PATCH /cards/{id}/experts` não usam
+  projeto — inalterados.
+- **C4 — Dropar o legado:** remover `models/project.py` (`ActiveProject`) + registro em `models/__init__.py`;
+  `database_manager.py`; `models/project_history.py`; `project_manager.py`; `routes/projects.py` (os 8 endpoints, todos
+  com callers mortos no front) e o `get_history_db` em `database.py`. **Mover** `get_project_manager`? Não — como o
+  `ProjectManager` inteiro sai, remover também os imports em `main.py` (`get_project_manager`, `projects_router`,
+  `ActiveProject`, worktree endpoints movidos/ajustados) e em `experts.py` (após C3, sem uso do manager). Remover os 4
+  endpoints do modal órfão em `experts.py` (`analyze`/`create`/`status`/`delete`) + `ExpertsModal.tsx` (não montado) +
+  imports mortos de `config/experts.py`. Tabela `project_history` some sozinha (só era criada pelo `database_manager`).
+  Apagar testes órfãos (`test_project_manager.py`, e ajustar os que tocavam ActiveProject/metrics FK).
 
 ### Fase D — Modelos LLM (back + front) + modelo-por-etapa
 - **`ModelType`** (back `schemas/card.py` + front `types/index.ts`): `opus-4.8 | sonnet-5 | haiku-4.5 | fable-5`.
@@ -114,7 +144,10 @@ C **depende** de B (o chat precisa parar de usar ActiveProject antes de removê-
 - **B:** unit dos repos de chat (criar/listar por projeto/histórico); `chat_service` persiste e scoping por projeto;
   `stream_response` usa o cwd passado (sem tocar ActiveProject); smoke real: criar sessão num projeto, trocar de
   projeto, ver as conversas trocarem + o chat responder no cwd do projeto.
-- **C:** boot OK + Chat vivo + testes após remover ActiveProject; migração do FK do metrics idempotente.
+- **C:** boot OK; worktree/git respondem por `project_id` (branch selector do AddCard + BranchesDropdown funcionam no
+  projeto selecionado); `expert-triage` resolve pelo card; migração do FK do metrics idempotente (roda 2x, PRAGMA);
+  `grep` por `ActiveProject`/`database_manager`/`project_manager`/`ProjectHistory` no backend volta vazio; suíte de
+  testes verde após remover/ajustar os testes órfãos.
 - **D:** ModelType/pricing consistentes (tsc); `model_mapping` cobre os 4 aliases (+ remap dos antigos); pipeline passa
   o `model` da etapa ao SDK (unit com stub); smoke real: rodar um card com um modelo escolhido e ver o custo/execução.
 
@@ -123,7 +156,9 @@ C **depende** de B (o chat precisa parar de usar ActiveProject antes de removê-
 1. Seletor de projeto no TopNav escopa Kanban **e** Chat; sem projeto → empty state coerente; board usa o `currentProjectId`.
 2. Conversas do chat são **por projeto e persistidas** (sobrevivem a restart); trocar de projeto troca as conversas.
 3. O agente de chat roda no **cwd do projeto selecionado** (sem `ActiveProject`).
-4. `ActiveProject`/`database_manager` removidos; FK do metrics aponta pra `projects.id`; boot + Chat + testes OK.
+4. Subsistema legado removido por completo (`ActiveProject`, `database_manager`, `project_history`, `project_manager`,
+   `routes/projects.py`, `ExpertsModal` órfão); worktree/git e experts-triage escopados por projeto do registry; FK do
+   metrics aponta pra `projects.id`; boot + Chat + testes OK.
 5. Modelos: opus-4.8/sonnet-5/haiku-4.5 nos tipos/pricing/pickers; fable-5 presente porém **desabilitado**; Gemini
    removido; **1M** em opus/sonnet; o **modelo escolhido por etapa controla a execução** do pipeline; dados antigos remapeados.
 
