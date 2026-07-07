@@ -12,6 +12,7 @@ from claude_agent_sdk import (
     ToolUseBlock,
     ResultMessage,
 )
+from .config.model_ids import resolve_model_id
 
 
 class ClaudeAgentChat:
@@ -21,67 +22,6 @@ class ClaudeAgentChat:
         """Initialize the Claude Agent Chat handler"""
         # No need for API key - Agent SDK uses Claude Code authentication
         pass
-
-    async def _stream_response_gemini(
-        self,
-        messages: list[dict],
-        model: str,
-        system_prompt: str | None = None
-    ) -> AsyncGenerator[str, None]:
-        """
-        Stream a response from Gemini using the GeminiAgent.
-
-        Args:
-            messages: List of conversation messages
-            model: Gemini model to use (e.g., "gemini-3-pro", "gemini-3-flash")
-            system_prompt: Optional system prompt
-
-        Yields:
-            str: Chunks of the response text as they arrive
-        """
-        print(f"[ClaudeAgentChat] _stream_response_gemini called with model: {model}")
-        print(f"[ClaudeAgentChat] Number of messages: {len(messages)}")
-
-        try:
-            from .gemini_agent import GeminiAgent
-
-            # Get current working directory from active project
-            from .database import async_session_maker
-            from .models.project import ActiveProject
-            from sqlalchemy import select
-
-            cwd = Path.cwd()
-            print(f"[ClaudeAgentChat] Initial cwd: {cwd}")
-
-            async with async_session_maker() as session:
-                result = await session.execute(
-                    select(ActiveProject).order_by(ActiveProject.loaded_at.desc()).limit(1)
-                )
-                active_project = result.scalar_one_or_none()
-                if active_project:
-                    cwd = Path(active_project.path)
-                    print(f"[ClaudeAgentChat] Using project cwd: {cwd}")
-
-            # Initialize Gemini agent
-            print(f"[ClaudeAgentChat] Initializing GeminiAgent with model: {model}")
-            gemini = GeminiAgent(model=model)
-
-            # Stream response
-            print(f"[ClaudeAgentChat] Starting stream...")
-            chunk_count = 0
-            async for chunk in gemini.chat_completion(messages, system_prompt, cwd):
-                chunk_count += 1
-                print(f"[ClaudeAgentChat] Yielding chunk {chunk_count}: {chunk[:50]}...")
-                yield chunk
-
-            print(f"[ClaudeAgentChat] Stream completed. Total chunks: {chunk_count}")
-
-        except Exception as e:
-            error_msg = f"Error in Gemini Agent: {str(e)}"
-            print(f"[ClaudeAgentChat] {error_msg}")
-            import traceback
-            traceback.print_exc()
-            raise RuntimeError(error_msg)
 
     async def stream_response(
         self,
@@ -103,13 +43,6 @@ class ClaudeAgentChat:
         """
         print(f"[ClaudeAgentChat] stream_response called with model: {model}")
 
-        # Check if it's a Gemini model
-        if model.startswith("gemini"):
-            print(f"[ClaudeAgentChat] Detected Gemini model, routing to _stream_response_gemini")
-            async for chunk in self._stream_response_gemini(messages, model, system_prompt):
-                yield chunk
-            return
-
         try:
             # Get current working directory from active project in database
             from .database import async_session_maker
@@ -125,21 +58,7 @@ class ClaudeAgentChat:
                 if active_project:
                     cwd = Path(active_project.path)
 
-            # Map model names to valid Anthropic API model names
-            model_mapping = {
-                # Claude 4.5 models (using aliases that auto-update to latest snapshot)
-                "opus-4.5": "claude-opus-4-5",
-                "sonnet-4.5": "claude-sonnet-4-5",
-                "haiku-4.5": "claude-haiku-4-5",
-                # Claude 3.5 models (for backward compatibility)
-                "claude-3.5-opus": "claude-3-5-opus-20240229",
-                "claude-3.5-sonnet": "claude-3-5-sonnet-20241022",
-                "claude-3.5-haiku": "claude-3-5-haiku-20241022",
-                # Claude 3 models
-                "claude-3-sonnet": "claude-3-sonnet-20240229",
-                "claude-3-opus": "claude-3-opus-20240229",
-            }
-            agent_model = model_mapping.get(model, "claude-sonnet-4-5")
+            agent_model = resolve_model_id(model)
 
             # Build conversation context
             # Instead of using /question command, send direct prompt with full context
