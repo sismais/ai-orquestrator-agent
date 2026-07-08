@@ -21,18 +21,17 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - **Banco único** `backend/orchestrator.db` (via `DATABASE_URL` no `.env`), gitignored, **tenant-shaped**:
   tabelas globais (`users`, `projects`, `workflows`) + tenant-scoped por `project_id` (`cards`, `executions`…).
 - **Supabase-ready:** SQLAlchemy async fala SQLite e Postgres — migrar = trocar `DATABASE_URL` + migrations.
-- **LEGADO desligado:** o `database_manager.py` multi-arquivo (`.claude/database.db` por projeto) e o
-  `ActiveProject` (projeto "ativo global") **ainda existem no código mas fora do caminho de sessão**
-  (`get_session()` devolve o engine único). Remoção definitiva = Fase 3d.
+- **LEGADO REMOVIDO (2026-07-07):** o `database_manager.py` multi-arquivo (`.claude/database.db` por projeto), o
+  `ActiveProject`, o `project_manager.py` e o `project_history` **foram apagados** — `get_session()` devolve o engine único.
 - Migrações: **sem Alembic**. `create_all` + `light_migrations.py` (ALTER idempotente + `remap_legacy_columns`).
 
 ### Multi-projeto (project-scoped)
 - **Registro de projetos:** tabela `Project` + API `/api/registry/projects` (CRUD). Cada projeto tem
   `path` (repo local), `rulesFile` (default `AGENTS.md`), `validateCommand`, `baseBranch`, `workflowId`.
 - Chamadas de card carregam `projectId` (`GET /api/cards?projectId=`, `POST` com `projectId`).
-- **Frontend:** seletor de projeto no header do board (`ProjectSelectorRegistry`) — troca sem reload.
-  ⚠️ Ainda há os controles **antigos** `ProjectSwitcher`/`ProjectLoader` no header (ligados ao
-  `ActiveProject`/execução legada) — consolidar na Fase 3d.
+- **Frontend:** seletor de projeto **app-level** no `TopNav` (`ProjectSelectorRegistry`, via `WorkspaceLayout`) —
+  escopa **todos os módulos** (board + chat), troca sem reload. Os controles antigos (`ProjectSwitcher`/`ProjectLoader`)
+  foram removidos.
 
 ### Workflow como config
 - Tabela `Workflow` (semeada no boot com o workflow **`dev`**): `columns[]` + `transitions{}`.
@@ -55,7 +54,9 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
   Review limpo → avança pra `validate_ci` e **para** (fronteira 3c).
 - **Provado (real, spike-loop-test):** card percorreu plan→implement→review com **2 voltas de fix-loop** e parou em
   `validate_ci` (~$2 via Max); painel de logs no board renderiza o histórico. Estado/logs nas tabelas `executions`/`execution_logs`.
-- **Ainda NÃO faz:** trilha SDD completa no `plan` (hoje só planner); model-por-etapa; auto-cleanup de worktree.
+- **Modelo-por-etapa LIGADO (2026-07-07):** `stage_runner.run_stage(model=)` passa o modelo escolhido (`card.model_*`
+  por coluna, via `pipeline_service.stage_model_for_column`) ao SDK, resolvido pelo mapa único `config/model_ids.py`.
+- **Ainda NÃO faz:** trilha SDD completa no `plan` (hoje só planner); auto-cleanup de worktree.
 
 ### validate_ci → PR draft → espera CI → ready_to_merge (Fase 3c — provada)
 - Coluna `validate_ci` ganhou handler próprio (git/gh, não um agente): `services/validate_ci_stage.run_validate_ci` +
@@ -92,6 +93,25 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - **Provado (real, spike-loop-test):** Stop durante o `plan` interrompeu a sessão de verdade → pausou → respondi a
   correção → retomou plan→implement→review→`validate_ci`. Confirma também que a troca `query()`→client não regrediu o pipeline.
 
+### Projeto = escopo do app (chat project-scoped + seletor app-level + modelos) — feito 2026-07-07/08
+- **Seletor de projeto app-level:** subiu do board pro `TopNav` (via `WorkspaceLayout`); escopa board **e** chat.
+- **Chat project-scoped + persistido em DB:** tabelas `chat_session`/`chat_message` (com `project_id`) + `repositories/chat_repository.py`.
+  O cwd do agente do chat vem do `Project.path` selecionado (`agent_chat.stream_response(cwd=)`, sem `ActiveProject`); o
+  contexto do Kanban no system_prompt é filtrado por projeto. Rotas exigem `projectId` (`POST /api/chat/sessions`,
+  `GET /api/chat/sessions?projectId=`).
+- **Gestão de conversas (UI + rota):** `/chat` = **lista** de conversas do projeto (título = 1ª mensagem, data, excluir);
+  `/chat/:sessionId` = conversa aberta (reload reabre; reload em `/chat` fica na lista, sem abrir nenhuma). `useChat(projectId,
+  activeSessionId)` é dirigido pela rota (react-router `useNavigate`/`useLocation`; a nav de módulos segue por estado `currentView`).
+- **Modelos atualizados:** `opus-4.8`/`sonnet-5`/`haiku-4.5` + `fable-5` (beta, **disabled** nos pickers), Gemini removido,
+  **1M de contexto** em opus/sonnet. Mapa único alias→id do SDK em `config/model_ids.py` (usado por chat **E** pipeline).
+- **Convenção WS (ping/pong):** os 3 WebSockets (chat, `/api/cards/ws`, `/api/execution/ws/:cardId`) respondem `{type:"pong"}`
+  ao `{type:"ping"}` do `useWebSocketBase` (heartbeat 30s) — senão o cliente estoura o pongTimeout e reconecta em loop.
+- **CLAUDE.md do projeto-alvo carrega no chat** (verificado empírico): `setting_sources=["user","project"]` + cwd = raiz do
+  projeto carregam o `CLAUDE.md` e resolvem os `@imports` (ex.: `@AGENTS.md`). O pipeline usa o preset `claude_code` +
+  `setting_sources=["project"]` (carrega igual), mas roda em worktree → só enxerga arquivos **commitados**.
+- Specs/planos: `docs/superpowers/specs/2026-07-07-projeto-escopo-do-app-*.md` + `plans/2026-07-07-projeto-escopo-app-feature.md`
+  e `plans/2026-07-07-remocao-subsistema-legado.md`.
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
@@ -112,12 +132,12 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
   e os endpoints `/api/execute-*` + expert-triage no `main.py`. **Chat preservado** (usa `agent_chat.py`, desacoplado
   do orchestrator). Board só usa Claude; boot OK; testes só com as falhas de baseline.
 
-> **3d-resto — falta só o `ActiveProject` (2026-07-05):** ele continua **acoplado ao Chat que foi mantido** —
-> `agent_chat.py` lê `ActiveProject.path` como cwd do agente do chat — **e** ao `metrics` (FK `metrics.project_id →
-> active_project.id`), além do fluxo antigo em `routes/projects.py` e do `database_manager`. Removê-lo exige
-> re-acoplar o cwd do `agent_chat` (ao Project registry ou a um default) + migrar o FK do `metrics` — passo delicado
-> separado, adiado pra não arriscar o Chat/metrics. **Dívida frontend:** `useAgentExecution` + a UI de execução legada
-> no `Card` ainda chamam `/api/execute-*` (agora 404) — inertes (nada dispara), limpar quando mexer no Card.
+> **3d-final — FEITO (2026-07-07):** o subsistema legado de "projeto ativo" foi **removido por completo** — `ActiveProject`,
+> `database_manager`, `project_manager`, `project_history`, `routes/projects.py` e o `ExpertsModal` órfão (não montado).
+> Worktree/git (`main.py`) e o `expert-triage` migraram pro `Project` do registry (resolvem por `project_id`); FK do
+> `metrics` repontado pra `projects.id`; o Chat deixou de usar `ActiveProject` (cwd = `Project.path` selecionado). Detalhe
+> na seção "Projeto = escopo do app" acima. **Dívida frontend restante:** `useAgentExecution` + a UI de execução legada no
+> `Card` ainda chamam `/api/execute-*` (agora 404) — inertes (nada dispara), limpar quando mexer no Card.
 
 ## Estado das fases
 
@@ -133,12 +153,13 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 | **3c** | push → `gh pr create --draft` → espera-CI (`ci-triage`) → **para no ready-to-merge** | ✅ **provado** |
 | 3d | Consolidar os 2 controles de projeto no header | ✅ **feito** |
 | 3d-resto | Cortar agent.py/orchestrator/live/gemini (mantendo o Chat) — ~8.600 linhas | ✅ **feito** |
-| 3d-final | Remover `ActiveProject` (re-acoplar cwd do `agent_chat` + migrar FK do `metrics`) + `database_manager` | ⚠️ **falta (acoplado ao Chat/metrics)** |
+| 3d-final | Remover `ActiveProject`/`database_manager`/`project_manager` (worktree/git + experts → registry; FK metrics → `projects.id`; chat cwd → `Project.path`) | ✅ **feito (2026-07-07)** |
+| Feature | Projeto = escopo do app: seletor app-level, chat project-scoped + persistido + gestão de conversas/rotas, modelos + modelo-por-etapa, ping/pong dos WS | ✅ **feito + smoke browser** |
 
 ## Design/planos versionados (superpowers) — começar por aqui ao retomar
 
-- Specs: `docs/superpowers/specs/` — design geral do painel + Fase 2 + Fase 3a.
-- Planos: `docs/superpowers/plans/` — Fase 1, 2a, 2b-1, 2b-2 (frontend).
+- Specs: `docs/superpowers/specs/` — design por fase (painel, Fase 2/3a/3b/3c, interação humana, chat-stop, projeto=escopo do app).
+- Planos: `docs/superpowers/plans/` — por fase (1 → 3d) + a feature "projeto = escopo do app" (feature + remoção do legado).
 - Notas: `docs/superpowers/notes/` — **`2026-06-17-fork-code-map.md`** (mapa do código p/ as próximas fases,
   com pontos de acoplamento) e `2026-06-17-spike-skill-loading.md` (como o SDK carrega o DevKit em worktree).
 
@@ -148,14 +169,20 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - `backend/src/database.py` — engine único via `DATABASE_URL`; `get_session()`.
 - `backend/src/services/{runner_service,stage_runner,pipeline_service,findings}.py` — **o runner + pipeline** (3b).
 - `backend/src/models/execution.py` — `Execution`/`ExecutionLog` (estado do run + logs; reusados pelo pipeline).
-- `backend/src/routes/{cards,projects_registry,workflows,runner}.py` — APIs project-scoped.
+- `backend/src/routes/{cards,projects_registry,workflows,runner,chat,experts}.py` — APIs project-scoped.
+- `backend/src/{models/chat.py, repositories/chat_repository.py, services/chat_service.py, agent_chat.py}` — chat project-scoped + persistido.
+- `backend/src/config/model_ids.py` — mapa único alias→id do SDK (chat **e** pipeline); `config/pricing.py` — preços.
 - `backend/src/repositories/card_repository.py` — `move()` valida por config.
 - `backend/src/services/{workflow_seed,workflow_rules,light_migrations}.py` — config + migração de colunas.
 - `backend/src/git_workspace.py` — worktree por card (reusar).
-- `frontend/src/App.tsx` — estado do board (colunas do config, `currentProjectId`, `AUTO_RUN_ON_DRAG`).
+- `frontend/src/App.tsx` — estado do board + roteamento do chat (`/chat`, `/chat/:sessionId`), `currentProjectId`.
+- `frontend/src/{layouts/WorkspaceLayout, components/Navigation/TopNav}` — seletor de projeto app-level.
+- `frontend/src/{hooks/useChat.ts, pages/ChatPage.tsx, api/chat.ts}` — chat project-scoped + gestão de conversas.
+- `frontend/src/hooks/useWebSocketBase.ts` — WS com heartbeat ping/pong (os handlers respondem pong).
 - `frontend/src/api/{cards,projectsRegistry,workflows}.ts` — clients.
 - `frontend/src/components/{Board,Column,Card}` — render das colunas do config.
 
 ## Bugs de baseline conhecidos (do fork, não regressão)
 - `GET /api/metrics/productivity/current` → 500 (`Card has no attribute 'status'`) em `metrics_repository.py`.
-- WebSocket `CardWS` (`/api/cards/ws`) falha ao conectar no load. Tratar quando mexer no data model/WS.
+- 3 testes pré-existentes vermelhos em `tests/test_test_result_analyzer.py` (formatação/encoding) — sem relação com runner/chat.
+- ~~WebSocket `CardWS` reconectava em loop~~ → **CORRIGIDO (2026-07-08):** os 3 WS (chat/cards/execução) respondem pong ao heartbeat ping.
