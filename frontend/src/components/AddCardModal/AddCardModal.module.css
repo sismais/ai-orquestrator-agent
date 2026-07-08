@@ -6,7 +6,7 @@
   inset: 0;
   background: rgba(0, 0, 0, 0.8);
   backdrop-filter: blur(4px);
-  z-index: var(--z-modal-backdrop);
+  z-index: 10000;
   display: flex;
   align-items: center;
   justify-content: center;
@@ -72,11 +72,11 @@
 
 /* Header */
 .header {
-  padding: var(--space-6) var(--space-8);
+  padding: var(--space-4) var(--space-6);
   border-bottom: 1px solid var(--border-subtle);
   display: flex;
   justify-content: space-between;
-  align-items: flex-start;
+  align-items: center;
   position: relative;
   z-index: 1;
   background: var(--bg-secondary);
@@ -89,20 +89,20 @@
 .titleGroup {
   display: flex;
   align-items: center;
-  gap: var(--space-3);
-  margin-bottom: var(--space-1);
+  gap: var(--space-2);
 }
 
 .titleIcon {
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   background: var(--gradient-purple);
   -webkit-background-clip: text;
   -webkit-text-fill-color: transparent;
+  flex-shrink: 0;
 }
 
 .title {
   font-family: var(--font-display);
-  font-size: 1.25rem;
+  font-size: 1.1rem;
   font-weight: 700;
   color: var(--text-primary);
   margin: 0;
@@ -110,10 +110,7 @@
 }
 
 .subtitle {
-  font-size: 0.875rem;
-  color: var(--text-tertiary);
-  margin: 0;
-  margin-left: calc(1.25rem + var(--space-3));
+  display: none;
 }
 
 .closeButton {

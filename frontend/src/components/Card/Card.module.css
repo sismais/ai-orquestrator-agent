@@ -15,6 +15,12 @@
   gap: 12px;
 }
 
+/* Limit card height and allow internal scrolling for overflowing content */
+.card {
+  max-height: 420px;
+  overflow: hidden;
+}
+
 .card:hover {
   transform: translateY(-2px);
   box-shadow: var(--shadow-lg);
@@ -80,6 +86,26 @@
   justify-content: space-between;
   align-items: flex-start;
   gap: 8px;
+}
+
+/* Main content area inside the card that can scroll vertically when needed */
+.content {
+  overflow-y: auto;
+  max-height: 260px;
+  padding-right: 6px; /* avoid scrollbar overlay */
+}
+
+.content::-webkit-scrollbar {
+  width: 8px;
+}
+
+.content::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-sm);
+}
+
+.content::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-hover);
 }
 
 .cardHeaderLeft {

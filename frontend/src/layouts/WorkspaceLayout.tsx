@@ -1,4 +1,4 @@
-import { ReactNode } from 'react';
+import { ReactNode, useEffect } from 'react';
 import TopNav from '../components/Navigation/TopNav';
 import styles from './WorkspaceLayout.module.css';
 
@@ -13,6 +13,7 @@ interface WorkspaceLayoutProps {
 }
 
 const WorkspaceLayout = ({ children, currentModule, onNavigate, currentProjectId, onProjectSwitch }: WorkspaceLayoutProps) => {
+  useWorkspaceBodyClass(currentModule);
   return (
     <div className={styles.workspace}>
       <TopNav
@@ -21,11 +22,28 @@ const WorkspaceLayout = ({ children, currentModule, onNavigate, currentProjectId
         currentProjectId={currentProjectId}
         onProjectSwitch={onProjectSwitch}
       />
-      <main className={styles.content}>
+      <main className={`${styles.content} ${currentModule === 'kanban' ? styles.kanbanContentWrapper : ''}`}>
         {children}
       </main>
     </div>
   );
 };
+
+// Add/remove body class to scope global overflow to Kanban only
+// (keeps Dashboard/Settings using normal body scroll)
+export function useWorkspaceBodyClass(currentModule: any) {
+  useEffect(() => {
+    const cls = 'kanban-mode';
+    if (currentModule === 'kanban') {
+      document.body.classList.add(cls);
+      // enforce style directly to avoid stylesheet ordering issues
+      document.body.style.overflowY = 'hidden';
+    } else {
+      document.body.classList.remove(cls);
+      document.body.style.overflowY = '';
+    }
+    return () => document.body.classList.remove(cls);
+  }, [currentModule]);
+}
 
 export default WorkspaceLayout;

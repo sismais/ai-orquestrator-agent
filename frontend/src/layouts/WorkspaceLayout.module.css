@@ -5,9 +5,18 @@
   background: var(--bg-primary);
 }
 
+
 .content {
   flex: 1;
   padding: var(--space-5) var(--space-6);
   overflow-y: auto;
   overflow-x: hidden;
+}
+
+/* Quando o layout for o Kanban, aplicar uma wrapper que evita scroll no body
+   e força o conteúdo a ocupar a altura disponível (colunas gerenciam a rolagem). */
+.kanbanContentWrapper {
+  box-sizing: border-box;
+  height: calc(100vh - 56px);
+  overflow-y: hidden;
 }

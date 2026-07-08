@@ -9,6 +9,7 @@ import {
 import { API_ENDPOINTS } from '../../api/config';
 import { GitDiffViewer } from '../GitDiffViewer';
 import { CardInteraction } from '../CardInteraction';
+import { BranchIndicator } from '../BranchIndicator';
 import styles from './CardEditModal.module.css';
 
 type TabId = 'details' | 'images' | 'changes' | 'interacao';
@@ -18,14 +19,16 @@ interface CardEditModalProps {
   onClose: () => void;
   card: Card;
   onUpdateCard: (card: Card) => void;
+  onRemove?: () => void;
 }
 
-export function CardEditModal({ isOpen, onClose, card, onUpdateCard }: CardEditModalProps) {
+export function CardEditModal({ isOpen, onClose, card, onUpdateCard, onRemove }: CardEditModalProps) {
   const [localCard, setLocalCard] = useState(card);
   const [uploading, setUploading] = useState(false);
   const [uploadError, setUploadError] = useState<string | null>(null);
   const [previewImages, setPreviewImages] = useState<{ file: File; preview: string }[]>([]);
   const [activeTab, setActiveTab] = useState<TabId>('details');
+  const [showDeleteConfirm, setShowDeleteConfirm] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const modalRef = useRef<HTMLDivElement>(null);
 
@@ -136,6 +139,12 @@ export function CardEditModal({ isOpen, onClose, card, onUpdateCard }: CardEditM
     onClose();
   };
 
+  const handleConfirmDelete = () => {
+    setShowDeleteConfirm(false);
+    onClose();
+    onRemove?.();
+  };
+
   if (!isOpen) return null;
 
   return (
@@ -146,7 +155,12 @@ export function CardEditModal({ isOpen, onClose, card, onUpdateCard }: CardEditM
         onClick={(e) => e.stopPropagation()}
       >
         <div className={styles.header}>
-          <h2 className={styles.title}>Edit Card</h2>
+          <div className={styles.headerTitle}>
+            <h2 className={styles.title}>Edit Card</h2>
+            {card.branchName && (
+              <BranchIndicator branchName={card.branchName} />
+            )}
+          </div>
           <button className={styles.closeButton} onClick={onClose}>
             <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2">
               <path d="M1 1l12 12M13 1L1 13" />
@@ -316,7 +330,47 @@ export function CardEditModal({ isOpen, onClose, card, onUpdateCard }: CardEditM
           <button className={styles.cancelButton} onClick={onClose}>
             Cancel
           </button>
+          {onRemove && (
+            <button
+              className={styles.deleteButton}
+              onClick={() => setShowDeleteConfirm(true)}
+              title="Excluir card"
+            >
+              <svg width="14" height="14" viewBox="0 0 14 14" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round">
+                <path d="M2 3.5h10M5 3.5V2h4v1.5M3.5 3.5l.5 8h6l.5-8" />
+              </svg>
+              Excluir
+            </button>
+          )}
         </div>
+
+        {showDeleteConfirm && (
+          <div className={styles.confirmOverlay} onClick={() => setShowDeleteConfirm(false)}>
+            <div
+              className={styles.confirmDialog}
+              onClick={(e) => e.stopPropagation()}
+            >
+              <h3 className={styles.confirmTitle}>Excluir card?</h3>
+              <p className={styles.confirmText}>
+                Tem certeza que deseja excluir <strong>{card.title}</strong>? Esta ação não pode ser desfeita.
+              </p>
+              <div className={styles.confirmActions}>
+                <button
+                  className={styles.confirmCancel}
+                  onClick={() => setShowDeleteConfirm(false)}
+                >
+                  Cancelar
+                </button>
+                <button
+                  className={styles.confirmDelete}
+                  onClick={handleConfirmDelete}
+                >
+                  Excluir
+                </button>
+              </div>
+            </div>
+          </div>
+        )}
       </div>
     </div>
   );

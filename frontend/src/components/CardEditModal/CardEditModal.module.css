@@ -9,7 +9,7 @@
   display: flex;
   align-items: center;
   justify-content: center;
-  z-index: 1000;
+  z-index: 10000;
   animation: fadeIn var(--duration-fast) var(--ease-out);
 }
 
@@ -50,6 +50,13 @@
   padding: var(--space-5);
   border-bottom: 1px solid var(--border-subtle);
   background: linear-gradient(180deg, var(--bg-surface) 0%, var(--bg-elevated) 100%);
+}
+
+.headerTitle {
+  display: flex;
+  align-items: center;
+  gap: var(--space-3);
+  flex-wrap: wrap;
 }
 
 .title {
@@ -289,9 +296,8 @@
 }
 
 .saveButton {
-  flex: 1;
-  padding: var(--space-3) var(--space-4);
-  background: linear-gradient(135deg, var(--accent-emerald) 0%, var(--accent-emerald-dark) 100%);
+  padding: var(--space-3) var(--space-6);
+  background: var(--accent-primary);
   color: white;
   border: none;
   border-radius: var(--radius-md);
@@ -299,11 +305,13 @@
   font-weight: 600;
   cursor: pointer;
   transition: all var(--duration-fast) var(--ease-out);
+  box-shadow: 0 4px 12px rgba(139, 123, 245, 0.3);
 }
 
 .saveButton:hover:not(:disabled) {
+  background: var(--accent-primary-hover);
   transform: translateY(-2px);
-  box-shadow: 0 4px 12px rgba(52, 211, 153, 0.3);
+  box-shadow: 0 6px 16px rgba(139, 123, 245, 0.4);
 }
 
 .saveButton:disabled {
@@ -327,6 +335,115 @@
   background: var(--bg-surface);
   border-color: var(--border-default);
   color: var(--text-primary);
+}
+
+.deleteButton {
+  display: inline-flex;
+  align-items: center;
+  gap: var(--space-2);
+  padding: var(--space-3) var(--space-4);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.deleteButton:hover {
+  background: rgba(239, 68, 68, 0.1);
+  border-color: rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+}
+
+/* Dialog de confirmacao de exclusao */
+.confirmOverlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 10001;
+  animation: fadeIn 150ms ease-out;
+}
+
+.confirmDialog {
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-lg);
+  padding: var(--space-6);
+  max-width: 400px;
+  width: 90%;
+  box-shadow: var(--shadow-xl);
+  animation: scaleIn 150ms var(--ease-out);
+}
+
+.confirmTitle {
+  font-size: 1.1rem;
+  font-weight: 700;
+  color: var(--text-primary);
+  margin-bottom: var(--space-3);
+}
+
+.confirmText {
+  color: var(--text-secondary);
+  font-size: 0.9rem;
+  line-height: 1.5;
+  margin-bottom: var(--space-5);
+}
+
+.confirmActions {
+  display: flex;
+  gap: var(--space-3);
+  justify-content: flex-end;
+}
+
+.confirmCancel {
+  padding: var(--space-2) var(--space-4);
+  background: transparent;
+  color: var(--text-secondary);
+  border: 1px solid var(--border-subtle);
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.confirmCancel:hover {
+  background: var(--bg-surface);
+  border-color: var(--border-default);
+  color: var(--text-primary);
+}
+
+.confirmDelete {
+  padding: var(--space-2) var(--space-4);
+  background: #ef4444;
+  color: white;
+  border: none;
+  border-radius: var(--radius-md);
+  font-size: 0.9rem;
+  font-weight: 600;
+  cursor: pointer;
+  transition: all var(--duration-fast) var(--ease-out);
+}
+
+.confirmDelete:hover {
+  background: #dc2626;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.3);
+}
+
+@keyframes fadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+@keyframes scaleIn {
+  from { opacity: 0; transform: scale(0.95); }
+  to { opacity: 1; transform: scale(1); }
 }
 
 /* Tabs Navigation */

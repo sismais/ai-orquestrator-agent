@@ -28,3 +28,38 @@
   background: transparent;
   border-radius: var(--radius-full);
 }
+
+/* Reserve space at bottom so footer scroller doesn't overlap content */
+.board {
+  padding-bottom: calc(var(--space-6, 48px));
+}
+
+/* Footer scroller - fixed at bottom with synced scroll */
+.footerScroller {
+  position: fixed;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  height: 18px;
+  overflow-x: auto;
+  overflow-y: hidden;
+  background: transparent;
+  z-index: 9999;
+  -webkit-overflow-scrolling: touch;
+}
+
+.footerSpacer {
+  height: 1px;
+  width: 100%;
+}
+
+/* Make the board's native scrollbar hidden (we'll keep footer visible) */
+.board::-webkit-scrollbar {
+  display: none;
+}
+
+/* Firefox and IE/Edge support for hiding the board's native scrollbar */
+.board {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}

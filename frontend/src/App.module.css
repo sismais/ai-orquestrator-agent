@@ -26,6 +26,12 @@ body {
   transition: background-color 180ms ease, color 180ms ease;
 }
 
+/* (restored) global scrolling is handled per-page; Kanban will opt-in to hide body scroll */
+/* When body has .kanban-mode, hide global vertical scroll so Kanban layout controls it */
+body.kanban-mode {
+  overflow-y: hidden;
+}
+
 .app {
   min-height: 100vh;
   display: flex;

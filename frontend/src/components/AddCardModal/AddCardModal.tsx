@@ -493,79 +493,6 @@ export function AddCardModal({ isOpen, onClose, onSubmit, title: modalTitle, sub
             </div>
           </div>
 
-          {/* Base Branch Selection */}
-          {availableBranches.length > 0 && (
-            <div className={styles.formSection}>
-              <div className={styles.inputGroup}>
-                <label className={styles.inputLabel}>
-                  <span className={styles.labelText}>Base Branch</span>
-                  <span className={styles.labelOptional}>Optional</span>
-                </label>
-                <div className={styles.selectWrapper}>
-                  <select
-                    className={styles.branchSelect}
-                    value={baseBranch}
-                    onChange={(e) => setBaseBranch(e.target.value)}
-                    disabled={isSubmitting || loadingBranches}
-                  >
-                    <option value="">Default ({defaultBranch})</option>
-                    {availableBranches.map((branch) => (
-                      <option key={branch.name} value={branch.name}>
-                        {branch.name} {branch.type === 'remote' ? '(remote)' : ''}
-                      </option>
-                    ))}
-                  </select>
-                  <div className={styles.selectIcon}>
-                    <svg width="12" height="7" viewBox="0 0 12 7" fill="none">
-                      <path d="M1 1L6 6L11 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
-                    </svg>
-                  </div>
-                </div>
-                <p className={styles.inputHint}>
-                  Select the branch from which the worktree will be created
-                </p>
-                <div className={styles.inputGlow} />
-              </div>
-            </div>
-          )}
-
-          {/* Model Selection */}
-          <div className={styles.formSection}>
-            <div className={styles.sectionHeader}>
-              <h3 className={styles.sectionTitle}>AI Model Configuration</h3>
-              <p className={styles.sectionDescription}>Choose models for each workflow stage</p>
-            </div>
-
-            <div className={styles.workflowStages}>
-              {WORKFLOW_STAGES.map((stage) => (
-                <div key={stage.key} className={styles.stageSection}>
-                  <div className={styles.stageHeader}>
-                    <div className={styles.stageIcon}>{stage.icon}</div>
-                    <div className={styles.stageInfo}>
-                      <h3 className={styles.stageTitle}>{stage.label}</h3>
-                      <p className={styles.stageDescription}>{stage.description}</p>
-                    </div>
-                  </div>
-
-                  <div className={styles.modelCarousel}>
-                    <div className={styles.modelCarouselInner}>
-                      {MODEL_CARDS.map((model) => (
-                        <ModelCard
-                          key={model.value}
-                          model={model}
-                          selected={getModelValue(stage.key) === model.value}
-                          onSelect={() => {
-                            updateModel(stage.key, model.value);
-                          }}
-                        />
-                      ))}
-                    </div>
-                  </div>
-                </div>
-              ))}
-            </div>
-          </div>
-
           {/* Image Upload */}
           <div className={styles.formSection}>
             <div className={styles.sectionHeader}>
@@ -632,6 +559,80 @@ export function AddCardModal({ isOpen, onClose, onSubmit, title: modalTitle, sub
                 ))}
               </div>
             )}
+          </div>
+
+          {/* Base Branch Selection */}
+          {availableBranches.length > 0 && (
+            <div className={styles.formSection}>
+              <div className={styles.inputGroup}>
+                <label className={styles.inputLabel}>
+                  <span className={styles.labelText}>Base Branch</span>
+                  <span className={styles.labelOptional}>Optional</span>
+                </label>
+                <div className={styles.selectWrapper}>
+                  <select
+                    className={styles.branchSelect}
+                    value={baseBranch}
+                    onChange={(e) => setBaseBranch(e.target.value)}
+                    disabled={isSubmitting || loadingBranches}
+                  >
+                    <option value="">Default ({defaultBranch})</option>
+                    {availableBranches.map((branch) => (
+                      <option key={branch.name} value={branch.name}>
+                        {branch.name} {branch.type === 'remote' ? '(remote)' : ''}
+                      </option>
+                    ))}
+                  </select>
+                  <div className={styles.selectIcon}>
+                    <svg width="12" height="7" viewBox="0 0 12 7" fill="none">
+                      <path d="M1 1L6 6L11 1" stroke="currentColor" strokeWidth="2" strokeLinecap="round"/>
+                    </svg>
+                  </div>
+                </div>
+                <p className={styles.inputHint}>
+                  Select the branch from which the worktree will be created
+                </p>
+                <div className={styles.inputGlow} />
+              </div>
+            </div>
+          )}
+
+          {/* Model Selection */}
+          <div className={styles.formSection}>
+            <div className={styles.sectionHeader}>
+              <h3 className={styles.sectionTitle}>AI Model Configuration</h3>
+              <p className={styles.sectionDescription}>Choose models for each workflow stage</p>
+            </div>
+
+            <div className={styles.workflowStages}>
+              {WORKFLOW_STAGES.map((stage) => (
+                <div key={stage.key} className={styles.stageSection}>
+                  <div className={styles.stageHeader}>
+                    <div className={styles.stageIcon}>{stage.icon}</div>
+                    <div className={styles.stageInfo}>
+                      <h3 className={styles.stageTitle}>{stage.label}</h3>
+                      <p className={styles.stageDescription}>{stage.description}</p>
+                    </div>
+                  </div>
+
+                  <div className={styles.modelCarousel}>
+                    <div className={styles.modelCarouselInner}>
+                      {MODEL_CARDS.map((model) => (
+                        <ModelCard
+                          key={model.value}
+                          model={model}
+                          selected={getModelValue(stage.key) === model.value}
+                          onSelect={() => {
+                            updateModel(stage.key, model.value);
+                          }}
+                          compact={true}
+                        />
+                      ))}
+                    </div>
+                  </div>
+                </div>
+              ))}
+            </div>
           </div>
 
           {/* Actions */}

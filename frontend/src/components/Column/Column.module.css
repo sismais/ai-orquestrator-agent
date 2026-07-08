@@ -11,6 +11,12 @@
   transition: all 180ms ease;
 }
 
+/* Limit column height so cards area can scroll individually */
+.column {
+  max-height: calc(100vh - 160px);
+  overflow: visible; /* allow internal cards to scroll */
+}
+
 /* Column Header */
 .header {
   display: flex;
@@ -66,6 +72,26 @@
   gap: var(--space-3);
   padding-bottom: var(--space-8);
   min-height: 200px;
+}
+
+/* Make cards scroll vertically when they exceed the available height of the column. */
+.cards {
+  overflow-y: auto;
+  max-height: calc(100vh - 260px);
+  padding-right: 6px; /* avoid scrollbar overlay on content */
+}
+
+.cards::-webkit-scrollbar {
+  width: 10px;
+}
+
+.cards::-webkit-scrollbar-thumb {
+  background: var(--bg-elevated);
+  border-radius: var(--radius-full);
+}
+
+.cards::-webkit-scrollbar-thumb:hover {
+  background: var(--bg-hover);
 }
 
 /* Active Drop Zone */

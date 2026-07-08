@@ -1,10 +1,9 @@
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useDraggable } from '@dnd-kit/core';
 import { Card as CardType, ExecutionStatus, WorkflowStatus, ExecutionHistory } from '../../types';
 import { LogsModal } from '../LogsModal';
 import { PipelineControls } from '../PipelineControls';
 import { CardEditModal } from '../CardEditModal';
-import { BranchIndicator } from '../BranchIndicator';
 import { ExpertBadges } from '../ExpertBadges';
 import { removeImage } from '../../utils/imageHandler';
 import { API_ENDPOINTS } from '../../api/config';
@@ -29,6 +28,7 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
   const [removingImageId, setRemovingImageId] = useState<string | null>(null);
   const [logsHistory, setLogsHistory] = useState<ExecutionHistory[] | undefined>(undefined);
   const [hasHistoricalLogs, setHasHistoricalLogs] = useState(false);
+  const cardRef = useRef<HTMLDivElement>(null);
 
   // Card só é desabilitado se estiver ATIVAMENTE em execução
   // Permitir arrastar se: idle, completed, error, ou se a execução já terminou
@@ -48,6 +48,22 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
         transform: `translate3d(${transform.x}px, ${transform.y}px, 0)`,
       }
     : undefined;
+
+  // Click no card abre o modal de edicao (exceto se clicar em botao/area interativa)
+  const handleCardClick = (e: React.MouseEvent) => {
+    const target = e.target as HTMLElement;
+    // Ignora apenas clicks em elementos <button> reais (nao o proprio card, que tem role=button do dnd)
+    if (target.closest('button')) return;
+    setIsEditOpen(true);
+  };
+
+  // Enter/Space abre o modal (acessibilidade)
+  const handleCardKeyDown = (e: React.KeyboardEvent) => {
+    if (e.key === 'Enter' || e.key === ' ') {
+      e.preventDefault();
+      setIsEditOpen(true);
+    }
+  };
 
   const getStatusClass = () => {
     if (!executionStatus) return '';
@@ -178,6 +194,8 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
         ref={setNodeRef}
         style={style}
         className={`${styles.card} ${isDragging ? styles.dragging : ''} ${getStatusClass()} ${card.isFixCard ? styles.fixCard : ''} ${card.columnId === 'paused' ? styles.paused : ''}`}
+        onClick={handleCardClick}
+        onKeyDown={handleCardKeyDown}
         {...listeners}
         {...attributes}
       >
@@ -189,11 +207,6 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
         <div className={styles.content}>
           <div className={styles.cardHeader}>
             <h3 className={styles.title}>{card.title}</h3>
-            {card.branchName && (
-              <BranchIndicator
-                branchName={card.branchName}
-              />
-            )}
           </div>
           {(card.experts || isLoadingExperts) && (
             <ExpertBadges
@@ -373,47 +386,6 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
             </span>
           </div>
         )}
-        <button
-          className={styles.editButton}
-          onClick={(e) => {
-            e.stopPropagation();
-            setIsEditOpen(true);
-          }}
-          aria-label="Edit card"
-          title="Edit card (add images)"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <path d="M10.5 1.5l2 2-8 8H2.5v-2l8-8z" />
-          </svg>
-        </button>
-        <button
-          className={styles.removeButton}
-          onClick={(e) => {
-            e.stopPropagation();
-            onRemove();
-          }}
-          aria-label="Remove card"
-        >
-          <svg
-            width="14"
-            height="14"
-            viewBox="0 0 14 14"
-            fill="none"
-            stroke="currentColor"
-            strokeWidth="2"
-            strokeLinecap="round"
-          >
-            <path d="M1 1l12 12M13 1L1 13" />
-          </svg>
-        </button>
       </div>
       {(executionStatus || (card.columnId === 'done' && hasHistoricalLogs)) && (
         <LogsModal
@@ -434,6 +406,7 @@ export function Card({ card, onRemove, onUpdateCard, isDragging = false, executi
           onClose={() => setIsEditOpen(false)}
           card={card}
           onUpdateCard={onUpdateCard}
+          onRemove={onRemove}
         />
       )}
     </>

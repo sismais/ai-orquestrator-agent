@@ -30,6 +30,7 @@
   margin-top: 8px;
   margin-right: 6px;
   padding: 6px 12px;
+  width: auto;
   border: 1px solid var(--accent-danger, #e5484d);
   border-radius: 6px;
   font-size: 12px;
@@ -41,6 +42,19 @@
 
 .stopButton:hover {
   background: color-mix(in srgb, var(--accent-danger, #e5484d) 25%, transparent);
+}
+
+.runningDot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: var(--accent-danger, #e5484d);
+  animation: pulse 1.2s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.4; }
 }
 
 .prLink {

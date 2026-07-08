@@ -144,7 +144,11 @@ export function PipelineControls({ card }: Props) {
 
       {isRunning && isActiveStage && (
         <button className={styles.stopButton} onClick={handleStop} title="Interromper o agente para corrigir">
-          ⏹ Stop
+          <span className={styles.runningDot} />
+          Running
+          <svg width="11" height="11" viewBox="0 0 14 14" fill="currentColor" aria-hidden="true">
+            <rect x="2" y="2" width="10" height="10" rx="1.5" />
+          </svg>
         </button>
       )}
 
