@@ -13,6 +13,8 @@ export interface ChatSession {
   createdAt: string;
   updatedAt: string;
   model?: string;
+  projectId?: string | null;
+  projectName?: string | null;
 }
 
 export interface ChatState {

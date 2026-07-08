@@ -12,6 +12,8 @@ export interface SessionHistoryResponse {
     content: string;
     timestamp: string;
   }>;
+  projectId?: string | null;
+  projectName?: string | null;
 }
 
 /**
@@ -36,6 +38,8 @@ export async function createChatSession(projectId: string): Promise<CreateSessio
 export interface ChatSessionSummary {
   sessionId: string;
   title: string | null;
+  projectId?: string | null;
+  projectName?: string | null;
   createdAt: string;
   updatedAt: string;
 }

@@ -89,6 +89,8 @@ export function useChat(projectId: string | null, activeSessionId: string | null
             createdAt: new Date().toISOString(),
             updatedAt: new Date().toISOString(),
             model: prev.selectedModel,
+            projectId: history.projectId ?? null,
+            projectName: history.projectName ?? null,
           },
           isLoading: false,
           error: null,

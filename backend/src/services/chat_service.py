@@ -63,6 +63,7 @@ class ChatService:
 
             return {
                 "sessionId": session_id,
+                "project_id": chat.project_id,
                 "messages": [
                     {
                         "role": m.role,

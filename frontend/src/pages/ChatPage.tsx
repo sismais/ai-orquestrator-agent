@@ -4,7 +4,7 @@ import { type ChatSessionSummary } from '../api/chat';
 import ChatMessage from '../components/Chat/ChatMessage';
 import ChatInput from '../components/Chat/ChatInput';
 import { ModelSelector } from '../components/Chat/ModelSelector';
-import { MessageSquarePlus, Trash2, ArrowLeft } from 'lucide-react';
+import { MessageSquarePlus, Trash2, ArrowLeft, FolderKanban } from 'lucide-react';
 import styles from './ChatPage.module.css';
 
 interface ChatPageProps {
@@ -21,6 +21,9 @@ interface ChatPageProps {
   onDeleteSession: (id: string) => void;
   onBackToList: () => void;
   currentProjectId: string | null;
+  currentProjectName: string | null;
+  sessionProjectId: string | null;
+  sessionProjectName: string | null;
 }
 
 /** Formata data em texto relativo simples (ex.: "ha 2h", "ontem"). */
@@ -56,6 +59,9 @@ const ChatPage = ({
   onDeleteSession,
   onBackToList,
   currentProjectId,
+  currentProjectName,
+  sessionProjectId,
+  sessionProjectName,
 }: ChatPageProps) => {
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const isConversationView = !!activeSessionId;
@@ -81,6 +87,12 @@ const ChatPage = ({
               ? 'Converse com o assistente inteligente do projeto'
               : 'Suas conversas com o assistente do projeto'}
           </p>
+          {isConversationView && sessionProjectName && (
+            <div className={styles.projectBadge} title={`Projeto dono da sessão: ${sessionProjectName}`}>
+              <FolderKanban size={14} />
+              <span>{sessionProjectName}</span>
+            </div>
+          )}
         </div>
         <div className={styles.chatActions}>
           <button
@@ -145,7 +157,15 @@ const ChatPage = ({
                     >
                       <div className={styles.sessionInfo}>
                         <span className={styles.sessionTitle}>{s.title || 'Nova conversa'}</span>
-                        <span className={styles.sessionDate}>{formatRelativeTime(s.updatedAt)}</span>
+                        <div className={styles.sessionMeta}>
+                          {s.projectName && (
+                            <span className={styles.sessionProject} title={`Projeto: ${s.projectName}`}>
+                              <FolderKanban size={12} />
+                              {s.projectName}
+                            </span>
+                          )}
+                          <span className={styles.sessionDate}>{formatRelativeTime(s.updatedAt)}</span>
+                        </div>
                       </div>
                       <button
                         className={styles.deleteSessionButton}

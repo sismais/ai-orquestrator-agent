@@ -12,12 +12,14 @@ class MessageSchema(BaseModel):
     model: Optional[str] = None
 
 
-class ChatSessionSchema(BaseModel):
-    """Schema for a chat session"""
-    id: str
+class SessionHistoryResponse(BaseModel):
+    """Schema for a chat session history response"""
+    sessionId: str
     messages: list[MessageSchema]
-    createdAt: datetime
-    updatedAt: datetime
+    projectId: Optional[str] = None
+    projectName: Optional[str] = None
+    createdAt: Optional[datetime] = None
+    updatedAt: Optional[datetime] = None
     model: Optional[str] = None
 
 

@@ -4,6 +4,8 @@ Chat API routes for WebSocket-based real-time chat.
 from fastapi import APIRouter, WebSocket, WebSocketDisconnect, HTTPException, Query
 from fastapi.responses import JSONResponse
 import json
+from ..database import async_session_maker
+from ..repositories.project_repository import ProjectRepository
 from ..services.chat_service import get_chat_service
 from ..schemas.chat import (
     CreateSessionRequest,
@@ -53,6 +55,11 @@ async def get_chat_history(session_id: str):
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
+    # Resolve nome do projeto dono da sessao para exibir na UI do chat.
+    async with async_session_maker() as db:
+        project = await ProjectRepository(db).get_by_id(session["project_id"])
+    project_name = project.name if project else None
+
     # Convert messages to schema format
     messages = [
         MessageSchema(
@@ -68,6 +75,8 @@ async def get_chat_history(session_id: str):
     return SessionHistoryResponse(
         sessionId=session_id,
         messages=messages,
+        projectId=session["project_id"],
+        projectName=project_name,
     )
 
 
@@ -201,12 +210,21 @@ async def list_sessions(project_id: str = Query(..., alias="projectId")):
     chat_service = get_chat_service()
     sessions = await chat_service.list_sessions(project_id)
 
+    # Resolve nomes dos projetos donos de cada sessao (para exibir na lista de
+    # chats da UI). Como a lista ja e escopada por project_id, todas pertencem
+    # ao mesmo projeto — mas trazemos o nome pra UI nao precisar de outra rota.
+    async with async_session_maker() as db:
+        project = await ProjectRepository(db).get_by_id(project_id)
+    project_name = project.name if project else None
+
     return JSONResponse(
         content={
             "sessions": [
                 {
                     "sessionId": s.id,
                     "title": s.title,
+                    "projectId": s.project_id,
+                    "projectName": project_name,
                     "createdAt": s.created_at.isoformat(),
                     "updatedAt": s.updated_at.isoformat(),
                 }

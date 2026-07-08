@@ -7,6 +7,7 @@ import { useWorkflowAutomation } from './hooks/useWorkflowAutomation';
 import { useChat } from './hooks/useChat';
 import { useViewPersistence } from './hooks/useViewPersistence';
 import { useCardWebSocket, CardMovedMessage, CardUpdatedMessage, CardCreatedMessage } from './hooks/useCardWebSocket';
+import { listProjects, type RegistryProject } from './api/projectsRegistry';
 import * as cardsApi from './api/cards';
 import WorkspaceLayout, { ModuleType } from './layouts/WorkspaceLayout';
 import HomePage from './pages/HomePage';
@@ -38,6 +39,7 @@ function App() {
   const [initialExecutions, setInitialExecutions] = useState<Map<string, ExecutionStatus> | undefined>();
   const [initialWorkflowStatuses, setInitialWorkflowStatuses] = useState<Map<string, WorkflowStatus> | undefined>();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(() => localStorage.getItem('orq.currentProjectId'));
+  const [registryProjects, setRegistryProjects] = useState<RegistryProject[]>([]);
   const [boardColumns, setBoardColumns] = useState<Column[]>([]);
   const [boardTransitions, setBoardTransitions] = useState<Record<string, string[]>>({});
   const didMountProjectIdEffect = useRef(false);
@@ -193,6 +195,12 @@ function App() {
   useEffect(() => {
     const loadInitialData = async () => {
       try {
+        // Carrega o catalogo de projetos (registry) para resolver nomes na UI
+        // (ex.: badge de projeto no chat). Independente do projeto selecionado.
+        listProjects()
+          .then(setRegistryProjects)
+          .catch(err => console.error('[App] listProjects failed', err));
+
         // Load cards (scoped to the selected project, when one is set)
         const loadedCards = await cardsApi.fetchCards(currentProjectId ?? undefined);
         setCards(loadedCards);
@@ -479,6 +487,9 @@ function App() {
     navigate(module === 'chat' ? '/chat' : '/');
   };
 
+  // Nome do projeto atualmente selecionado no dropdown (para exibir no chat).
+  const currentProjectName = registryProjects.find(p => p.id === currentProjectId)?.name ?? null;
+
   // Navegação da lista/conversa do chat
   const openChatSession = (id: string) => navigate(`/chat/${id}`);
   const backToChatList = () => navigate('/chat');
@@ -730,6 +741,9 @@ function App() {
             onDeleteSession={handleDeleteChatSession}
             onBackToList={backToChatList}
             currentProjectId={currentProjectId}
+            currentProjectName={currentProjectName}
+            sessionProjectId={chatState.session?.projectId ?? null}
+            sessionProjectName={chatState.session?.projectName ?? null}
           />
         );
 
