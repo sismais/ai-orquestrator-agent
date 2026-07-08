@@ -258,6 +258,9 @@ class ChatService:
             project = await ProjectRepository(db).get_by_id(chat.project_id)
             cwd = project.path if project else None
 
+            if not chat.title:
+                chat.title = message.strip().split("\n")[0][:60]
+
             await repo.add_message(session_id, "user", message, model)
             await db.commit()
 

@@ -1,4 +1,5 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
+import { useNavigate, useLocation } from 'react-router-dom';
 import { DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
 import { Card as CardType, Column, ColumnId, ExecutionStatus, WorkflowStatus, WorkflowStage } from './types';
 import { useAgentExecution } from './hooks/useAgentExecution';
@@ -19,11 +20,16 @@ const AUTO_RUN_ON_DRAG = false;
 
 function App() {
   const { getSavedView, saveView } = useViewPersistence();
+  const location = useLocation();
+  const navigate = useNavigate();
+  const chatMatch = location.pathname.match(/^\/chat(?:\/([^/]+))?\/?$/);
+  const isChatRoute = chatMatch !== null;
+  const urlChatSessionId = chatMatch?.[1] ?? null;
 
-  // Inicializar com view salva
-  const [currentView, setCurrentView] = useState<ModuleType>(() => {
-    return getSavedView();
-  });
+  // Inicializar com view salva (ou chat, se a URL apontar pra /chat)
+  const [currentView, setCurrentView] = useState<ModuleType>(() =>
+    window.location.pathname.startsWith('/chat') ? 'chat' : getSavedView()
+  );
   const [cards, setCards] = useState<CardType[]>([]);
   const [activeCard, setActiveCard] = useState<CardType | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -38,6 +44,12 @@ function App() {
   const dragStartColumnRef = useRef<ColumnId | null>(null);
 
   const isValidMove = (from: string, to: string) => (boardTransitions[from] ?? []).includes(to);
+
+  // Mantém currentView em sync quando a navegação do browser (back/forward,
+  // link direto) leva pra rota do chat.
+  useEffect(() => {
+    if (isChatRoute) setCurrentView('chat');
+  }, [isChatRoute]);
 
   // Carrega a configuração do workflow (colunas + transições) do backend
   useEffect(() => {
@@ -72,7 +84,14 @@ function App() {
 
   // Estado para controlar loading de experts
   const [loadingExpertsCardId, setLoadingExpertsCardId] = useState<string | null>(null);
-  const { state: chatState, sendMessage, handleModelChange, createNewSession } = useChat(currentProjectId);
+  const {
+    state: chatState,
+    sessions: chatSessions,
+    sendMessage,
+    handleModelChange,
+    createSession,
+    deleteSession,
+  } = useChat(currentProjectId, urlChatSessionId);
 
   // Define moveCard and updateCardSpecPath BEFORE useWorkflowAutomation
   const moveCard = (cardId: string, newColumnId: ColumnId) => {
@@ -457,6 +476,19 @@ function App() {
   const handleNavigate = (module: ModuleType) => {
     setCurrentView(module);
     saveView(module);
+    navigate(module === 'chat' ? '/chat' : '/');
+  };
+
+  // Navegação da lista/conversa do chat
+  const openChatSession = (id: string) => navigate(`/chat/${id}`);
+  const backToChatList = () => navigate('/chat');
+  const handleNewChat = async () => {
+    const id = await createSession();
+    if (id) navigate(`/chat/${id}`);
+  };
+  const handleDeleteChatSession = async (id: string) => {
+    await deleteSession(id);
+    if (urlChatSessionId === id) navigate('/chat');
   };
 
   const handleDragStart = (event: DragStartEvent) => {
@@ -685,13 +717,18 @@ function App() {
       case 'chat':
         return (
           <ChatPage
+            sessions={chatSessions}
+            activeSessionId={urlChatSessionId}
             messages={chatState.session?.messages || []}
             isLoading={chatState.isLoading}
             error={chatState.error}
             onSendMessage={sendMessage}
             selectedModel={chatState.selectedModel}
             onModelChange={handleModelChange}
-            onNewChat={createNewSession}
+            onOpenSession={openChatSession}
+            onNewChat={handleNewChat}
+            onDeleteSession={handleDeleteChatSession}
+            onBackToList={backToChatList}
             currentProjectId={currentProjectId}
           />
         );

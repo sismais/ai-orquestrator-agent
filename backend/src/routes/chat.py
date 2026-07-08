@@ -202,6 +202,7 @@ async def list_sessions(project_id: str = Query(..., alias="projectId")):
                     "sessionId": s.id,
                     "title": s.title,
                     "createdAt": s.created_at.isoformat(),
+                    "updatedAt": s.updated_at.isoformat(),
                 }
                 for s in sessions
             ],

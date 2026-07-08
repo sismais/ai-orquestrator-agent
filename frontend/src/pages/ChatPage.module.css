@@ -46,6 +46,29 @@
   gap: var(--space-3);
 }
 
+.backButton {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  color: var(--text-secondary);
+  font-size: 0.8125rem;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 150ms ease;
+  width: fit-content;
+  margin-bottom: var(--space-1);
+}
+
+.backButton:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-cyan);
+  color: var(--text-primary);
+}
+
 .newChatButton {
   display: flex;
   align-items: center;
@@ -137,6 +160,84 @@
   flex-direction: column;
   gap: var(--space-4);
   min-height: 100%;
+}
+
+.sessionListContainer {
+  padding: var(--space-5);
+  display: flex;
+  flex-direction: column;
+  min-height: 100%;
+}
+
+.sessionList {
+  display: flex;
+  flex-direction: column;
+  gap: var(--space-2);
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+
+.sessionItem {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 16px;
+  background: var(--bg-elevated);
+  border: 1px solid var(--border-default);
+  border-radius: var(--radius-md);
+  cursor: pointer;
+  transition: all 180ms ease;
+  box-shadow: var(--shadow-sm);
+}
+
+.sessionItem:hover {
+  background: var(--bg-hover);
+  border-color: var(--accent-cyan);
+  box-shadow: var(--shadow-md);
+  transform: translateY(-1px);
+}
+
+.sessionInfo {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  min-width: 0;
+  flex: 1;
+}
+
+.sessionTitle {
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--text-primary);
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.sessionDate {
+  font-size: 0.75rem;
+  color: var(--text-tertiary);
+}
+
+.deleteSessionButton {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 8px;
+  background: transparent;
+  border: none;
+  border-radius: var(--radius-md);
+  color: var(--text-tertiary);
+  cursor: pointer;
+  transition: all 150ms ease;
+  flex-shrink: 0;
+  margin-left: var(--space-3);
+}
+
+.deleteSessionButton:hover {
+  background: var(--danger-subtle);
+  color: var(--accent-danger);
 }
 
 .emptyState {

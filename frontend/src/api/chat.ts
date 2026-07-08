@@ -37,6 +37,7 @@ export interface ChatSessionSummary {
   sessionId: string;
   title: string | null;
   createdAt: string;
+  updatedAt: string;
 }
 
 /**

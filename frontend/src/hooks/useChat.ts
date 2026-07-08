@@ -3,7 +3,13 @@ import { ChatState, Message } from '../types/chat';
 import { v4 as uuidv4 } from 'uuid';
 import { useWebSocketBase } from './useWebSocketBase';
 import { WS_ENDPOINTS } from '../api/config';
-import { createChatSession, listChatSessions, getChatHistory } from '../api/chat';
+import {
+  createChatSession,
+  listChatSessions,
+  getChatHistory,
+  deleteChatSession,
+  type ChatSessionSummary,
+} from '../api/chat';
 
 interface ChatWebSocketMessage {
   type: 'chunk' | 'end' | 'error';
@@ -12,7 +18,7 @@ interface ChatWebSocketMessage {
   message?: string;
 }
 
-export function useChat(projectId: string | null) {
+export function useChat(projectId: string | null, activeSessionId: string | null) {
   const [state, setState] = useState<ChatState>({
     isOpen: false,
     session: null,
@@ -22,85 +28,83 @@ export function useChat(projectId: string | null) {
     unreadCount: 0,
   });
 
+  const [sessions, setSessions] = useState<ChatSessionSummary[]>([]);
+
   // sessionId só existe depois que a sessão é criada no backend (REST),
   // por isso é estado (não ref): precisa disparar re-render para o WS conectar.
   const [sessionId, setSessionId] = useState<string | null>(null);
   const currentMessageId = useRef<string | null>(null);
   const pendingMessage = useRef<string | null>(null);
 
-  // Ao trocar de projeto: reusa a sessao mais recente do projeto (carregando o
-  // historico), ou cria a primeira se nao houver nenhuma. Evita acumular sessoes
-  // vazias a cada reload/troca. Sem projeto: nao ha sessao/WS (empty state na UI).
+  // Lista de conversas do projeto (tela /chat sem conversa aberta).
   useEffect(() => {
     let cancelled = false;
 
-    setSessionId(null);
-    currentMessageId.current = null;
-
     if (!projectId) {
-      setState((prev) => ({ ...prev, session: null, error: null, isLoading: false }));
+      setSessions([]);
       return;
     }
 
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
-
-    (async () => {
-      try {
-        const sessions = await listChatSessions(projectId);
-        if (cancelled) return;
-
-        if (sessions.length > 0) {
-          const latest = sessions[0]; // backend ordena por updated_at desc
-          const history = await getChatHistory(latest.sessionId);
-          if (cancelled) return;
-          const messages: Message[] = history.messages.map((m) => ({
-            id: uuidv4(),
-            role: m.role,
-            content: m.content,
-            timestamp: m.timestamp,
-            isStreaming: false,
-          }));
-          setSessionId(latest.sessionId);
-          setState((prev) => ({
-            ...prev,
-            session: {
-              id: latest.sessionId,
-              messages,
-              createdAt: latest.createdAt,
-              updatedAt: latest.createdAt,
-              model: prev.selectedModel,
-            },
-            isLoading: false,
-            error: null,
-          }));
-        } else {
-          const res = await createChatSession(projectId);
-          if (cancelled) return;
-          setSessionId(res.sessionId);
-          setState((prev) => ({
-            ...prev,
-            session: {
-              id: res.sessionId,
-              messages: [],
-              createdAt: res.createdAt,
-              updatedAt: res.createdAt,
-              model: prev.selectedModel,
-            },
-            isLoading: false,
-            error: null,
-          }));
-        }
-      } catch (err) {
-        if (cancelled) return;
-        console.error('[useChat] Failed to init chat session:', err);
-        setState((prev) => ({ ...prev, isLoading: false, error: 'Falha ao iniciar sessao de chat.' }));
-      }
-    })();
+    listChatSessions(projectId)
+      .then((s) => {
+        if (!cancelled) setSessions(s);
+      })
+      .catch(() => {});
 
     return () => {
       cancelled = true;
     };
   }, [projectId]);
+
+  // Conversa ativa, dirigida pela rota (/chat/:sessionId). Sem sessão ativa,
+  // mostra a lista (nenhuma conversa aberta, sem WS conectado).
+  useEffect(() => {
+    let cancelled = false;
+    currentMessageId.current = null;
+
+    if (!projectId || !activeSessionId) {
+      setSessionId(null);
+      setState((prev) => ({ ...prev, session: null, isLoading: false, error: null }));
+      return;
+    }
+
+    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+
+    getChatHistory(activeSessionId)
+      .then((history) => {
+        if (cancelled) return;
+        const messages: Message[] = history.messages.map((m) => ({
+          id: uuidv4(),
+          role: m.role,
+          content: m.content,
+          timestamp: m.timestamp,
+          isStreaming: false,
+        }));
+        setSessionId(activeSessionId);
+        setState((prev) => ({
+          ...prev,
+          session: {
+            id: activeSessionId,
+            messages,
+            createdAt: new Date().toISOString(),
+            updatedAt: new Date().toISOString(),
+            model: prev.selectedModel,
+          },
+          isLoading: false,
+          error: null,
+        }));
+      })
+      .catch((err) => {
+        if (cancelled) return;
+        console.error('[useChat] Failed to load session:', err);
+        setSessionId(null);
+        setState((prev) => ({ ...prev, session: null, isLoading: false, error: 'Conversa nao encontrada.' }));
+      });
+
+    return () => {
+      cancelled = true;
+    };
+  }, [projectId, activeSessionId]);
 
   // Keyboard shortcut (Cmd+K or Ctrl+K)
   useEffect(() => {
@@ -174,6 +178,11 @@ export function useChat(projectId: string | null) {
           isLoading: false,
         };
       });
+
+      // Recarrega a lista pra refletir titulo/updatedAt da conversa recem-respondida.
+      if (projectId) {
+        listChatSessions(projectId).then(setSessions).catch(() => {});
+      }
     } else if (chatData.type === 'error') {
       setState((prev) => ({
         ...prev,
@@ -182,7 +191,7 @@ export function useChat(projectId: string | null) {
       }));
       currentMessageId.current = null;
     }
-  }, []);
+  }, [projectId]);
 
   const handleOpen = useCallback(() => {
     console.log('[ChatWS] Connected');
@@ -204,7 +213,7 @@ export function useChat(projectId: string | null) {
     }));
   }, []);
 
-  const { isConnected, send, reconnect } = useWebSocketBase({
+  const { isConnected, send } = useWebSocketBase({
     url: WS_ENDPOINTS.chat(sessionId ?? ''),
     // Conecta quando a sessão do projeto existe. O Chat é uma página (só visível
     // na aba Chat), então o antigo gate `state.isOpen` (widget flutuante) não se aplica.
@@ -268,57 +277,43 @@ export function useChat(projectId: string | null) {
     }));
   }, []);
 
-  const closeChat = useCallback(() => {
-    setState((prev) => ({
-      ...prev,
-      isOpen: false,
-    }));
-  }, []);
-
   const handleModelChange = useCallback((model: string) => {
     // O modelo vai por mensagem (payload do send); trocar de modelo apenas atualiza
     // o selecionado, sem reiniciar a conversa nem criar sessao nova.
     setState((prev) => ({ ...prev, selectedModel: model }));
   }, []);
 
-  const createNewSession = useCallback(() => {
-    if (!projectId) return;
+  const createSession = useCallback(async (): Promise<string | null> => {
+    if (!projectId) return null;
 
-    currentMessageId.current = null;
-    setState((prev) => ({ ...prev, isLoading: true, error: null }));
+    try {
+      const res = await createChatSession(projectId);
+      const list = await listChatSessions(projectId);
+      setSessions(list);
+      return res.sessionId;
+    } catch (err) {
+      console.error('[useChat] Failed to create session:', err);
+      setState((prev) => ({ ...prev, error: 'Falha ao criar nova conversa.' }));
+      return null;
+    }
+  }, [projectId]);
 
-    createChatSession(projectId)
-      .then((res) => {
-        setSessionId(res.sessionId);
-        setState((prev) => ({
-          ...prev,
-          session: {
-            id: res.sessionId,
-            messages: [],
-            createdAt: res.createdAt,
-            updatedAt: res.createdAt,
-            model: prev.selectedModel,
-          },
-          isLoading: false,
-          error: null,
-        }));
-
-        // Reconnect com a nova sessão (o hook de WS também reage à troca de url/enabled)
-        reconnect();
-      })
-      .catch((err) => {
-        console.error('[useChat] Failed to create new session:', err);
-        setState((prev) => ({ ...prev, isLoading: false, error: 'Falha ao criar nova sessao.' }));
-      });
-  }, [projectId, reconnect]);
+  const deleteSession = useCallback(async (id: string): Promise<void> => {
+    try {
+      await deleteChatSession(id);
+      if (projectId) setSessions(await listChatSessions(projectId));
+    } catch (err) {
+      console.error('[useChat] Failed to delete session:', err);
+    }
+  }, [projectId]);
 
   return {
     state,
+    sessions,
     sendMessage,
-    toggleChat,
-    closeChat,
     handleModelChange,
-    createNewSession,
+    createSession,
+    deleteSession,
     isConnected,
   };
 }
