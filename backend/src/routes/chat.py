@@ -137,6 +137,12 @@ async def chat_websocket(websocket: WebSocket, session_id: str):
                 message_content = message_data.get("content")
                 message_model = message_data.get("model", "sonnet-5")
 
+                # Heartbeat: responde pong ao ping do cliente (useWebSocketBase),
+                # senao o cliente estoura o pongTimeout e reconecta em loop.
+                if message_type == "ping":
+                    await websocket.send_text(json.dumps({"type": "pong"}))
+                    continue
+
                 if message_type != "message" or not message_content:
                     await websocket.send_text(
                         json.dumps({
