@@ -32,6 +32,7 @@ from .routes.settings import router as settings_router
 from .routes.experts import router as experts_router
 from .routes.workflows import router as workflows_router
 from .routes.runner import router as runner_router
+from .routes.filesystem import router as filesystem_router
 from .database import get_db, async_session_maker
 from .repositories.card_repository import CardRepository
 from .schemas.card import CardUpdate
@@ -111,6 +112,7 @@ app.include_router(settings_router)
 app.include_router(experts_router)
 app.include_router(workflows_router)
 app.include_router(runner_router)
+app.include_router(filesystem_router)
 
 
 @app.get("/health", response_model=HealthResponse)

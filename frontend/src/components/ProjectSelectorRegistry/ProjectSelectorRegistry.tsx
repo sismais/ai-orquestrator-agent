@@ -1,7 +1,11 @@
 import { useState, useEffect, useCallback } from 'react';
+import { createPortal } from 'react-dom';
 import { FolderKanban, X } from 'lucide-react';
 import { listProjects, createProject, type RegistryProject } from '../../api/projectsRegistry';
+import { FolderBrowserModal } from '../FolderBrowserModal/FolderBrowserModal';
 import styles from './ProjectSelectorRegistry.module.css';
+
+const CREATE_PROJECT_ID = '__add_project__';
 
 interface ProjectSelectorRegistryProps {
   currentProjectId: string | null;
@@ -11,11 +15,12 @@ interface ProjectSelectorRegistryProps {
 export function ProjectSelectorRegistry({ currentProjectId, onSwitch }: ProjectSelectorRegistryProps) {
   const [projects, setProjects] = useState<RegistryProject[]>([]);
   const [isLoading, setIsLoading] = useState(false);
-  const [isFormOpen, setIsFormOpen] = useState(false);
+  const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isFolderBrowserOpen, setIsFolderBrowserOpen] = useState(false);
 
   const loadProjects = useCallback(async () => {
     setIsLoading(true);
@@ -35,18 +40,18 @@ export function ProjectSelectorRegistry({ currentProjectId, onSwitch }: ProjectS
 
   const handleSelectChange = (e: React.ChangeEvent<HTMLSelectElement>) => {
     const id = e.target.value;
-    if (id && id !== currentProjectId) {
-      onSwitch(id);
+    if (!id || id === CREATE_PROJECT_ID || id === currentProjectId) {
+      if (id === CREATE_PROJECT_ID) {
+        setIsCreateModalOpen(true);
+      }
+      return;
     }
-  };
 
-  const handleOpenForm = () => {
-    setIsFormOpen(true);
-    setError(null);
+    onSwitch(id);
   };
 
   const handleCancel = () => {
-    setIsFormOpen(false);
+    setIsCreateModalOpen(false);
     setName('');
     setPath('');
     setError(null);
@@ -64,7 +69,7 @@ export function ProjectSelectorRegistry({ currentProjectId, onSwitch }: ProjectS
       const project = await createProject({ name: name.trim(), path: path.trim() });
       await loadProjects();
       onSwitch(project.id);
-      setIsFormOpen(false);
+      setIsCreateModalOpen(false);
       setName('');
       setPath('');
     } catch (err) {
@@ -82,52 +87,94 @@ export function ProjectSelectorRegistry({ currentProjectId, onSwitch }: ProjectS
           className={styles.select}
           value={currentProjectId ?? ''}
           onChange={handleSelectChange}
-          disabled={isLoading || projects.length === 0}
+          disabled={isLoading}
           title="Selecionar projeto do board"
         >
           {projects.length === 0 && <option value="">Nenhum projeto cadastrado</option>}
-          {projects.length > 0 && !currentProjectId && <option value="">Selecione um projeto</option>}
+          {projects.length > 0 && <option value="">Selecione um projeto</option>}
           {projects.map(project => (
             <option key={project.id} value={project.id}>
               {project.name}
             </option>
           ))}
+          <option value={CREATE_PROJECT_ID}>+ Novo Projeto</option>
         </select>
       </div>
 
-      {isFormOpen ? (
-        <div className={styles.inlineForm}>
-          <input
-            className={styles.input}
-            type="text"
-            placeholder="Nome"
-            value={name}
-            onChange={(e) => setName(e.target.value)}
-            disabled={isCreating}
-          />
-          <input
-            className={styles.input}
-            type="text"
-            placeholder="Caminho local"
-            value={path}
-            onChange={(e) => setPath(e.target.value)}
-            disabled={isCreating}
-            onKeyDown={(e) => {
-              if (e.key === 'Enter' && !isCreating) handleCreate();
-            }}
-          />
-          <button className={styles.confirmButton} onClick={handleCreate} disabled={isCreating}>
-            {isCreating ? '...' : 'Criar'}
-          </button>
-          <button className={styles.cancelButton} onClick={handleCancel} disabled={isCreating} title="Cancelar">
-            <X size={14} />
-          </button>
-          {error && <span className={styles.errorText}>{error}</span>}
-        </div>
-      ) : (
-        <button className={styles.addButton} onClick={handleOpenForm} title="Cadastrar novo projeto">
-          ＋ Projeto
-        </button>
+      {isCreateModalOpen && createPortal(
+        <div className={styles.modalOverlay} onClick={handleCancel}>
+          <div className={styles.modal} onClick={(e) => e.stopPropagation()}>
+            <div className={styles.modalHeader}>
+              <div className={styles.modalTitleGroup}>
+                <span className={styles.modalIcon}>＋</span>
+                <div>
+                  <h2 className={styles.modalTitle}>Cadastrar novo projeto</h2>
+                  <p className={styles.modalSubtitle}>Informe nome e caminho local do projeto.</p>
+                </div>
+              </div>
+              <button className={styles.closeButton} onClick={handleCancel} aria-label="Fechar modal">
+                <X size={16} />
+              </button>
+            </div>
+
+            <div className={styles.modalBody}>
+              <label className={styles.fieldLabel}>
+                Nome
+                <input
+                  className={styles.input}
+                  type="text"
+                  placeholder="Nome do projeto"
+                  value={name}
+                  onChange={(e) => setName(e.target.value)}
+                  disabled={isCreating}
+                />
+              </label>
+              <label className={styles.fieldLabel}>
+                Caminho local
+                <div className={styles.pathField}>
+                  <input
+                    className={styles.input}
+                    type="text"
+                    placeholder="Caminho local"
+                    value={path}
+                    onChange={(e) => setPath(e.target.value)}
+                    disabled={isCreating}
+                  />
+                  <button
+                    type="button"
+                    className={styles.browseButton}
+                    onClick={() => setIsFolderBrowserOpen(true)}
+                    disabled={isCreating}
+                  >
+                    Escolher pasta
+                  </button>
+                </div>
+              </label>
+              {error && <div className={styles.errorText}>{error}</div>}
+            </div>
+
+            <div className={styles.modalFooter}>
+              <button className={styles.cancelButton} onClick={handleCancel} disabled={isCreating}>
+                Cancelar
+              </button>
+              <button className={styles.confirmButton} onClick={handleCreate} disabled={isCreating}>
+                {isCreating ? 'Criando...' : 'Criar projeto'}
+              </button>
+            </div>
+          </div>
+        </div>,
+        document.body
+      )}
+
+      {isFolderBrowserOpen && (
+        <FolderBrowserModal
+          initialPath={path.trim() || undefined}
+          onSelect={(selectedPath) => {
+            setPath(selectedPath);
+            setIsFolderBrowserOpen(false);
+          }}
+          onClose={() => setIsFolderBrowserOpen(false)}
+        />
       )}
     </div>
   );
