@@ -7,6 +7,8 @@ import { useWorkflowAutomation } from './hooks/useWorkflowAutomation';
 import { useChat } from './hooks/useChat';
 import { useViewPersistence } from './hooks/useViewPersistence';
 import { useCardWebSocket, CardMovedMessage, CardUpdatedMessage, CardCreatedMessage } from './hooks/useCardWebSocket';
+import { useToast } from './hooks/useToast';
+import { ToastContainer } from './components/Toast/ToastContainer';
 import { listProjects, type RegistryProject } from './api/projectsRegistry';
 import * as cardsApi from './api/cards';
 import WorkspaceLayout, { ModuleType } from './layouts/WorkspaceLayout';
@@ -141,11 +143,24 @@ function App() {
     executions,
   });
 
+  // Toasts globais + contador de cards pausados (A3)
+  const { toasts, addToast, removeToast } = useToast();
+  const pausedCount = cards.filter(c => c.columnId === 'paused').length;
+
   // WebSocket para sincronização de cards em tempo real
   const { isConnected: cardsWsConnected } = useCardWebSocket({
     enabled: true,
     onCardMoved: useCallback(async (message: CardMovedMessage) => {
       console.log(`[App] Card moved via WebSocket: ${message.cardId}`);
+
+      // Avisar quando um card pausa e passa a aguardar resposta do usuário
+      if (message.toColumn === 'paused' && message.fromColumn !== 'paused') {
+        addToast({
+          type: 'info',
+          title: '⏸ Aguardando você',
+          message: `"${message.card.title}" pausou e precisa da sua resposta.`,
+        });
+      }
 
       // Atualizar o card na lista local
       setCards(prev => prev.map(card =>
@@ -157,7 +172,7 @@ function App() {
       if (workflowStatus && workflowStatus.stage !== 'idle') {
         console.log(`[App] Card ${message.cardId} has active workflow, may need recovery`);
       }
-    }, [getWorkflowStatus]),
+    }, [getWorkflowStatus, addToast]),
 
     onCardUpdated: useCallback((message: CardUpdatedMessage) => {
       console.log(`[App] Card updated via WebSocket: ${message.cardId}`);
@@ -767,15 +782,19 @@ function App() {
   }
 
   return (
-    <WorkspaceLayout
-      currentModule={currentView}
-      onNavigate={handleNavigate}
-      currentProjectId={currentProjectId}
-      onProjectSwitch={setCurrentProjectId}
-    >
-      {renderView()}
-      <div id="modal-root" />
-    </WorkspaceLayout>
+    <>
+      <WorkspaceLayout
+        currentModule={currentView}
+        onNavigate={handleNavigate}
+        currentProjectId={currentProjectId}
+        onProjectSwitch={setCurrentProjectId}
+        pausedCount={pausedCount}
+      >
+        {renderView()}
+        <div id="modal-root" />
+      </WorkspaceLayout>
+      <ToastContainer toasts={toasts} onDismiss={removeToast} />
+    </>
   );
 }
 

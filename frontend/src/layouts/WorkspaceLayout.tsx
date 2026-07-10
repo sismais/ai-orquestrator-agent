@@ -10,9 +10,10 @@ interface WorkspaceLayoutProps {
   onNavigate: (module: ModuleType) => void;
   currentProjectId: string | null;
   onProjectSwitch: (projectId: string) => void;
+  pausedCount?: number;
 }
 
-const WorkspaceLayout = ({ children, currentModule, onNavigate, currentProjectId, onProjectSwitch }: WorkspaceLayoutProps) => {
+const WorkspaceLayout = ({ children, currentModule, onNavigate, currentProjectId, onProjectSwitch, pausedCount = 0 }: WorkspaceLayoutProps) => {
   useWorkspaceBodyClass(currentModule);
   return (
     <div className={styles.workspace}>
@@ -21,6 +22,7 @@ const WorkspaceLayout = ({ children, currentModule, onNavigate, currentProjectId
         onNavigate={onNavigate}
         currentProjectId={currentProjectId}
         onProjectSwitch={onProjectSwitch}
+        pausedCount={pausedCount}
       />
       <main className={`${styles.content} ${currentModule === 'kanban' ? styles.kanbanContentWrapper : ''}`}>
         {children}
