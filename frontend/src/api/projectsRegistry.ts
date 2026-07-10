@@ -16,6 +16,7 @@ export interface RegistryProject {
   baseBranch: string;
   workflowId: string | null;
   favorite: boolean;
+  objective?: string | null;
 }
 
 const base = () => `${API_CONFIG.BASE_URL}/api/registry/projects`;
@@ -26,11 +27,16 @@ export async function listProjects(): Promise<RegistryProject[]> {
   return (await r.json()).projects;
 }
 
-export async function createProject(input: { name: string; path: string; workflowId?: string }): Promise<RegistryProject> {
+export async function createProject(input: { name: string; path: string; objective?: string; workflowId?: string }): Promise<RegistryProject> {
   const r = await fetch(base(), {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify({ name: input.name, path: input.path, workflowId: input.workflowId ?? 'dev' }),
+    body: JSON.stringify({
+      name: input.name,
+      path: input.path,
+      objective: input.objective || undefined,
+      workflowId: input.workflowId ?? 'dev',
+    }),
   });
   if (!r.ok) {
     const e = await r.json().catch(() => ({}));

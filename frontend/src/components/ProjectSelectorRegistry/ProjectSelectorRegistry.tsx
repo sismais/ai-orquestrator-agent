@@ -18,6 +18,7 @@ export function ProjectSelectorRegistry({ currentProjectId, onSwitch }: ProjectS
   const [isCreateModalOpen, setIsCreateModalOpen] = useState(false);
   const [name, setName] = useState('');
   const [path, setPath] = useState('');
+  const [objective, setObjective] = useState('');
   const [isCreating, setIsCreating] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isFolderBrowserOpen, setIsFolderBrowserOpen] = useState(false);
@@ -54,6 +55,7 @@ export function ProjectSelectorRegistry({ currentProjectId, onSwitch }: ProjectS
     setIsCreateModalOpen(false);
     setName('');
     setPath('');
+    setObjective('');
     setError(null);
   };
 
@@ -66,12 +68,17 @@ export function ProjectSelectorRegistry({ currentProjectId, onSwitch }: ProjectS
     setIsCreating(true);
     setError(null);
     try {
-      const project = await createProject({ name: name.trim(), path: path.trim() });
+      const project = await createProject({
+        name: name.trim(),
+        path: path.trim(),
+        objective: objective.trim() || undefined,
+      });
       await loadProjects();
       onSwitch(project.id);
       setIsCreateModalOpen(false);
       setName('');
       setPath('');
+      setObjective('');
     } catch (err) {
       setError(err instanceof Error ? err.message : 'Falha ao criar projeto.');
     } finally {
@@ -149,6 +156,17 @@ export function ProjectSelectorRegistry({ currentProjectId, onSwitch }: ProjectS
                     Escolher pasta
                   </button>
                 </div>
+              </label>
+              <label className={styles.fieldLabel}>
+                Objetivo (opcional)
+                <textarea
+                  className={styles.input}
+                  rows={2}
+                  placeholder="Objetivo de negócio do projeto — os agentes usam isso para calibrar decisões"
+                  value={objective}
+                  onChange={(e) => setObjective(e.target.value)}
+                  disabled={isCreating}
+                />
               </label>
               {error && <div className={styles.errorText}>{error}</div>}
             </div>

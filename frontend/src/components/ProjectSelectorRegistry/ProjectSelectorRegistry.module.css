@@ -242,6 +242,13 @@
   font-size: 14px;
 }
 
+/* Textarea do campo "Objetivo": limita o resize à vertical (evita estourar o modal)
+   e herda a fonte do app (textarea usa monospace por padrão no browser). */
+textarea.input {
+  resize: vertical;
+  font-family: inherit;
+}
+
 .pathField .browseButton {
   display: inline-flex;
   align-items: center;
