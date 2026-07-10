@@ -81,6 +81,30 @@ def test_build_stage_options_inclui_snippet_de_autonomia():
     assert opts.permission_mode == "acceptEdits"
 
 
+def test_build_stage_options_sem_progress_nao_registra_mcp():
+    from src.services.stage_runner import build_stage_options
+    opts = build_stage_options("implement", "/wt", "opus-4.8")
+    assert not getattr(opts, "mcp_servers", None)     # sem callback -> sem tool
+    assert "PROGRESSO" in opts.system_prompt["append"] or "send_to_user" in opts.system_prompt["append"]
+
+
+async def test_send_to_user_tool_emite_progress():
+    from src.services.stage_runner import _make_progress_server
+    emitted: list = []
+
+    async def on_log(text, log_type="info"):
+        emitted.append((log_type, text))
+
+    server, tool_name = _make_progress_server(on_log)
+    assert tool_name.endswith("send_to_user")
+    # invoca o handler da tool diretamente (contrato SDK: dict -> {"content": [...]})
+    from src.services.stage_runner import _progress_handler_for
+    handler = _progress_handler_for(on_log)
+    out = await handler({"message": "implementei o service X"})
+    assert emitted == [("progress", "implementei o service X")]
+    assert "content" in out
+
+
 def test_build_stage_options_sem_model_usa_default_do_cli():
     from src.services.stage_runner import build_stage_options
     opts = build_stage_options("plan", "/tmp/wt", None)

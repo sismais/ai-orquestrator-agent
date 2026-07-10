@@ -19,6 +19,8 @@ from claude_agent_sdk import (
     ToolUseBlock,
     ToolResultBlock,
     ResultMessage,
+    create_sdk_mcp_server,
+    tool,
 )
 
 from . import session_registry as sessions
@@ -54,18 +56,67 @@ AUTONOMY_SNIPPET = (
 )
 
 
-def build_stage_options(stage_key: str, worktree: str, model: "str | None") -> ClaudeAgentOptions:
-    """Ponto unico de montagem das options do estagio (perfis por modelo — N1)."""
+# Instrucao de uso da tool send_to_user (padrao Anthropic 2). Definir a tool nao basta —
+# o system prompt precisa dizer QUANDO usa-la.
+PROGRESS_SNIPPET = (
+    "\n\n## Progresso (send_to_user)\n"
+    "Voce tem a tool `send_to_user`. Use-a para reportar progresso ao humano em marcos "
+    "significativos (ex.: 'li o AGENTS.md e o modulo X', 'implementei o service, faltam os testes', "
+    "'rodando a validacao') — SEM encerrar o turno. Mensagens curtas (1 frase). Nao a use para o "
+    "resultado final (esse vai no formato pedido) nem para cada micro-passo."
+)
+
+_PROGRESS_SERVER_NAME = "sismais"
+_PROGRESS_TOOL = "send_to_user"
+PROGRESS_TOOL_FQN = f"mcp__{_PROGRESS_SERVER_NAME}__{_PROGRESS_TOOL}"
+
+
+def _progress_handler_for(on_log):
+    async def _handler(args: dict) -> dict:
+        msg = (args or {}).get("message") or ""
+        if on_log and msg:
+            try:
+                r = on_log(str(msg)[:500], "progress")
+                if inspect.isawaitable(r):
+                    await r
+            except Exception:  # noqa: BLE001 — progresso e best-effort
+                pass
+        return {"content": [{"type": "text", "text": "ok"}]}
+    return _handler
+
+
+def _make_progress_server(on_log):
+    """Cria o MCP server in-process com a tool send_to_user (closure sobre on_log)."""
+    handler = _progress_handler_for(on_log)
+    decorated = tool(_PROGRESS_TOOL, "Reporta uma mensagem curta de progresso ao humano no card, "
+                     "sem encerrar o turno.", {"message": str})(handler)
+    server = create_sdk_mcp_server(name=_PROGRESS_SERVER_NAME, tools=[decorated])
+    return server, PROGRESS_TOOL_FQN
+
+
+def build_stage_options(stage_key: str, worktree: str, model: "str | None",
+                        progress_cb=None) -> ClaudeAgentOptions:
+    """Ponto unico de montagem das options do estagio (perfis por modelo — N1).
+
+    `progress_cb` (opcional, N5): quando presente, pluga o MCP server in-process com a tool
+    send_to_user (closure sobre o callback). Sem callback -> sem tool (contrato do stage_fn
+    intacto; os testes nao instanciam o server).
+    """
     body, tools = load_stage_agent(stage_key)
     profile = get_profile(model) if model else None
-    append = body + AUTONOMY_SNIPPET + (profile.prompt_append if profile else "")
+    append = body + AUTONOMY_SNIPPET + PROGRESS_SNIPPET + (profile.prompt_append if profile else "")
+    allowed = list(tools)
     options_kwargs = dict(
         cwd=worktree,
         setting_sources=["project"],
         system_prompt={"type": "preset", "preset": "claude_code", "append": append},
-        allowed_tools=tools,
         permission_mode="acceptEdits",
     )
+    if progress_cb is not None:
+        server, fqn = _make_progress_server(progress_cb)
+        options_kwargs["mcp_servers"] = {_PROGRESS_SERVER_NAME: server}
+        allowed.append(fqn)
+    options_kwargs["allowed_tools"] = allowed
     if model:
         options_kwargs["model"] = profile.model_id
     return ClaudeAgentOptions(**options_kwargs)
@@ -266,7 +317,7 @@ class _AttemptOutcome:
 async def _run_single_attempt(stage_key: str, worktree: str, prompt: str,
                               card_id: "str | None", on_log, model_alias: "str | None") -> _AttemptOutcome:
     """UMA sessao SDK: conecta, roda o turno, classifica o fim. Sem politica de retry aqui."""
-    options = build_stage_options(stage_key, worktree, model_alias)
+    options = build_stage_options(stage_key, worktree, model_alias, progress_cb=on_log)
     texts: list[str] = []
     cost = None
     usage = None
