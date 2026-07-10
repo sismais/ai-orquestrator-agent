@@ -90,6 +90,8 @@ export function PipelineControls({ card }: Props) {
     e.stopPropagation();
     if (!projectId) return;
     setLogs([]);
+    setRunMeta(null); // sem isso, o LogsModal do run novo exibe custo/tokens do run anterior
+    setPrUrl(null);
     setStatus('running');
     setStartedAt(new Date().toISOString());
     setCompletedAt(undefined);
