@@ -332,7 +332,13 @@ class ExecutionRepository:
         }
 
     async def get_cost_stats_for_card(self, card_id: str) -> dict:
-        """Retorna estatísticas agregadas de custos para um card"""
+        """Retorna estatísticas agregadas de custos para um card.
+
+        Prefere o custo real reportado pelo SDK (execution_cost); o derivado de
+        tokens x preço (CostCalculator) fica só como fallback para execuções legadas
+        sem execution_cost — o derivado cobra preço cheio de input (inclui cache_read)
+        e inflaria o custo 5-10x.
+        """
         # Buscar todas as execuções do card
         result = await self.db.execute(
             select(Execution)
@@ -340,5 +346,29 @@ class ExecutionRepository:
         )
         executions = result.scalars().all()
 
-        # Calcular breakdown de custos usando o serviço
-        return CostCalculator.calculate_cost_breakdown(executions)
+        costs = {
+            "totalCost": 0.0,
+            "planCost": 0.0,
+            "implementCost": 0.0,
+            "testCost": 0.0,
+            "reviewCost": 0.0,
+            "currency": "USD",
+        }
+        for execution in executions:
+            if execution.execution_cost and float(execution.execution_cost) > 0:
+                cost = float(execution.execution_cost)
+            else:
+                cost = float(CostCalculator.calculate_execution_cost(execution))
+
+            stage = execution.workflow_stage
+            if stage == "plan":
+                costs["planCost"] += cost
+            elif stage == "implement":
+                costs["implementCost"] += cost
+            elif stage == "test":
+                costs["testCost"] += cost
+            elif stage == "review":
+                costs["reviewCost"] += cost
+            costs["totalCost"] += cost
+
+        return costs
