@@ -34,6 +34,33 @@ STAGE_AGENTS: dict[str, tuple[str, list[str]]] = {
 }
 
 
+# Padrao oficial Anthropic (anti-parada-prematura): sem isto, um agente que encerra o
+# turno com um plano/promessa passa como estagio concluido e o pipeline commita o nada.
+AUTONOMY_SNIPPET = (
+    "\n\n## Operacao autonoma\n"
+    "Voce opera de forma autonoma dentro de um pipeline; o usuario nao acompanha em tempo real. "
+    "Antes de encerrar o turno, verifique seu ultimo paragrafo: se for um plano, uma analise, uma "
+    "pergunta retorica ou uma promessa de trabalho nao feito, execute esse trabalho AGORA com tool "
+    "calls em vez de encerrar. Encerre somente com o resultado final no formato pedido — ou com "
+    "`needs_human`/`pendingQuestions` quando a decisao for genuinamente humana."
+)
+
+
+def build_stage_options(stage_key: str, worktree: str, model: "str | None") -> ClaudeAgentOptions:
+    """Ponto unico de montagem das options do estagio (futuro plug de perfis por modelo)."""
+    body, tools = load_stage_agent(stage_key)
+    options_kwargs = dict(
+        cwd=worktree,
+        setting_sources=["project"],
+        system_prompt={"type": "preset", "preset": "claude_code", "append": body + AUTONOMY_SNIPPET},
+        allowed_tools=tools,
+        permission_mode="acceptEdits",
+    )
+    if model:
+        options_kwargs["model"] = resolve_model_id(model)
+    return ClaudeAgentOptions(**options_kwargs)
+
+
 def has_stage(stage_key: str) -> bool:
     return stage_key in STAGE_AGENTS
 
@@ -150,17 +177,7 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optiona
     `interrupt()`/`say()`. on_log(str) opcional (sync ou async). `model` (alias de UI, ex.: "opus-4.8")
     e opcional — quando ausente, mantem o comportamento atual (sem `model=` no SDK, usa default do CLI).
     """
-    body, tools = load_stage_agent(stage_key)
-    options_kwargs = dict(
-        cwd=worktree,
-        setting_sources=["project"],
-        system_prompt={"type": "preset", "preset": "claude_code", "append": body},
-        allowed_tools=tools,
-        permission_mode="acceptEdits",
-    )
-    if model:
-        options_kwargs["model"] = resolve_model_id(model)
-    options = ClaudeAgentOptions(**options_kwargs)
+    options = build_stage_options(stage_key, worktree, model)
 
     texts: list[str] = []
     cost = None
