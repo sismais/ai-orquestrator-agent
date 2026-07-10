@@ -30,9 +30,12 @@ export function PipelineControls({ card }: Props) {
   const [runMeta, setRunMeta] = useState<{ costUsd?: number | null; totalTokens?: number | null } | null>(null);
 
   const onLog = useCallback((msg: { logType: string; content: string; timestamp: string }) => {
-    const type: ExecutionLog['type'] = msg.logType === 'error'
-      ? 'error'
-      : msg.logType === 'system' ? 'result' : 'info';
+    const type: ExecutionLog['type'] =
+      msg.logType === 'error' ? 'error'
+      : msg.logType === 'system' ? 'result'
+      : msg.logType === 'tool' ? 'tool'
+      : msg.logType === 'progress' ? 'progress'
+      : 'info';
     setLogs(prev => [...prev, { timestamp: msg.timestamp, type, content: msg.content }]);
   }, []);
 

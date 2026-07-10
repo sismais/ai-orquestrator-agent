@@ -125,7 +125,7 @@ export interface Column {
 
 export interface ExecutionLog {
   timestamp: string;
-  type: 'info' | 'tool' | 'text' | 'error' | 'result';
+  type: 'info' | 'tool' | 'text' | 'error' | 'result' | 'progress';
   content: string;
 }
 

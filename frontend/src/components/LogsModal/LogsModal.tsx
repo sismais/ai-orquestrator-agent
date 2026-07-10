@@ -142,6 +142,7 @@ export function LogsModal({
     switch (type) {
       case 'info': return styles.logInfo;
       case 'tool': return styles.logTool;
+      case 'progress': return styles.logProgress;
       case 'text': return styles.logText;
       case 'error': return styles.logError;
       case 'result': return styles.logResult;

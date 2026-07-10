@@ -534,6 +534,20 @@
   color: #a78bfa;
 }
 
+/* PROGRESS (send_to_user — marco reportado ao humano; borda verde persistente p/ destacar) */
+.logProgress .logType {
+  color: #22c55e;
+}
+.logProgress {
+  border-left: 3px solid #22c55e;
+}
+.logProgress:hover {
+  border-left-color: #22c55e;
+}
+.logGroupHeader .logProgress {
+  color: #22c55e;
+}
+
 /* TEXT */
 .logText .logType {
   color: #34d399;
