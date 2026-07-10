@@ -121,8 +121,11 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
     if stage_key == "plan":
         # Planner e read-only (Read/Glob/Grep): devolve o plano como TEXTO (nao escreve arquivo no repo).
         # O orquestrador captura o texto e passa pro implement — nada de artefato do runner na branch.
+        # Em workflows custom o plan pode vir DEPOIS de estagios SDD: a cadeia chega como material.
+        chain = extra.get("chain")
+        chain_block = f"\n\nMaterial dos estagios anteriores:\n{chain}\n" if chain else ""
         return (
-            f"{header}\n\nTarefa: {task}{answer_block}\n\n"
+            f"{header}\n\nTarefa: {task}{answer_block}{chain_block}\n\n"
             "Produza o conteudo do plano de implementacao (abordagem, arquivos afetados, reuso, riscos), "
             "derivando do que ja existe no projeto. Responda com o plano em markdown. "
             "Se uma decisao de arquitetura nao tiver base no projeto, devolva tambem um bloco JSON "

@@ -498,3 +498,43 @@ async def test_agentkey_desconhecido_pausa_com_motivo(maker):
     assert await _card_column(maker, card_id) == "paused"
     ex = await _last_execution(maker, card_id)
     assert "agentKey" in (ex.workflow_error or "")
+
+
+async def test_pausa_vai_para_coluna_de_pausa_do_config(maker):
+    """N4-review: o DESTINO da pausa vem do isPausedState do config (nao do literal 'paused')."""
+    cols = [
+        {"key": "backlog", "label": "B", "order": 0, "agentKey": None, "isPausedState": False, "isTerminal": False},
+        {"key": "spec", "label": "S", "order": 1, "agentKey": "specify", "isPausedState": False, "isTerminal": False},
+        {"key": "entregue", "label": "E", "order": 2, "agentKey": None, "isPausedState": False, "isTerminal": True},
+        {"key": "esperando", "label": "Esperando humano", "order": 3, "agentKey": None, "isPausedState": True, "isTerminal": False},
+    ]
+    trans = {
+        "backlog": ["spec", "esperando"],
+        "spec": ["entregue", "esperando"],
+        "entregue": [],
+        "esperando": ["spec"],
+    }
+    card_id = await _make_project_card_com_workflow(maker, cols, trans, workflow_id="custom4")
+    fake, counts = make_stage_fn({
+        "specify": ['{"pendingQuestions":[{"question":"qual regra?"}]}'],
+    })
+    await pipeline_service.run_pipeline("p2", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "esperando"   # pausou na coluna do config
+    ex = await _last_execution(maker, card_id)
+    assert ex.status.value == "paused"
+
+
+async def test_resume_com_etapa_inexistente_no_workflow_segue_do_inicio_ativo(maker):
+    """N4-review: resume_stage que nao existe no workflow custom nao termina SUCCESS no-op."""
+    card_id = await _make_project_card_com_workflow(maker, _SDD_COLUMNS, _SDD_TRANSITIONS,
+                                                    workflow_id="custom5")
+    async with maker() as s:
+        await CardRepository(s).move(card_id, "paused")   # simula card pausado
+        await s.commit()
+    fake, counts = make_stage_fn({
+        "review": ['{"blocks":[],"fixNow":[]}'],
+    })
+    await pipeline_service.run_pipeline("p2", card_id, session_maker=maker, stage_fn=fake,
+                                        resume_stage="plan", human_answer="segue")
+    assert counts.get("specify") == 1                          # retomou da primeira coluna ativa
+    assert await _card_column(maker, card_id) == "entregue"    # e foi ate o fim

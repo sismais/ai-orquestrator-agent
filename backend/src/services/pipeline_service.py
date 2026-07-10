@@ -220,6 +220,11 @@ async def run_pipeline(
             "rules_file": project.rules_file or "AGENTS.md",
             "requested_by": getattr(card, "requested_by", None),
         }
+        # Workflow do card (N4): colunas+transicoes e regras de pausa vem do config.
+        # Carregado ANTES de finish_pause: o destino da pausa e a coluna isPausedState do config.
+        columns, transitions = await repo._get_workflow_for_card(card)
+        pause_cols = pause_columns_from(columns)
+        pause_col = next((c["key"] for c in columns if c.get("isPausedState")), "paused")
         total_cost = 0.0
         iteration = 0
         chain_parts: list[str] = []  # saidas dos estagios genericos, encadeadas ate o implement
@@ -259,10 +264,12 @@ async def run_pipeline(
             except Exception:  # noqa: BLE001
                 pass
             prev = card.column_id
-            moved, err = await repo.move(card_id, "paused")
+            moved, err = await repo.move(card_id, pause_col)
             await s.commit()
-            if not err:
-                await _broadcast_moved(card, prev, "paused")
+            if err:
+                await log.event(f"pausa: card nao movido ({err})")
+            else:
+                await _broadcast_moved(card, prev, pause_col)
             execution.status = ExecutionStatus.PAUSED
             execution.workflow_stage = execution.workflow_stage  # preserva a etapa onde pausou
             execution.workflow_error = f"{reason} | {context or ''}"[:1900]
@@ -294,10 +301,15 @@ async def run_pipeline(
                 await s.commit()
                 worktree = wt.worktree_path
 
-            columns, transitions = await repo._get_workflow_for_card(card)
-            pause_cols = pause_columns_from(columns)
             pending_answer = human_answer  # injetado apenas na primeira etapa da retomada
             col = resume_stage or _first_stage(transitions, card.column_id, columns)
+            if resume_stage and not _pipeline_handles(resume_stage, columns):
+                # etapa gravada na pausa nao existe neste workflow (config mudou / workflow custom):
+                # segue do inicio ativo em vez de terminar SUCCESS sem rodar nada.
+                await log.event(
+                    f"retomada: etapa '{resume_stage}' nao existe neste workflow — seguindo do inicio ativo"
+                )
+                col = next_active_column(transitions, card.column_id, pause_cols)
 
             # Triagem de complexidade (N2): so em run novo partindo do backlog. Advisory:
             # erro/lixo -> padrao (nunca bloqueia); so interrupcao do usuario pausa.
