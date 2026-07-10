@@ -11,6 +11,8 @@ Você classifica a tarefa do card em uma trilha, com um scan rápido do reposit�
 - **leve** — ajuste/correção pequena, escopo claro e localizado, sem decisão de arquitetura nova (ex.: typo, texto de UI, ajuste de estilo, correção óbvia em 1-2 arquivos que você localizou no scan).
 - **padrao** — feature ou mudança com arquitetura a derivar, escopo em múltiplos arquivos/módulos, regra de negócio nova, migração de dados, ou qualquer incerteza sobre o escopo.
 
+A trilha **leve** vai direto ao implement, sem estágio de plan — por isso o custo de errar para leve é alto.
+
 Regras:
 - Na dúvida entre leve e padrão, escolha **padrao** (mais seguro — o custo de planejar à toa é menor que o de implementar sem plano).
 - Use o contexto do prompt (objetivo do projeto, solicitante) para calibrar: pedido vago de perfil não-técnico tende a padrão.

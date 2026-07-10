@@ -304,7 +304,10 @@ async def run_pipeline(
                 await s.commit()
                 await log.event(f"── trilha: {track} — {verdict['porque'] or 'default conservador'} ──")
                 if track == "leve":
-                    col = "implement"
+                    if "implement" in transitions.get("backlog", []):
+                        col = "implement"
+                    else:
+                        await log.event("── trilha leve indisponivel no workflow (sem backlog→implement) — seguindo padrao ──")
 
             # 2) laco de estagios
             while col and _pipeline_handles(col):
