@@ -147,6 +147,15 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - ci-triage roda com modelo explícito (`fix_model`). **fable-5 habilitado nos pickers.**
 - Plano: `plans/2026-07-10-onda-n1-perfis-modelo.md`.
 
+### Onda N2 — router de complexidade — feito 2026-07-10
+- Estágio de **triagem** no início de todo run novo partindo do backlog: agente
+  `devkit/.claude/agents/sismais-dev-router.md` (haiku-4.5, com fallback de recusa da N1) classifica
+  **leve** (pula o `plan`, começa no `implement` — transição nova `backlog → implement` no seed) ou
+  **padrao** (fluxo completo). Advisory: erro/não-parse → `padrao` (nunca bloqueia); Stop pausa.
+- Override humano: retomadas e cards posicionados manualmente fora do backlog NÃO re-triam.
+- Trilha + justificativa nos logs do run; `Execution.track` persistida e exposta em `GET .../execution`.
+- Plano: `plans/2026-07-10-onda-n2-router-complexidade.md`.
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
