@@ -421,3 +421,80 @@ async def test_excecao_inesperada_pausa_o_card(maker):
     assert ex.is_active is False
     assert "erro interno" in (ex.workflow_error or "")
     assert "explodiu por dentro" in (ex.workflow_error or "")
+
+
+async def _make_project_card_com_workflow(maker, columns, transitions, workflow_id="custom"):
+    """Projeto com workflow CUSTOM + card. Reusa o padrao de _make_project_card."""
+    from src.models.workflow import Workflow
+    async with maker() as s:
+        s.add(Workflow(id=workflow_id, name="Custom", columns=columns, transitions=transitions))
+        s.add(Project(id="p2", name="proj2", path="/tmp/proj2", workflow_id=workflow_id,
+                      base_branch="main"))
+        repo = CardRepository(s)
+        card = await repo.create(CardCreate(title="Tarefa Y"), project_id="p2")
+        await s.commit()
+        return card.id
+
+
+_SDD_COLUMNS = [
+    {"key": "backlog", "label": "Backlog", "order": 0, "agentKey": None, "isPausedState": False, "isTerminal": False},
+    {"key": "spec", "label": "Spec", "order": 1, "agentKey": "specify", "isPausedState": False, "isTerminal": False},
+    {"key": "implement", "label": "Implement", "order": 2, "agentKey": "implement", "isPausedState": False, "isTerminal": False},
+    {"key": "review", "label": "Review", "order": 3, "agentKey": "review", "isPausedState": False, "isTerminal": False},
+    {"key": "entregue", "label": "Entregue", "order": 4, "agentKey": None, "isPausedState": False, "isTerminal": True},
+    {"key": "paused", "label": "Paused", "order": 5, "agentKey": None, "isPausedState": True, "isTerminal": False},
+]
+_SDD_TRANSITIONS = {
+    "backlog": ["spec", "paused"],
+    "spec": ["implement", "paused"],
+    "implement": ["review", "paused"],
+    "review": ["entregue", "implement", "paused"],
+    "entregue": [],
+    "paused": ["spec", "implement", "review"],
+}
+
+
+async def test_workflow_custom_executa_coluna_spec(maker):
+    """N4: coluna 'spec' (agentKey specify) EXECUTA e encadeia a saida para o implement."""
+    card_id = await _make_project_card_com_workflow(maker, _SDD_COLUMNS, _SDD_TRANSITIONS)
+    seen: dict[str, list] = {}
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        seen.setdefault(stage_key, []).append(prompt)
+        if stage_key == "review":
+            return StageResult(ok=True, text='{"blocks":[],"fixNow":[]}')
+        if stage_key == "specify":
+            return StageResult(ok=True, text="SPEC-GERADA-PELO-SPECIFIER")
+        return StageResult(ok=True, text=f"{stage_key} ok")
+
+    await pipeline_service.run_pipeline("p2", card_id, session_maker=maker, stage_fn=fake)
+
+    assert "specify" in seen                                   # a coluna spec executou
+    assert "SPEC-GERADA-PELO-SPECIFIER" in seen["implement"][0]  # saida encadeada ao implement
+    assert await _card_column(maker, card_id) == "entregue"    # fronteira custom (agentKey None)
+
+
+async def test_workflow_custom_pausa_em_pending_questions_de_estagio_generico(maker):
+    card_id = await _make_project_card_com_workflow(maker, _SDD_COLUMNS, _SDD_TRANSITIONS,
+                                                    workflow_id="custom2")
+    fake, counts = make_stage_fn({
+        "specify": ['{"pendingQuestions":[{"question":"qual regra de negocio?"}]}'],
+    })
+    await pipeline_service.run_pipeline("p2", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "paused"
+    assert counts.get("implement") is None
+
+
+async def test_agentkey_desconhecido_pausa_com_motivo(maker):
+    cols = [
+        {"key": "backlog", "label": "B", "order": 0, "agentKey": None, "isPausedState": False, "isTerminal": False},
+        {"key": "magica", "label": "M", "order": 1, "agentKey": "inexistente", "isPausedState": False, "isTerminal": False},
+        {"key": "paused", "label": "P", "order": 2, "agentKey": None, "isPausedState": True, "isTerminal": False},
+    ]
+    trans = {"backlog": ["magica", "paused"], "magica": ["paused"], "paused": ["magica"]}
+    card_id = await _make_project_card_com_workflow(maker, cols, trans, workflow_id="custom3")
+    fake, counts = make_stage_fn({})
+    await pipeline_service.run_pipeline("p2", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "paused"
+    ex = await _last_execution(maker, card_id)
+    assert "agentKey" in (ex.workflow_error or "")

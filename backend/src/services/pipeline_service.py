@@ -34,30 +34,47 @@ from ..services.findings import (
 from ..services.runner_service import prepare_worktree
 from ..services.stage_runner import (
     build_stage_prompt,
+    has_stage,
     run_stage as _default_run_stage,
 )
 from ..services.validate_ci_stage import run_validate_ci
-from ..services.workflow_rules import next_active_column
+from ..services.workflow_rules import next_active_column, pause_columns_from
 
 DEFAULT_MAX_ITERATIONS = 4
 _LOG_FLUSH_CHARS = 800
 TRIAGE_MODEL = "haiku-4.5"  # triagem e barata; recusa cai no fallback do perfil (N1)
 
-# Colunas que o pipeline executa: estagios de agente + validate_ci (git/gh, tratado a parte).
-_AGENT_STAGES = ("plan", "implement", "review")
+# agentKey -> campo do card com o alias de modelo escolhido para a etapa.
+# Estagios SDD genericos usam o modelo do plan (mesma natureza: planejamento read-only).
+_STAGE_MODEL_FIELD = {
+    "plan": "model_plan", "specify": "model_plan", "clarify": "model_plan", "tasks": "model_plan",
+    "implement": "model_implement", "review": "model_review",
+}
 
-# coluna -> campo do card com o alias de modelo escolhido para a etapa.
-_STAGE_MODEL_FIELD = {"plan": "model_plan", "implement": "model_implement", "review": "model_review"}
+# agentKey do handler git/gh (nao e um agente): normaliza hifen/underscore do config.
+_VALIDATE_CI_KEYS = {"validate-ci", "validate_ci"}
 
 
-def _pipeline_handles(col: Optional[str]) -> bool:
-    return col in _AGENT_STAGES or col == "validate_ci"
+def _agent_key_for(col: Optional[str], columns: list) -> Optional[str]:
+    """agentKey da coluna no config (None = fronteira/manual)."""
+    for c in columns or []:
+        if c.get("key") == col:
+            return c.get("agentKey")
+    return None
 
 
-def stage_model_for_column(col: str, card) -> "str | None":
-    """Alias do modelo escolhido para a etapa (coluna) corrente, ou None se a coluna nao executa agente por-modelo."""
-    field = _STAGE_MODEL_FIELD.get(col)
+def _pipeline_handles(col: Optional[str], columns: list) -> bool:
+    return bool(col) and _agent_key_for(col, columns) is not None
+
+
+def stage_model_for_agent(agent_key: str, card) -> "str | None":
+    """Alias do modelo escolhido para o agentKey da etapa corrente, ou None se a etapa nao tem modelo por-card."""
+    field = _STAGE_MODEL_FIELD.get(agent_key)
     return getattr(card, field, None) if field else None
+
+
+# Compat (pre-N4): o nome antigo consultava por coluna; hoje coluna do seed dev == agentKey.
+stage_model_for_column = stage_model_for_agent
 
 
 class _LogSink:
@@ -118,11 +135,11 @@ def _format_questions(pend: list) -> str:
     return "\n".join(lines)
 
 
-def _first_stage(transitions: dict, current: str) -> Optional[str]:
+def _first_stage(transitions: dict, current: str, columns: list) -> Optional[str]:
     """Onde comecar: a propria coluna se o pipeline a trata, senao a proxima ativa."""
-    if _pipeline_handles(current):
+    if _pipeline_handles(current, columns):
         return current
-    return next_active_column(transitions, current)
+    return next_active_column(transitions, current, pause_columns_from(columns))
 
 
 async def _broadcast_moved(card: Card, from_col: str, to_col: str) -> None:
@@ -205,7 +222,7 @@ async def run_pipeline(
         }
         total_cost = 0.0
         iteration = 0
-        plan_text: Optional[str] = None
+        chain_parts: list[str] = []  # saidas dos estagios genericos, encadeadas ate o implement
         tokens = {"input": 0, "output": 0}
         models_used: set[str] = set()
 
@@ -277,9 +294,10 @@ async def run_pipeline(
                 await s.commit()
                 worktree = wt.worktree_path
 
-            transitions = await repo._get_transitions_for_card(card)
+            columns, transitions = await repo._get_workflow_for_card(card)
+            pause_cols = pause_columns_from(columns)
             pending_answer = human_answer  # injetado apenas na primeira etapa da retomada
-            col = resume_stage or _first_stage(transitions, card.column_id)
+            col = resume_stage or _first_stage(transitions, card.column_id, columns)
 
             # Triagem de complexidade (N2): so em run novo partindo do backlog. Advisory:
             # erro/lixo -> padrao (nunca bloqueia); so interrupcao do usuario pausa.
@@ -309,8 +327,8 @@ async def run_pipeline(
                     else:
                         await log.event("── trilha leve indisponivel no workflow (sem backlog→implement) — seguindo padrao ──")
 
-            # 2) laco de estagios
-            while col and _pipeline_handles(col):
+            # 2) laco de estagios — dispatch pelo agentKey das colunas do config (N4)
+            while col and _pipeline_handles(col, columns):
                 prev = card.column_id
                 moved, err = await repo.move(card_id, col)
                 await s.commit()
@@ -322,15 +340,24 @@ async def run_pipeline(
                 execution.workflow_stage = col
                 await s.commit()
 
-                # validate_ci: push -> PR draft -> espera CI -> ready_to_merge (git/gh, nao um agente)
-                if col == "validate_ci":
-                    await log.event("── estagio: validate_ci ──")
+                agent_key = _agent_key_for(col, columns)
+                # config invalido e erro humano: agentKey sem agente mapeado nao avanca silencioso
+                if agent_key not in _VALIDATE_CI_KEYS and not has_stage(agent_key):
+                    await finish_pause(
+                        f"coluna {col} com agentKey desconhecido: {agent_key}",
+                        "Config do workflow referencia um agente que o backend nao mapeia (STAGE_AGENTS).",
+                    )
+                    return
+
+                # validate-ci: push -> PR draft -> espera CI -> ready_to_merge (git/gh, nao um agente)
+                if agent_key in _VALIDATE_CI_KEYS:
+                    await log.event(f"── estagio: {col} ──")
                     vres = await run_validate_ci(
                         worktree=worktree, branch=card.branch_name or "", base_branch=base_branch,
                         card=card, project=project, gm=gm, log=log, stage_fn=stage_fn,
                         max_iterations=max_iterations, stage_context=stage_context,
                         account_fn=account,
-                        fix_model=stage_model_for_column("implement", card),
+                        fix_model=stage_model_for_agent("implement", card),
                     )
                     if vres["status"] == "pause":
                         await finish_pause(vres["reason"], vres.get("context"), question=vres.get("question"))
@@ -338,23 +365,25 @@ async def run_pipeline(
                     if vres.get("pr_url"):
                         execution.result = vres["pr_url"]
                         await s.commit()
-                    col = next_active_column(transitions, "validate_ci")  # -> ready_to_merge (para)
+                    col = next_active_column(transitions, col, pause_cols)  # -> ready_to_merge (para)
                     continue
                 await log.event(f"── estagio: {col} ──")
 
                 extra: dict = {"context": stage_context}
-                if col == "review":
+                if agent_key == "review":
                     extra["diff"] = await gm.diff_against_base(worktree, base_branch)
-                elif col == "implement" and plan_text:
-                    extra["plan"] = plan_text
+                elif agent_key == "implement" and chain_parts:
+                    extra["plan"] = "\n\n".join(chain_parts)
+                elif agent_key not in ("implement", "review") and chain_parts:
+                    extra["chain"] = "\n\n".join(chain_parts)
                 if pending_answer:
                     extra["human_answer"] = pending_answer
                     pending_answer = None
-                prompt = build_stage_prompt(col, card.title, card.description or "", worktree, extra)
-                res = await stage_fn(col, worktree, prompt, card_id=card_id, on_log=log,
-                                     model=stage_model_for_column(col, card))
+                prompt = build_stage_prompt(agent_key, card.title, card.description or "", worktree, extra)
+                res = await stage_fn(agent_key, worktree, prompt, card_id=card_id, on_log=log,
+                                     model=stage_model_for_agent(agent_key, card))
                 await log.flush()
-                await account(res, stage_model_for_column(col, card))
+                await account(res, stage_model_for_agent(agent_key, card))
                 if res.interrupted:
                     await finish_pause(
                         "interrompido pelo usuario", "O usuario parou a execucao para corrigir o rumo.",
@@ -371,16 +400,7 @@ async def run_pipeline(
                     )
                     return
 
-                if col == "plan":
-                    pend = parse_pending_questions(res.text)
-                    if pend:
-                        await finish_pause("plan: pendencias de arquitetura", res.text[:1500],
-                                           question=_format_questions(pend))
-                        return
-                    plan_text = res.text
-                    col = next_active_column(transitions, "plan")
-
-                elif col == "implement":
+                if agent_key == "implement":
                     nh = detect_needs_human(res.text)
                     if nh:
                         await finish_pause(
@@ -389,9 +409,9 @@ async def run_pipeline(
                         )
                         return
                     await gm.commit_all(worktree, f"wip: {card.title[:60]}")
-                    col = next_active_column(transitions, "implement")
+                    col = next_active_column(transitions, col, pause_cols)
 
-                elif col == "review":
+                elif agent_key == "review":
                     f = parse_review_findings_strict(res.text)
                     if f is None:
                         # falha-fechada: reviewer sem JSON re-explica o contrato e tenta 1x (A2)
@@ -403,9 +423,9 @@ async def run_pipeline(
                             "Nao ha veredito valido sem esse JSON."
                         )
                         res = await stage_fn("review", worktree, retry_prompt, card_id=card_id, on_log=log,
-                                             model=stage_model_for_column("review", card))
+                                             model=stage_model_for_agent("review", card))
                         await log.flush()
-                        await account(res, stage_model_for_column("review", card))
+                        await account(res, stage_model_for_agent("review", card))
                         if res.interrupted:
                             await finish_pause(
                                 "interrompido pelo usuario",
@@ -436,23 +456,27 @@ async def run_pipeline(
                             )
                             return
                         iteration += 1
+                        # a COLUNA do implement vem do config (workflows custom podem renomea-la);
+                        # o agentKey literal "implement" segue sendo o agente que corrige.
+                        impl_col = next((c["key"] for c in columns if c.get("agentKey") == "implement"),
+                                        "implement")
                         prev = card.column_id
-                        moved, err = await repo.move(card_id, "implement")
+                        moved, err = await repo.move(card_id, impl_col)
                         await s.commit()
                         if err:
                             await finish_pause("fix-loop: transicao invalida", err)
                             return
                         card = moved
-                        await _broadcast_moved(card, prev, "implement")
+                        await _broadcast_moved(card, prev, impl_col)
                         await log.event(f"── fix-loop #{iteration}: implement ──")
                         fix_prompt = build_stage_prompt(
                             "implement", card.title, card.description or "", worktree,
                             {"findings": f, "context": stage_context},
                         )
                         fix_res = await stage_fn("implement", worktree, fix_prompt, card_id=card_id, on_log=log,
-                                                 model=stage_model_for_column("implement", card))
+                                                 model=stage_model_for_agent("implement", card))
                         await log.flush()
-                        await account(fix_res, stage_model_for_column("implement", card))
+                        await account(fix_res, stage_model_for_agent("implement", card))
                         if fix_res.interrupted:
                             await finish_pause(
                                 "interrompido pelo usuario", "O usuario parou a correcao.",
@@ -471,12 +495,28 @@ async def run_pipeline(
                             await finish_pause("fix-loop: needs_human", nh)
                             return
                         await gm.commit_all(worktree, f"fix: {card.title[:50]} #{iteration}")
-                        col = "review"  # re-revisa no topo do laco
+                        # `col` segue sendo a coluna de review do config — re-revisa no topo do laco
                         continue
-                    col = next_active_column(transitions, "review")  # -> validate_ci
+                    col = next_active_column(transitions, col, pause_cols)  # -> validate_ci
+
+                else:
+                    # Estagio generico (plan e colunas SDD/custom): pausa em pendencias ou
+                    # needs_human; senao ACUMULA a saida na cadeia que chega ao implement.
+                    pend = parse_pending_questions(res.text)
+                    if pend:
+                        await finish_pause(f"{agent_key}: pendencias", res.text[:1500],
+                                           question=_format_questions(pend))
+                        return
+                    nh = detect_needs_human(res.text)
+                    if nh:
+                        await finish_pause(f"{agent_key}: needs_human", nh,
+                                           question=f"O agente precisa da sua decisao para continuar:\n\n{nh}")
+                        return
+                    chain_parts.append(f"## Saida do estagio {agent_key}\n{res.text}")
+                    col = next_active_column(transitions, col, pause_cols)
 
             # 3) parada limpa na fronteira (ex.: ready_to_merge): avanca e encerra
-            if col and not _pipeline_handles(col) and card.column_id != col:
+            if col and not _pipeline_handles(col, columns) and card.column_id != col:
                 prev = card.column_id
                 moved, err = await repo.move(card_id, col)
                 await s.commit()
