@@ -162,6 +162,18 @@ async def test_resume_starts_at_stage_with_answer(maker):
     assert await _card_column(maker, card_id) == "ready_to_merge"
 
 
+async def test_estagio_sem_output_pausa(maker):
+    """Turno vazio (ok=True, text='') nao pode contar como estagio concluido (A2)."""
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({"plan": [""]})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "paused"
+    assert counts.get("implement") is None
+    ex = await _last_execution(maker, card_id)
+    assert "sem output" in (ex.workflow_error or "")
+
+
 async def test_interrupt_pauses_card(maker):
     card_id = await _make_project_card(maker)
 

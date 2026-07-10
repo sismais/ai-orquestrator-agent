@@ -305,6 +305,12 @@ async def run_pipeline(
                 if not res.ok:
                     await finish_pause(f"erro no estagio {col}", res.error)
                     return
+                if not (res.text or "").strip():
+                    await finish_pause(
+                        f"estagio {col} terminou sem output",
+                        "O agente encerrou o turno sem produzir texto — provavel recusa ou turno abortado.",
+                    )
+                    return
 
                 if col == "plan":
                     pend = parse_pending_questions(res.text)
@@ -395,6 +401,10 @@ async def run_pipeline(
                             return
                         if not fix_res.ok:
                             await finish_pause("erro no fix-loop", fix_res.error)
+                            return
+                        if not (fix_res.text or "").strip():
+                            await finish_pause("fix-loop terminou sem output",
+                                               "O agente encerrou o turno sem produzir texto.")
                             return
                         nh = detect_needs_human(fix_res.text)
                         if nh:
