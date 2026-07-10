@@ -20,6 +20,7 @@ class ProjectCreateBody(BaseModel):
     validate_command: Optional[str] = Field(None, alias="validateCommand")
     base_branch: str = Field("main", alias="baseBranch")
     workflow_id: Optional[str] = Field("dev", alias="workflowId")
+    objective: Optional[str] = None
 
     class Config:
         populate_by_name = True
@@ -33,6 +34,7 @@ class ProjectPatchBody(BaseModel):
     base_branch: Optional[str] = Field(None, alias="baseBranch")
     workflow_id: Optional[str] = Field(None, alias="workflowId")
     favorite: Optional[bool] = None
+    objective: Optional[str] = None
 
     class Config:
         populate_by_name = True
@@ -43,7 +45,7 @@ def _to_dict(p) -> dict:
         "id": p.id, "name": p.name, "path": p.path, "remote": p.remote,
         "rulesFile": p.rules_file, "validateCommand": p.validate_command,
         "baseBranch": p.base_branch, "workflowId": p.workflow_id,
-        "favorite": p.favorite,
+        "favorite": p.favorite, "objective": p.objective,
         "createdAt": p.created_at.isoformat() if p.created_at else None,
         "lastOpenedAt": p.last_opened_at.isoformat() if p.last_opened_at else None,
     }
@@ -63,7 +65,7 @@ async def create_project(body: ProjectCreateBody, db: AsyncSession = Depends(get
     p = await repo.create(
         name=body.name, path=body.path, remote=body.remote, rules_file=body.rules_file,
         validate_command=body.validate_command, base_branch=body.base_branch,
-        workflow_id=body.workflow_id,
+        workflow_id=body.workflow_id, objective=body.objective,
     )
     await db.commit()
     return {"project": _to_dict(p)}

@@ -11,6 +11,8 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 _COLUMNS = [
     ("cards", "project_id", "VARCHAR(36)"),
     ("executions", "fix_iterations", "INTEGER"),
+    ("cards", "requested_by", "VARCHAR(120)"),
+    ("projects", "objective", "TEXT"),
 ]
 
 

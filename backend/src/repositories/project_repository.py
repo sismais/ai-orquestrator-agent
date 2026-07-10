@@ -29,11 +29,13 @@ class ProjectRepository:
 
     async def create(self, name: str, path: str, workflow_id: str | None = "dev",
                      remote: str | None = None, rules_file: str = "AGENTS.md",
-                     validate_command: str | None = None, base_branch: str = "main") -> Project:
+                     validate_command: str | None = None, base_branch: str = "main",
+                     objective: "str | None" = None) -> Project:
         project = Project(
             id=str(uuid4()), name=name, path=path, remote=remote,
             rules_file=rules_file, validate_command=validate_command,
             base_branch=base_branch, workflow_id=workflow_id,
+            objective=objective,
         )
         self.session.add(project)
         await self.session.flush()
@@ -45,7 +47,8 @@ class ProjectRepository:
         if not project:
             return None
         allowed = {"name", "remote", "rules_file", "validate_command",
-                   "base_branch", "workflow_id", "favorite", "last_opened_at"}
+                   "base_branch", "workflow_id", "favorite", "last_opened_at",
+                   "objective"}
         for key, value in fields.items():
             if key in allowed:
                 setattr(project, key, value)

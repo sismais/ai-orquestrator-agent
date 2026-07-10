@@ -18,6 +18,8 @@ class Card(Base):
     description: Mapped[str | None] = mapped_column(Text, nullable=True)
     column_id: Mapped[str] = mapped_column(String(20), nullable=False, default="backlog")
     project_id: Mapped[str | None] = mapped_column(String(36), nullable=True, index=True)
+    # Quem pediu (A4): texto livre (nome/papel: dev, PO, CEO) — calibra as decisoes dos agentes
+    requested_by: Mapped[str | None] = mapped_column(String(120), nullable=True)
     spec_path: Mapped[str | None] = mapped_column(String(500), nullable=True)
     model_plan: Mapped[str] = mapped_column(String(20), default="opus-4.8", nullable=False)
     model_implement: Mapped[str] = mapped_column(String(20), default="opus-4.8", nullable=False)

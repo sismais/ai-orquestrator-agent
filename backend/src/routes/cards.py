@@ -52,6 +52,7 @@ def card_to_dict(card: Card) -> dict:
         "completed_at": card.completed_at,
         "experts": card.experts,
         "dependencies": card.dependencies,
+        "requestedBy": card.requested_by,
     }
 
 

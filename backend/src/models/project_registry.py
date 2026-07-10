@@ -17,6 +17,8 @@ class Project(Base):
     path: Mapped[str] = mapped_column(String(500), nullable=False, unique=True)
     remote: Mapped[str | None] = mapped_column(String(500), nullable=True)
     rules_file: Mapped[str] = mapped_column(String(120), nullable=False, default="AGENTS.md")
+    # Objetivo de negocio do projeto (A4) — injetado no prompt dos agentes de estagio
+    objective: Mapped[str | None] = mapped_column(Text, nullable=True)
     validate_command: Mapped[str | None] = mapped_column(Text, nullable=True)
     base_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="main")
     workflow_id: Mapped[str | None] = mapped_column(String(36), nullable=True)

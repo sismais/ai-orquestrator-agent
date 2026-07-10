@@ -51,6 +51,7 @@ class CardRepository:
             test_error_context=getattr(card_data, 'test_error_context', None),
             base_branch=getattr(card_data, 'base_branch', None),
             dependencies=getattr(card_data, 'dependencies', []) or [],
+            requested_by=card_data.requested_by,
         )
         self.session.add(card)
         await self.session.flush()

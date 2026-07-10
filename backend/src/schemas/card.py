@@ -100,6 +100,8 @@ class CardCreate(CardBase):
     base_branch: Optional[str] = Field(None, alias="baseBranch")  # Branch base para o worktree
     dependencies: Optional[List[str]] = Field(default_factory=list)  # Card IDs this card depends on
     project_id: Optional[str] = Field(None, alias="projectId")
+    # Quem pediu (A4): texto livre (nome/papel) — calibra as decisoes dos agentes
+    requested_by: Optional[str] = Field(None, alias="requestedBy", max_length=120)
 
     class Config:
         populate_by_name = True
@@ -173,6 +175,8 @@ class CardResponse(BaseModel):
     dependencies: Optional[List[str]] = Field(default_factory=list)
     # Projeto dono do card (o broadcast WS é global; o front usa isto p/ escopar UI por projeto)
     project_id: Optional[str] = Field(None, alias="projectId")
+    # Quem pediu (A4)
+    requested_by: Optional[str] = Field(None, alias="requestedBy")
 
     @property
     def is_finalized(self) -> bool:

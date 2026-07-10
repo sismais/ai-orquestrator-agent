@@ -35,3 +35,16 @@ async def test_register_list_and_delete_project(client):
     # deleta
     r = await client.delete(f"/api/registry/projects/{pid}")
     assert r.status_code == 200
+
+
+async def test_create_e_patch_objective(client):
+    r = await client.post("/api/registry/projects", json={
+        "name": "P", "path": "/tmp/obj-test", "objective": "ERP de gestao"
+    })
+    assert r.status_code == 201, r.text
+    assert r.json()["project"]["objective"] == "ERP de gestao"
+    pid = r.json()["project"]["id"]
+
+    r2 = await client.patch(f"/api/registry/projects/{pid}", json={"objective": "novo objetivo"})
+    assert r2.status_code == 200
+    assert r2.json()["project"]["objective"] == "novo objetivo"

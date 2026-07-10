@@ -209,6 +209,17 @@ class TestCardRepository:
         assert fix_card.model_test == parent_card.model_test
         assert fix_card.model_review == parent_card.model_review
 
+    async def test_create_persiste_requested_by(self, async_session):
+        """Test that requested_by (quem pediu) is persisted on create."""
+        repo = CardRepository(async_session)
+
+        card = await repo.create(
+            CardCreate(title="T", requestedBy="PO Maria"), project_id=None
+        )
+        await async_session.commit()
+
+        assert card.requested_by == "PO Maria"
+
     async def test_get_all_cards(self, async_session):
         """Test getting all cards including fix cards."""
         repo = CardRepository(async_session)
