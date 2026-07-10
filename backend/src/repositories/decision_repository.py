@@ -36,6 +36,8 @@ def format_decisions_block(rows: list) -> str:
         return ""
     lines = ["Decisoes anteriores deste projeto (respeite-as; NAO re-pergunte o que ja foi decidido):"]
     for r in rows:
-        src = f" [fontes: {', '.join(r.sources)}]" if r.sources else ""
+        # leitura defensiva: sources corrompida (nao-lista / itens nao-string) nao quebra o prompt
+        src = (f" [fontes: {', '.join(str(x) for x in r.sources)}]"
+               if isinstance(r.sources, list) and r.sources else "")
         lines.append(f"- P: {r.question}\n  D: {r.decision} ({r.source}{src})")
     return "\n".join(lines)

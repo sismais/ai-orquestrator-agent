@@ -228,10 +228,15 @@ async def run_pipeline(
         pause_cols = pause_columns_from(columns)
         pause_col = next((c["key"] for c in columns if c.get("isPausedState")), "paused")
         # Memoria de decisoes (N3): carregada UMA vez; reinjetada nos prompts de planejamento
-        # e consultada pelo gate de escalacao antes de acionar o humano.
-        decisions_block = format_decisions_block(
-            await DecisionRepository(s).recent_for_project(project_id, limit=10)
-        )
+        # e consultada pelo gate de escalacao antes de acionar o humano. Best-effort: uma
+        # linha de memoria corrompida NUNCA pode orfanar o run nem quebrar runs futuros.
+        try:
+            decisions_block = format_decisions_block(
+                await DecisionRepository(s).recent_for_project(project_id, limit=10)
+            )
+        except Exception:  # noqa: BLE001
+            print(f"[pipeline] memoria de decisoes ilegivel (seguindo sem o bloco):\n{traceback.format_exc()}")
+            decisions_block = ""
         total_cost = 0.0
         iteration = 0
         chain_parts: list[str] = []  # saidas dos estagios genericos, encadeadas ate o implement
@@ -549,8 +554,20 @@ async def run_pipeline(
                                                question="Você interrompeu o agente. O que devo ajustar?")
                             return
                         verdict = parse_clarifier_output(gate.text if gate.ok else "")
-                        decided = verdict["decisions"]
-                        remaining = verdict["pendingQuestions"] if (gate.ok and (decided or verdict["pendingQuestions"])) else pend
+                        raw = verdict["decisions"]
+
+                        def _score(d):
+                            try:
+                                return int(d.get("score") or 0)
+                            except (TypeError, ValueError, AttributeError):
+                                return 0
+
+                        # Invariante do Pause-or-Decide imposta em CODIGO (nao so no prompt):
+                        # score < 2 NAO decide — a "decisao" e rebaixada a pendencia pro humano.
+                        decided = [d for d in raw if isinstance(d, dict) and _score(d) >= 2]
+                        demoted = [{"question": str(d.get("question", d)) if isinstance(d, dict) else str(d)}
+                                   for d in raw if d not in decided]
+                        remaining = (verdict["pendingQuestions"] + demoted) if (gate.ok and (raw or verdict["pendingQuestions"])) else pend
                         if decided:
                             try:
                                 drepo = DecisionRepository(s)
@@ -559,12 +576,16 @@ async def run_pipeline(
                                         project_id=project_id, card_id=card_id,
                                         question=str(d.get("question", ""))[:2000],
                                         decision=str(d.get("decision", ""))[:2000],
-                                        source="clarifier", score=d.get("score"),
-                                        sources=d.get("sources"), stage=agent_key,
+                                        source="clarifier", score=_score(d),
+                                        sources=[str(x) for x in v] if isinstance(v := d.get("sources"), list) else None,
+                                        stage=agent_key,
                                     )
                                 await s.commit()
                             except Exception:  # noqa: BLE001 — memoria best-effort
-                                pass
+                                try:
+                                    await s.rollback()  # sessao envenenada nao pode quebrar o que segue
+                                except Exception:  # noqa: BLE001
+                                    pass
                             await log.event(f"── gate decidiu {len(decided)} pendencia(s) com fonte ──")
                         if remaining:
                             await finish_pause(f"{agent_key}: pendencias", res.text[:1500],
@@ -572,12 +593,18 @@ async def run_pipeline(
                             return
                         # tudo decidido: re-roda o estagio UMA vez com as decisoes (mesmo canal do human_answer)
                         decided_text = "\n".join(
-                            f"- {d.get('question')}: {d.get('decision')} (fontes: {', '.join(d.get('sources') or [])})"
+                            f"- {d.get('question')}: {d.get('decision')} "
+                            f"(fontes: {', '.join(str(x) for x in (d.get('sources') if isinstance(d.get('sources'), list) else []))})"
                             for d in decided
                         )
-                        rerun_extra = dict(extra)
-                        rerun_extra["human_answer"] = (
+                        decisions_note = (
                             "Decisoes do revisor de escalacao (com fontes do projeto) — siga-as:\n" + decided_text
+                        )
+                        rerun_extra = dict(extra)
+                        # concatena (nao sobrescreve) uma resposta humana da retomada, se houver
+                        prior_answer = extra.get("human_answer")
+                        rerun_extra["human_answer"] = (
+                            f"{prior_answer}\n\n{decisions_note}" if prior_answer else decisions_note
                         )
                         rerun_prompt = build_stage_prompt(agent_key, card.title, card.description or "",
                                                           worktree, rerun_extra)

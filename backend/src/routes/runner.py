@@ -102,7 +102,10 @@ async def answer_card(project_id: str, card_id: str, body: AnswerRequest,
         )
         await db.commit()
     except Exception:  # noqa: BLE001 — memoria e best-effort, nunca bloqueia a retomada
-        pass
+        try:
+            await db.rollback()  # sessao envenenada nao pode quebrar o create_execution seguinte
+        except Exception:  # noqa: BLE001
+            pass
     resume_stage = _resume_stage_from(last.workflow_stage)
     execution_id = await create_execution(db, card_id, card.title)
 

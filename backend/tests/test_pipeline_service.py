@@ -640,3 +640,81 @@ async def test_gate_com_clarifier_quebrado_pausa_com_tudo(maker):
 
     await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
     assert await _card_column(maker, card_id) == "paused"
+
+
+async def test_gate_score_baixo_vira_pendencia(maker):
+    """Review N3: score < 2 NAO decide — a 'decisao' e rebaixada a pendencia, o card pausa
+    e NADA e persistido na memoria (invariante score>=2 imposta em codigo)."""
+    card_id = await _make_project_card(maker)
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        if stage_key == "plan":
+            return StageResult(ok=True, text='{"pendingQuestions":[{"question":"Qual banco?"}]}')
+        if stage_key == "clarify":
+            return StageResult(ok=True, text=(
+                '{"decisions": [{"question": "Qual banco?", "decision": "chuto SQLite", '
+                '"score": 1, "sources": []}], "pendingQuestions": []}'
+            ))
+        return StageResult(ok=True, text=f"{stage_key} ok")
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "paused"
+    # a pergunta rebaixada VOLTA ao humano
+    async with maker() as s:
+        from sqlalchemy import select as _sel
+        from src.models.activity_log import ActivityLog, ActivityType
+        acts = (await s.execute(_sel(ActivityLog).where(
+            ActivityLog.card_id == card_id,
+            ActivityLog.activity_type == ActivityType.COMMENTED,
+        ))).scalars().all()
+    agent_comments = [a.description or "" for a in acts if a.user_id == "agent"]
+    assert any("Qual banco?" in c for c in agent_comments)
+    # nada persistido com score < 2
+    async with maker() as s:
+        from src.repositories.decision_repository import DecisionRepository
+        rows = await DecisionRepository(s).recent_for_project("p1")
+    assert rows == []
+
+
+async def test_memoria_corrompida_nao_orfana_o_run(maker):
+    """Review N3: Decision pre-existente com sources corrompida NAO explode o run_pipeline."""
+    card_id = await _make_project_card(maker)
+    async with maker() as s:
+        from src.models.decision import Decision
+        s.add(Decision(project_id="p1", card_id="cX", question="Q?", decision="D",
+                       source="human", sources={"a": 1}, stage="plan"))
+        s.add(Decision(project_id="p1", card_id="cY", question="Q2?", decision="D2",
+                       source="human", sources=[1, 2], stage="plan"))
+        await s.commit()
+    fake, counts = make_stage_fn({"review": ['{"blocks":[],"fixNow":[]}']})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "ready_to_merge"   # completou, nao orfanou
+
+
+async def test_gate_sources_nao_string_persistidas_como_strings(maker):
+    """Review N3: clarifier devolvendo sources como lista de dicts -> persiste lista de strings."""
+    card_id = await _make_project_card(maker)
+    calls = {"plan": 0}
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        if stage_key == "plan":
+            calls["plan"] += 1
+            if calls["plan"] == 1:
+                return StageResult(ok=True, text='{"pendingQuestions":[{"question":"Qual banco?"}]}')
+            return StageResult(ok=True, text="plano final ok")
+        if stage_key == "clarify":
+            return StageResult(ok=True, text=(
+                '{"decisions": [{"question": "Qual banco?", "decision": "SQLite", '
+                '"score": 2, "sources": [{"file": "AGENTS.md"}, 42]}], "pendingQuestions": []}'
+            ))
+        text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text)
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+    async with maker() as s:
+        from src.repositories.decision_repository import DecisionRepository
+        rows = await DecisionRepository(s).recent_for_project("p1")
+    assert len(rows) == 1
+    assert isinstance(rows[0].sources, list)
+    assert all(isinstance(x, str) for x in rows[0].sources)
