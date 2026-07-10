@@ -45,3 +45,33 @@ async def test_check_status_fail_lists_names(monkeypatch):
 async def test_check_status_no_pr(monkeypatch):
     await _patch_run(monkeypatch, "", rc=1)  # gh falha (sem PR)
     assert (await pr_service.check_status("/wt"))["state"] == "none"
+
+
+async def test_get_pr_state_merged(monkeypatch):
+    await _patch_run(monkeypatch, '{"state": "MERGED"}')
+    assert await pr_service.get_pr_state("/wt") == "MERGED"
+
+
+async def test_get_pr_state_open(monkeypatch):
+    await _patch_run(monkeypatch, '{"state": "OPEN"}')
+    assert await pr_service.get_pr_state("/wt") == "OPEN"
+
+
+async def test_get_pr_state_closed(monkeypatch):
+    await _patch_run(monkeypatch, '{"state": "CLOSED"}')
+    assert await pr_service.get_pr_state("/wt") == "CLOSED"
+
+
+async def test_get_pr_state_sem_pr(monkeypatch):
+    await _patch_run(monkeypatch, "", rc=1)  # gh falha (sem PR)
+    assert await pr_service.get_pr_state("/wt") == "UNKNOWN"
+
+
+async def test_get_pr_state_valor_desconhecido(monkeypatch):
+    await _patch_run(monkeypatch, '{"state": "DRAFT"}')  # estado fora do enum esperado
+    assert await pr_service.get_pr_state("/wt") == "UNKNOWN"
+
+
+async def test_get_pr_state_json_invalido(monkeypatch):
+    await _patch_run(monkeypatch, "nao-e-json")
+    assert await pr_service.get_pr_state("/wt") == "UNKNOWN"

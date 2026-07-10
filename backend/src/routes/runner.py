@@ -139,6 +139,43 @@ async def say_card(project_id: str, card_id: str, body: AnswerRequest, db: Async
     return {"success": True}
 
 
+@router.post("/{card_id}/check-merge")
+async def check_merge(project_id: str, card_id: str, db: AsyncSession = Depends(get_db)):
+    """Detecta se o PR do card foi mergeado (no GitHub) e, se sim, move o card para 'done'.
+
+    Idempotente; so age em card em ready_to_merge com worktree. NUNCA faz merge — so detecta
+    o merge feito pelo humano no GitHub e reflete no board (respeita a regra inegociavel)."""
+    repo = CardRepository(db)
+    card = await repo.get_by_id(card_id)
+    if not card:
+        raise HTTPException(status_code=404, detail="Card not found")
+    if card.column_id != "ready_to_merge":
+        return {"merged": card.column_id == "done", "state": "N/A"}
+    if not card.worktree_path:
+        return {"merged": False, "state": "UNKNOWN"}
+
+    from ..services.pr_service import get_pr_state
+    state = await get_pr_state(card.worktree_path)
+    if state != "MERGED":
+        return {"merged": False, "state": state}
+
+    prev = card.column_id
+    moved, err = await repo.move(card_id, "done")
+    await db.commit()
+    if err:
+        return {"merged": True, "state": state, "moved": False, "error": err}
+
+    # broadcast igual ao pipeline (o front atualiza o board sozinho via WS card_moved)
+    try:
+        from ..schemas.card import CardResponse
+        from ..services.card_ws import card_ws_manager
+        card_dict = CardResponse.model_validate(moved).model_dump(by_alias=True, mode="json")
+        await card_ws_manager.broadcast_card_moved(card_id, prev, "done", card_dict)
+    except Exception:  # noqa: BLE001 — WS nunca derruba a rota
+        pass
+    return {"merged": True, "state": state, "moved": True}
+
+
 @router.get("/{card_id}/execution")
 async def get_card_execution(project_id: str, card_id: str, db: AsyncSession = Depends(get_db)):
     """Ultimo run do card + seus logs (para reload/historico do painel)."""

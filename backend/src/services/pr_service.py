@@ -31,6 +31,20 @@ async def get_pr_url(worktree: str) -> Optional[str]:
     return url if rc == 0 and url.startswith("http") else None
 
 
+async def get_pr_state(worktree: str) -> str:
+    """Estado do PR da branch atual: 'OPEN' | 'MERGED' | 'CLOSED' | 'UNKNOWN'.
+
+    Detecta o merge feito pelo humano no GitHub — o orquestrador NUNCA faz merge."""
+    rc, out, _ = await _run(["gh", "pr", "view", "--json", "state"], cwd=worktree)
+    if rc != 0:
+        return "UNKNOWN"
+    try:
+        state = (json.loads(out) or {}).get("state")
+    except (json.JSONDecodeError, ValueError):
+        return "UNKNOWN"
+    return state if state in ("OPEN", "MERGED", "CLOSED") else "UNKNOWN"
+
+
 async def create_or_get_pr(worktree: str, base: str, title: str, body: str) -> tuple[bool, str]:
     """Reusa o PR da branch se existir; senao cria um PR DRAFT. Retorna (ok, url_ou_erro)."""
     existing = await get_pr_url(worktree)
