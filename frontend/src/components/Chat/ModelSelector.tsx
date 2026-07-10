@@ -53,8 +53,7 @@ export const AVAILABLE_MODELS: AIModel[] = [
     performance: 'powerful',
     icon: '📖',
     accent: 'fable',
-    badge: 'Beta',
-    disabled: true
+    badge: 'Novo'
   }
 ];
 

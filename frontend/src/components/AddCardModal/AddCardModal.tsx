@@ -63,8 +63,7 @@ const MODEL_CARDS: ModelCardData[] = [
     tagline: 'Creative and narrative tasks',
     performance: 'Beta',
     icon: '📖',
-    accent: 'fable',
-    disabled: true
+    accent: 'fable'
   }
 ];
 
