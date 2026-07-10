@@ -190,6 +190,18 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - Front: LogsModal e PipelineControls renderizam `tool`/`progress` distintamente.
 - Plano: `plans/2026-07-10-onda-n5-send-to-user-auditoria.md`.
 
+### Onda N6 — ciclo fechado no board + limpeza da UI legada — feito 2026-07-10
+- **Merge detectado:** `pr_service.get_pr_state` (`gh pr view --json state`) + endpoint
+  `POST .../cards/{cid}/check-merge` move o card `ready_to_merge → done` quando o PR foi mergeado
+  no GitHub (idempotente; **nunca faz merge** — só detecta o do humano). PipelineControls faz poll
+  leve (20s) enquanto o card está em ready_to_merge + botão "Verificar merge"; o card fecha via WS.
+- **UI legada removida:** o Card perdeu os badges/mensagens de execução legados ("Executing /plan…",
+  barra "Planning…"), o botão "Create PR" placeholder, o "View Logs" legado e o banner de merge morto;
+  `useWorkflowAutomation` e `useAgentExecution` (hooks mortos), o bloco `AUTO_RUN_ON_DRAG`, o poll de
+  merge morto e os endpoints `execute-*` inexistentes foram apagados. `PipelineControls` é a fonte
+  única de execução/PR/logs do card. (Dívida do fork registrada no ARQUITETURA resolvida.)
+- Plano: `plans/2026-07-10-onda-n6-ciclo-fechado-limpeza.md`.
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
@@ -214,8 +226,8 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 > `database_manager`, `project_manager`, `project_history`, `routes/projects.py` e o `ExpertsModal` órfão (não montado).
 > Worktree/git (`main.py`) e o `expert-triage` migraram pro `Project` do registry (resolvem por `project_id`); FK do
 > `metrics` repontado pra `projects.id`; o Chat deixou de usar `ActiveProject` (cwd = `Project.path` selecionado). Detalhe
-> na seção "Projeto = escopo do app" acima. **Dívida frontend restante:** `useAgentExecution` + a UI de execução legada no
-> `Card` ainda chamam `/api/execute-*` (agora 404) — inertes (nada dispara), limpar quando mexer no Card.
+> na seção "Projeto = escopo do app" acima. **Dívida frontend — RESOLVIDA na onda N6:** `useAgentExecution`/`useWorkflowAutomation`
+> e a UI de execução legada do `Card` foram removidos; `PipelineControls` é a fonte única.
 
 ## Estado das fases
 

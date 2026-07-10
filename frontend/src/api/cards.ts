@@ -2,7 +2,7 @@
  * API client for cards endpoints.
  */
 
-import type { Card, CardImage, ColumnId, ModelType, ActiveExecution, ExecutionLog, MergeStatus, TokenStats, DiffStats, FileDiff } from '../types';
+import type { Card, CardImage, ColumnId, ModelType, ActiveExecution, MergeStatus, TokenStats, DiffStats, FileDiff } from '../types';
 import { API_ENDPOINTS } from './config';
 
 // Raw response from backend (snake_case for nested objects)
@@ -47,11 +47,6 @@ interface CardResponse {
   tokenStats?: TokenStats;
   // Diff stats (snake_case from backend)
   diffStats?: DiffStatsRaw;
-}
-
-export interface WorkflowStateUpdate {
-  stage: 'idle' | 'planning' | 'implementing' | 'testing' | 'reviewing' | 'completed' | 'error';
-  error?: string;
 }
 
 interface CardsListResponse {
@@ -254,58 +249,4 @@ export async function updateSpecPath(cardId: string, specPath: string): Promise<
   return mapCardResponseToCard(data.card);
 }
 
-interface LogsResponse {
-  cardId: string;
-  status: 'idle' | 'running' | 'success' | 'error';
-  startedAt?: string;
-  completedAt?: string;
-  duration?: number;
-  result?: string;
-  logs: ExecutionLog[];
-  workflowStage?: string; // Stage do workflow (plan, implement, test, review)
-}
-
-/**
- * Fetch execution logs for a card.
- */
-export async function fetchLogs(cardId: string): Promise<LogsResponse> {
-  const response = await fetch(`${API_ENDPOINTS.logs}/${cardId}`);
-
-  if (!response.ok) {
-    throw new Error(`Failed to fetch logs: ${response.statusText}`);
-  }
-
-  const data = await response.json();
-
-  // API returns { success: boolean, execution: LogsResponse }
-  // We need to extract the execution object
-  if (data.success && data.execution) {
-    return data.execution;
-  }
-
-  // Fallback for direct response format
-  if (data.cardId) {
-    return data;
-  }
-
-  throw new Error('Invalid response format from logs API');
-}
-
-/**
- * Update workflow state for a card.
- */
-export async function updateWorkflowState(
-  cardId: string,
-  state: WorkflowStateUpdate
-): Promise<void> {
-  const response = await fetch(`${API_ENDPOINTS.cards}/${cardId}/workflow-state`, {
-    method: 'PATCH',
-    headers: { 'Content-Type': 'application/json' },
-    body: JSON.stringify(state),
-  });
-
-  if (!response.ok) {
-    throw new Error('Failed to update workflow state');
-  }
-}
 
