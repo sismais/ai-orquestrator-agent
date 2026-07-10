@@ -28,6 +28,7 @@ from ..services.card_ws import card_ws_manager
 from ..services.execution_ws import execution_ws_manager
 from ..services.findings import (
     detect_needs_human,
+    parse_clarifier_output,
     parse_pending_questions,
     parse_review_findings_strict,
     parse_track_verdict,
@@ -524,9 +525,84 @@ async def run_pipeline(
                     # needs_human; senao ACUMULA a saida na cadeia que chega ao implement.
                     pend = parse_pending_questions(res.text)
                     if pend:
-                        await finish_pause(f"{agent_key}: pendencias", res.text[:1500],
-                                           question=_format_questions(pend))
-                        return
+                        # Gate de escalacao (N3): clarifier julga com score 0-3 + decisoes passadas
+                        # antes de acionar o humano. Fail-closed: erro/lixo -> pausa com tudo.
+                        await log.event(f"── gate de escalacao: {len(pend)} pendencia(s) ──")
+                        gate_prompt = (
+                            f"Voce e o revisor de escalacao. Um estagio de planejamento ({agent_key}) "
+                            f"levantou as pendencias abaixo para a tarefa: {card.title}.\n\n"
+                            f"Pendencias:\n{_format_questions(pend)}\n\n"
+                            + (f"{decisions_block}\n\n" if decisions_block else "")
+                            + "Aplique o Pause-or-Decide (score 0-3, +1 por fonte verificavel entre "
+                            "arquivo de regras do projeto, docs/, codigo existente e skills): score >= 2 "
+                            "DECIDE citando as fontes; score < 2 mantem a pergunta pendente. "
+                            'Devolva SO o JSON {"decisions": [{"question","decision","score","sources"}], '
+                            '"pendingQuestions": [{"question","context"}]} — sem prosa fora dele.'
+                        )
+                        gate = await stage_fn("clarify", worktree, gate_prompt, card_id=card_id,
+                                              on_log=log, model=stage_model_for_agent("clarify", card))
+                        await log.flush()
+                        await account(gate, stage_model_for_agent("clarify", card))
+                        if gate.interrupted:
+                            await finish_pause("interrompido pelo usuario",
+                                               "O usuario parou a execucao durante o gate de escalacao.",
+                                               question="Você interrompeu o agente. O que devo ajustar?")
+                            return
+                        verdict = parse_clarifier_output(gate.text if gate.ok else "")
+                        decided = verdict["decisions"]
+                        remaining = verdict["pendingQuestions"] if (gate.ok and (decided or verdict["pendingQuestions"])) else pend
+                        if decided:
+                            try:
+                                drepo = DecisionRepository(s)
+                                for d in decided:
+                                    await drepo.add(
+                                        project_id=project_id, card_id=card_id,
+                                        question=str(d.get("question", ""))[:2000],
+                                        decision=str(d.get("decision", ""))[:2000],
+                                        source="clarifier", score=d.get("score"),
+                                        sources=d.get("sources"), stage=agent_key,
+                                    )
+                                await s.commit()
+                            except Exception:  # noqa: BLE001 — memoria best-effort
+                                pass
+                            await log.event(f"── gate decidiu {len(decided)} pendencia(s) com fonte ──")
+                        if remaining:
+                            await finish_pause(f"{agent_key}: pendencias", res.text[:1500],
+                                               question=_format_questions(remaining))
+                            return
+                        # tudo decidido: re-roda o estagio UMA vez com as decisoes (mesmo canal do human_answer)
+                        decided_text = "\n".join(
+                            f"- {d.get('question')}: {d.get('decision')} (fontes: {', '.join(d.get('sources') or [])})"
+                            for d in decided
+                        )
+                        rerun_extra = dict(extra)
+                        rerun_extra["human_answer"] = (
+                            "Decisoes do revisor de escalacao (com fontes do projeto) — siga-as:\n" + decided_text
+                        )
+                        rerun_prompt = build_stage_prompt(agent_key, card.title, card.description or "",
+                                                          worktree, rerun_extra)
+                        res = await stage_fn(agent_key, worktree, rerun_prompt, card_id=card_id,
+                                             on_log=log, model=stage_model_for_agent(agent_key, card))
+                        await log.flush()
+                        await account(res, stage_model_for_agent(agent_key, card))
+                        if res.interrupted:
+                            await finish_pause("interrompido pelo usuario",
+                                               "O usuario parou a execucao.",
+                                               question="Você interrompeu o agente. O que devo ajustar?")
+                            return
+                        if not res.ok:
+                            await finish_pause(f"erro no re-run do {agent_key}", res.error)
+                            return
+                        if not (res.text or "").strip():
+                            await finish_pause(f"estagio {agent_key} terminou sem output no re-run",
+                                               "O agente encerrou o turno sem produzir texto.")
+                            return
+                        pend2 = parse_pending_questions(res.text)
+                        if pend2:
+                            # re-run ainda com pendencias: pausa direto (gate nao roda em loop)
+                            await finish_pause(f"{agent_key}: pendencias apos o gate", res.text[:1500],
+                                               question=_format_questions(pend2))
+                            return
                     nh = detect_needs_human(res.text)
                     if nh:
                         await finish_pause(f"{agent_key}: needs_human", nh,

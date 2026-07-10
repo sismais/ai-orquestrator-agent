@@ -75,3 +75,16 @@ def test_parse_track_verdict_default_conservador():
     assert parse_track_verdict("")["trilha"] == "padrao"
     assert parse_track_verdict("sem json aqui")["trilha"] == "padrao"
     assert parse_track_verdict('{"trilha": "turbo"}')["trilha"] == "padrao"   # valor desconhecido
+
+
+def test_parse_clarifier_output():
+    from src.services.findings import parse_clarifier_output
+    out = parse_clarifier_output(
+        'analise...\n{"decisions": [{"question": "Qual banco?", "decision": "SQLite", '
+        '"score": 2, "sources": ["AGENTS.md"]}], "pendingQuestions": []}'
+    )
+    assert out["decisions"][0]["decision"] == "SQLite"
+    assert out["pendingQuestions"] == []
+    # sem JSON -> nada decidido, tudo pendente (fail-closed do gate)
+    vazio = parse_clarifier_output("nao sei")
+    assert vazio["decisions"] == [] and vazio["pendingQuestions"] == []

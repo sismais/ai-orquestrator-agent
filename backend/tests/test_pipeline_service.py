@@ -560,3 +560,83 @@ async def test_decisoes_anteriores_chegam_ao_prompt_do_plan(maker):
     await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
     assert "SQLAlchemy 2 async" in seen["plan"][0]
     assert "SQLAlchemy 2 async" not in seen["implement"][0]
+
+
+async def test_gate_resolve_pendencias_e_estagio_re_roda(maker):
+    """N3: clarifier decide (score>=2) -> plan re-roda com as decisoes, sem pausar."""
+    card_id = await _make_project_card(maker)
+    calls = {"plan": 0}
+    seen: dict[str, list] = {}
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        seen.setdefault(stage_key, []).append(prompt)
+        if stage_key == "plan":
+            calls["plan"] += 1
+            if calls["plan"] == 1:
+                return StageResult(ok=True, text='{"pendingQuestions":[{"question":"Qual banco?"}]}')
+            return StageResult(ok=True, text="plano final ok")
+        if stage_key == "clarify":
+            return StageResult(ok=True, text=(
+                '{"decisions": [{"question": "Qual banco?", "decision": "SQLite unico", '
+                '"score": 2, "sources": ["AGENTS.md"]}], "pendingQuestions": []}'
+            ))
+        text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text)
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "ready_to_merge"   # NAO pausou
+    assert calls["plan"] == 2                                        # re-rodou com as decisoes
+    assert "SQLite unico" in seen["plan"][1]                         # decisao injetada no re-run
+    # decisao do clarifier persistida na memoria
+    async with maker() as s:
+        from src.repositories.decision_repository import DecisionRepository
+        rows = await DecisionRepository(s).recent_for_project("p1")
+    assert any(r.source == "clarifier" and "SQLite" in r.decision for r in rows)
+
+
+async def test_gate_com_pendencia_restante_pausa_so_com_ela(maker):
+    card_id = await _make_project_card(maker)
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        if stage_key == "plan":
+            return StageResult(ok=True, text=(
+                '{"pendingQuestions":[{"question":"Qual banco?"},{"question":"Qual cor do botao?"}]}'
+            ))
+        if stage_key == "clarify":
+            return StageResult(ok=True, text=(
+                '{"decisions": [{"question": "Qual banco?", "decision": "SQLite", "score": 2, '
+                '"sources": ["AGENTS.md"]}], '
+                '"pendingQuestions": [{"question": "Qual cor do botao?"}]}'
+            ))
+        return StageResult(ok=True, text=f"{stage_key} ok")
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "paused"
+    ex = await _last_execution(maker, card_id)
+    # a pausa carrega SO a pergunta restante (a decidida nao volta ao humano)
+    async with maker() as s:
+        from sqlalchemy import select as _sel
+        from src.models.activity_log import ActivityLog, ActivityType
+        acts = (await s.execute(_sel(ActivityLog).where(
+            ActivityLog.card_id == card_id,
+            ActivityLog.activity_type == ActivityType.COMMENTED,
+        ))).scalars().all()
+    agent_comments = [a.description or "" for a in acts if a.user_id == "agent"]
+    assert any("Qual cor do botao?" in c for c in agent_comments)
+    assert not any("Qual banco?" in c for c in agent_comments)
+
+
+async def test_gate_com_clarifier_quebrado_pausa_com_tudo(maker):
+    """Fail-closed: clarifier com erro/lixo -> pausa com TODAS as perguntas originais."""
+    card_id = await _make_project_card(maker)
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        if stage_key == "plan":
+            return StageResult(ok=True, text='{"pendingQuestions":[{"question":"Qual banco?"}]}')
+        if stage_key == "clarify":
+            return StageResult(ok=False, error="explodiu")
+        return StageResult(ok=True, text=f"{stage_key} ok")
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "paused"

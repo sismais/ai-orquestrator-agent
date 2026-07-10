@@ -97,6 +97,23 @@ def parse_pending_questions(text: str) -> list:
     return _as_list(obj.get("pendingQuestions"))
 
 
+def parse_clarifier_output(text: str) -> dict:
+    """Extrai {decisions, pendingQuestions} do clarifier (gate de escalacao, N3).
+
+    Fail-closed: sem JSON parseavel -> nada decidido ({} vazios) e o chamador pausa
+    com as perguntas originais."""
+    empty = {"decisions": [], "pendingQuestions": []}
+    if not text:
+        return dict(empty)
+    obj = _last_matching(text, lambda o: "decisions" in o or "pendingQuestions" in o)
+    if obj is None:
+        return dict(empty)
+    return {
+        "decisions": _as_list(obj.get("decisions")),
+        "pendingQuestions": _as_list(obj.get("pendingQuestions")),
+    }
+
+
 def parse_ci_verdict(text: str) -> dict:
     """Extrai {verdict, porque} do ci-triage. Default conservador: 'related' se nao parsear
     (assim o orquestrador tenta corrigir em vez de ignorar uma falha real)."""
