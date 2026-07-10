@@ -204,6 +204,30 @@ async def test_logs_persisted(maker):
     assert len(logs) > 0
 
 
+async def test_review_sem_json_nao_aprova_o_diff(maker):
+    """Review que nunca devolve JSON: re-pede 1x e depois PAUSA (falha-fechada, A2)."""
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({"review": ["parece tudo certo! aprovado."]})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "paused"      # NAO ready_to_merge
+    assert counts.get("review") == 2                            # pediu de novo antes de pausar
+    ex = await _last_execution(maker, card_id)
+    assert "veredito" in (ex.workflow_error or "")
+
+
+async def test_review_json_na_segunda_tentativa_aprova(maker):
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({"review": [
+        "sem json aqui",
+        '{"blocks":[],"fixNow":[],"suggestions":[]}',
+    ]})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+    assert counts.get("review") == 2
+
+
 async def test_excecao_inesperada_pausa_o_card(maker):
     """Excecao fora do stage_fn nao pode deixar a Execution RUNNING orfa (A1)."""
     card_id = await _make_project_card(maker)

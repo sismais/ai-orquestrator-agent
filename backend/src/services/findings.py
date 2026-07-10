@@ -80,6 +80,25 @@ def parse_review_findings(text: str) -> dict:
     }
 
 
+def parse_review_findings_strict(text: str) -> Optional[dict]:
+    """Como parse_review_findings, mas devolve None quando o texto NAO contem nenhum
+    JSON com os baldes. Falha-fechada: review nao-parseavel NAO pode aprovar o diff
+    (o parser tolerante devolvia baldes vazios e liberava o caminho do merge)."""
+    if not text:
+        return None
+    obj = _last_matching(
+        text,
+        lambda o: any(k in o for k in ("blocks", "fixNow", "suggestions")),
+    )
+    if obj is None:
+        return None
+    return {
+        "blocks": _as_list(obj.get("blocks")),
+        "fixNow": _as_list(obj.get("fixNow")),
+        "suggestions": _as_list(obj.get("suggestions")),
+    }
+
+
 def parse_pending_questions(text: str) -> list:
     """Extrai a lista `pendingQuestions` de um JSON no texto ([] se ausente)."""
     if not text:

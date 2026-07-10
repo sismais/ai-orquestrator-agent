@@ -28,7 +28,7 @@ from ..services.execution_ws import execution_ws_manager
 from ..services.findings import (
     detect_needs_human,
     parse_pending_questions,
-    parse_review_findings,
+    parse_review_findings_strict,
 )
 from ..services.runner_service import prepare_worktree
 from ..services.stage_runner import (
@@ -327,7 +327,34 @@ async def run_pipeline(
                     col = next_active_column(transitions, "implement")
 
                 elif col == "review":
-                    f = parse_review_findings(res.text)
+                    f = parse_review_findings_strict(res.text)
+                    if f is None:
+                        # falha-fechada: reviewer sem JSON re-explica o contrato e tenta 1x (A2)
+                        await log.event("review sem JSON parseavel — re-pedindo o veredito")
+                        retry_prompt = prompt + (
+                            "\n\nSua resposta anterior nao continha o JSON de achados. Responda AGORA "
+                            'somente com o JSON {"blocks": [...], "fixNow": [...], "suggestions": [...]} '
+                            "(arrays vazios se o diff estiver aprovado)."
+                        )
+                        res = await stage_fn("review", worktree, retry_prompt, card_id=card_id, on_log=log,
+                                             model=stage_model_for_column("review", card))
+                        await log.flush()
+                        await account(res)
+                        if res.interrupted:
+                            await finish_pause("interrompido pelo usuario",
+                                               "O usuario parou a execucao para corrigir o rumo.")
+                            return
+                        if not res.ok:
+                            await finish_pause("erro no re-pedido do review", res.error)
+                            return
+                        f = parse_review_findings_strict(res.text)
+                        if f is None:
+                            await finish_pause(
+                                "review sem veredito parseavel", (res.text or "")[:1500],
+                                question=("O revisor nao devolveu o JSON de achados apos 2 tentativas. "
+                                          "Como devo proceder?"),
+                            )
+                            return
                     blocking = len(f["blocks"]) + len(f["fixNow"])
                     if blocking > 0:
                         if iteration >= max_iterations:

@@ -34,6 +34,19 @@ def test_last_json_wins():
     assert len(f["blocks"]) == 0
 
 
+def test_parse_review_findings_strict_devolve_none_sem_json():
+    from src.services.findings import parse_review_findings_strict
+    assert parse_review_findings_strict("") is None
+    assert parse_review_findings_strict("parece tudo certo, aprovado!") is None
+    assert parse_review_findings_strict('{"outra": "coisa"}') is None
+
+
+def test_parse_review_findings_strict_parseia_json_valido():
+    from src.services.findings import parse_review_findings_strict
+    f = parse_review_findings_strict('bla ```json\n{"blocks":[],"fixNow":[{"titulo":"x"}]}\n```')
+    assert f == {"blocks": [], "fixNow": [{"titulo": "x"}], "suggestions": []}
+
+
 def test_pending_questions_present():
     text = 'plano...\n{"pendingQuestions":[{"question":"q1"},{"question":"q2"}]}'
     assert len(parse_pending_questions(text)) == 2
