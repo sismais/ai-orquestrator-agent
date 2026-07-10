@@ -30,19 +30,35 @@ def _pause(reason: str, context: str, question: str) -> dict:
 
 
 async def run_validate_ci(*, worktree: str, branch: str, base_branch: str, card, project,
-                          gm, log, stage_fn, max_iterations: int) -> dict:
+                          gm, log, stage_fn, max_iterations: int,
+                          stage_context: "dict | None" = None,
+                          account_fn=None,
+                          fix_model: "str | None" = None) -> dict:
+    """`stage_context`: contexto do projeto (rules_file etc.) repassado ao build_stage_prompt.
+    `account_fn(res)`: contabiliza custo/tokens de cada dispatch de agente no run.
+    `fix_model`: alias de modelo p/ o implementer (resolvido pelo pipeline — evita import circular).
+    """
     title = card.title[:70]
 
     async def implement_fix(instruction: str) -> Optional[dict]:
         """Despacha o implementer p/ corrigir + commita. Retorna dict de pausa se needs_human/erro."""
-        prompt = build_stage_prompt("implement", card.title, instruction, worktree, {})
-        res = await stage_fn("implement", worktree, prompt, card_id=card.id, on_log=log)
+        prompt = build_stage_prompt("implement", card.title, instruction, worktree,
+                                    {"context": stage_context or {}})
+        res = await stage_fn("implement", worktree, prompt, card_id=card.id, on_log=log,
+                             model=fix_model)
         await log.flush()
+        # contabiliza ANTES dos checks: turno interrompido/erro tambem custou tokens
+        if account_fn:
+            await account_fn(res)
         if res.interrupted:
             return _pause("interrompido pelo usuario", "durante o validate_ci",
                           "Você interrompeu. O que devo ajustar?")
         if not res.ok:
             return _pause("erro ao corrigir no validate_ci", res.error or "", "Falha ao corrigir. O que fazer?")
+        if not (res.text or "").strip():
+            return _pause("fix de validacao terminou sem output",
+                          "O agente encerrou o turno sem produzir texto — provavel recusa ou turno abortado.",
+                          "O agente encerrou o turno sem produzir texto. Como devo proceder?")
         nh = detect_needs_human(res.text)
         if nh:
             return _pause("validate_ci: needs_human", nh, f"O agente precisa da sua decisao:\n\n{nh}")
@@ -105,9 +121,12 @@ async def run_validate_ci(*, worktree: str, branch: str, base_branch: str, card,
         await log.event(f"── CI vermelha: {', '.join(status['failing'])[:200]} — triagem ──")
         ci_log = await pr_service.failing_check_logs(worktree)
         diff = await gm.diff_against_base(worktree, base_branch)
-        tprompt = build_stage_prompt("ci-triage", card.title, "", worktree, {"ci_log": ci_log, "diff": diff})
+        tprompt = build_stage_prompt("ci-triage", card.title, "", worktree,
+                                     {"ci_log": ci_log, "diff": diff, "context": stage_context or {}})
         tres = await stage_fn("ci-triage", worktree, tprompt, card_id=card.id, on_log=log)
         await log.flush()
+        if account_fn:
+            await account_fn(tres)
         verdict = parse_ci_verdict(tres.text)
         if verdict["verdict"] == "unrelated":
             await log.event(f"── CI: falha unrelated ({verdict['porque'][:120]}) — seguindo ──")

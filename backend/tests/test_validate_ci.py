@@ -27,9 +27,11 @@ class Obj:
 
 
 def make_stage_fn(script):
+    # `model=None` na assinatura: o implement_fix do validate_ci passa `model=fix_model`
+    # (mesmo contrato do run_stage real).
     calls = []
 
-    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None):
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
         calls.append(stage_key)
         text = script.get(stage_key, f"{stage_key} ok")
         return StageResult(ok=True, text=text)
@@ -127,3 +129,44 @@ async def test_local_validate_fail_then_fix(monkeypatch):
     res = await vci.run_validate_ci(**_ctx(fake, validate_command="npm test"))
     assert res["status"] == "ok"
     assert "implement" in calls
+
+
+async def test_fix_sem_output_pausa(monkeypatch):
+    # implementer encerra o turno sem texto -> pausa (nao commita nem segue cego)
+    async def run_cmd(wt, cmd):
+        return False, "boom"
+    monkeypatch.setattr(vci, "_run_command", run_cmd)
+    fake, _ = make_stage_fn({"implement": ""})
+    res = await vci.run_validate_ci(**_ctx(fake, validate_command="npm test"))
+    assert res["status"] == "pause"
+    assert "sem output" in res["reason"]
+
+
+async def test_contexto_custo_e_modelo_propagam_nos_dispatches(monkeypatch):
+    # stage_context chega ao header dos prompts; account_fn contabiliza cada dispatch;
+    # fix_model vai para o implementer.
+    seq = [{"state": "fail", "failing": ["build"]}, {"state": "pass", "failing": []}]
+    async def status(wt):
+        return seq.pop(0)
+    monkeypatch.setattr(pr_service, "check_status", status)
+
+    dispatches: dict = {}
+    accounted: list = []
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        dispatches[stage_key] = (prompt, model)
+        text = {"ci-triage": '{"verdict":"related"}', "implement": "corrigido"}[stage_key]
+        return StageResult(ok=True, text=text, cost_usd=0.5)
+
+    async def account(res):
+        accounted.append(res.cost_usd)
+
+    ctx = _ctx(fake)
+    ctx.update(stage_context={"rules_file": "REGRAS.md", "project_name": "proj"},
+               account_fn=account, fix_model="opus-4.8")
+    res = await vci.run_validate_ci(**ctx)
+    assert res["status"] == "ok"
+    assert "REGRAS.md" in dispatches["ci-triage"][0]
+    assert "REGRAS.md" in dispatches["implement"][0]
+    assert dispatches["implement"][1] == "opus-4.8"
+    assert accounted == [0.5, 0.5]  # triage + fix, ambos contabilizados

@@ -297,7 +297,9 @@ async def run_pipeline(
                     vres = await run_validate_ci(
                         worktree=worktree, branch=card.branch_name or "", base_branch=base_branch,
                         card=card, project=project, gm=gm, log=log, stage_fn=stage_fn,
-                        max_iterations=max_iterations,
+                        max_iterations=max_iterations, stage_context=stage_context,
+                        account_fn=account,
+                        fix_model=stage_model_for_column("implement", card),
                     )
                     if vres["status"] == "pause":
                         await finish_pause(vres["reason"], vres.get("context"), question=vres.get("question"))

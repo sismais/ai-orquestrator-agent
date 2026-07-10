@@ -54,6 +54,39 @@ async def test_running_orfa_vira_paused_e_card_pausa(maker):
         assert any("reiniciou" in (a.description or "") for a in acts)
 
 
+async def test_running_inativa_de_crash_antigo_nao_e_recuperada(maker):
+    """RUNNING+is_active=False e residuo de crash ANTIGO ja superado por um run posterior
+    (create_execution desativa runs anteriores sem mudar o status). O sweep nao pode
+    puxar o card concluido de volta para paused."""
+    async with maker() as s:
+        s.add(Project(id="p1", name="proj", path="/tmp/proj", workflow_id="dev", base_branch="main"))
+        repo = CardRepository(s)
+        card = await repo.create(CardCreate(title="Tarefa X"), project_id="p1")
+        card.column_id = "ready_to_merge"
+        # Execution A: residuo antigo (RUNNING, desativada por um run posterior)
+        s.add(Execution(card_id=card.id, status=ExecutionStatus.RUNNING,
+                        command="pipeline", is_active=False, workflow_stage="implement"))
+        # Execution B: o run mais recente, concluido com sucesso
+        s.add(Execution(card_id=card.id, status=ExecutionStatus.SUCCESS,
+                        command="pipeline", is_active=False, workflow_stage="validate_ci"))
+        await s.commit()
+        card_id = card.id
+
+    count = await recover_orphan_executions(session_maker=maker)
+    assert count == 0
+    async with maker() as s:
+        card = await CardRepository(s).get_by_id(card_id)
+        assert card.column_id == "ready_to_merge"  # nao voltou para paused
+        exs = (await s.execute(select(Execution).where(Execution.card_id == card_id))).scalars().all()
+        assert {ex.status for ex in exs} == {ExecutionStatus.RUNNING, ExecutionStatus.SUCCESS}
+        # nenhum comentario de retomada foi adicionado
+        acts = (await s.execute(select(ActivityLog).where(
+            ActivityLog.card_id == card_id,
+            ActivityLog.activity_type == ActivityType.COMMENTED,
+        ))).scalars().all()
+        assert acts == []
+
+
 async def test_sem_orfas_nao_faz_nada(maker):
     count = await recover_orphan_executions(session_maker=maker)
     assert count == 0

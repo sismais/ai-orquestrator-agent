@@ -23,14 +23,21 @@ _RESUME_HINT = (
 
 
 async def recover_orphan_executions(session_maker=async_session_maker) -> int:
-    """Marca como PAUSED toda Execution RUNNING (orfa de restart). Devolve o total.
+    """Marca como PAUSED toda Execution RUNNING ativa (orfa de restart). Devolve o total.
+
+    Filtra `is_active`: orfa REAL de crash fica RUNNING+is_active=True (nada desativa com o
+    servidor caido). Rows RUNNING+is_active=False sao residuos de crashes antigos ja
+    superados por um run posterior — recupera-las puxaria cards concluidos de volta p/ paused.
 
     O sweep NUNCA derruba o boot: qualquer excecao e logada e a funcao devolve 0.
     """
     try:
         async with session_maker() as s:
             rows = (await s.execute(
-                select(Execution).where(Execution.status == ExecutionStatus.RUNNING)
+                select(Execution).where(
+                    Execution.status == ExecutionStatus.RUNNING,
+                    Execution.is_active == True,  # noqa: E712
+                )
             )).scalars().all()
             if not rows:
                 return 0
