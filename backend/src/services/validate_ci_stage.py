@@ -123,7 +123,8 @@ async def run_validate_ci(*, worktree: str, branch: str, base_branch: str, card,
         diff = await gm.diff_against_base(worktree, base_branch)
         tprompt = build_stage_prompt("ci-triage", card.title, "", worktree,
                                      {"ci_log": ci_log, "diff": diff, "context": stage_context or {}})
-        tres = await stage_fn("ci-triage", worktree, tprompt, card_id=card.id, on_log=log)
+        tres = await stage_fn("ci-triage", worktree, tprompt, card_id=card.id, on_log=log,
+                              model=fix_model)
         await log.flush()
         if account_fn:
             await account_fn(tres)

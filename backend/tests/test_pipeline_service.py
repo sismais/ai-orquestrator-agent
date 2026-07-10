@@ -295,6 +295,21 @@ async def test_prompt_do_estagio_recebe_contexto_do_projeto(maker):
         assert "CEO" in seen[stage][0], stage
 
 
+async def test_account_prefere_modelo_real_do_fallback(maker):
+    """N1: se o run_stage caiu no fallback, model_used registra o modelo REAL."""
+    card_id = await _make_project_card(maker)
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text, cost_usd=0.01, used_model="opus-4.8"
+                           if stage_key != "plan" else "sonnet-5")
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    ex = await _last_execution(maker, card_id)
+    assert "sonnet-5" in (ex.model_used or "")
+    assert "opus-4.8" in (ex.model_used or "")
+
+
 async def test_excecao_inesperada_pausa_o_card(maker):
     """Excecao fora do stage_fn nao pode deixar a Execution RUNNING orfa (A1)."""
     card_id = await _make_project_card(maker)

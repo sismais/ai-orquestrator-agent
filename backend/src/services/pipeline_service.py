@@ -219,8 +219,9 @@ async def run_pipeline(
                     + int(u.get("cache_creation_input_tokens") or 0) \
                     + int(u.get("cache_read_input_tokens") or 0)
                 tokens["output"] += int(u.get("output_tokens") or 0)
-            if model_alias:
-                models_used.add(model_alias)
+            used = getattr(res, "used_model", None) or model_alias
+            if used:
+                models_used.add(used)
 
         def persist_run_stats() -> None:
             execution.input_tokens = tokens["input"] or None

@@ -170,3 +170,25 @@ async def test_contexto_custo_e_modelo_propagam_nos_dispatches(monkeypatch):
     assert "REGRAS.md" in dispatches["implement"][0]
     assert dispatches["implement"][1] == "opus-4.8"
     assert accounted == [0.5, 0.5]  # triage + fix, ambos contabilizados
+
+
+async def test_ci_triage_recebe_modelo_explicito(monkeypatch):
+    # N1: o ci-triage roda no mesmo modelo dos fixes (fix_model), nao no default do CLI.
+    seq = [{"state": "fail", "failing": ["build"]}, {"state": "pass", "failing": []}]
+    async def status(wt):
+        return seq.pop(0)
+    monkeypatch.setattr(pr_service, "check_status", status)
+
+    dispatches: dict = {}
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        dispatches[stage_key] = (prompt, model)
+        text = {"ci-triage": '{"verdict":"related"}', "implement": "corrigido"}[stage_key]
+        return StageResult(ok=True, text=text)
+
+    ctx = _ctx(fake)
+    ctx.update(fix_model="fable-5")
+    res = await vci.run_validate_ci(**ctx)
+    assert res["status"] == "ok"
+    assert dispatches["ci-triage"][1] == "fable-5"
+    assert dispatches["implement"][1] == "fable-5"
