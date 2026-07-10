@@ -18,6 +18,15 @@ from ..services.pipeline_service import create_execution, run_pipeline
 router = APIRouter(prefix="/api/projects/{project_id}/cards", tags=["runner"])
 
 
+def _log_task_result(task: asyncio.Task) -> None:
+    """Ultimo recurso: se a task do pipeline morrer com excecao nao tratada, loga em vez de sumir."""
+    if task.cancelled():
+        return
+    exc = task.exception()
+    if exc:
+        print(f"[runner] pipeline task morreu com excecao nao tratada: {exc!r}")
+
+
 class AnswerRequest(BaseModel):
     message: str
 
@@ -43,7 +52,8 @@ async def execute_card(project_id: str, card_id: str, db: AsyncSession = Depends
     execution_id = await create_execution(db, card_id, card.title)
 
     # roda o pipeline em background (abre a propria sessao); nao bloqueia o request
-    asyncio.create_task(run_pipeline(project_id, card_id, execution_id=execution_id))
+    task = asyncio.create_task(run_pipeline(project_id, card_id, execution_id=execution_id))
+    task.add_done_callback(_log_task_result)
 
     return {"success": True, "executionId": execution_id, "cardId": card_id}
 
@@ -75,10 +85,11 @@ async def answer_card(project_id: str, card_id: str, body: AnswerRequest,
     resume_stage = _resume_stage_from(last.workflow_stage)
     execution_id = await create_execution(db, card_id, card.title)
 
-    asyncio.create_task(run_pipeline(
+    task = asyncio.create_task(run_pipeline(
         project_id, card_id, execution_id=execution_id,
         resume_stage=resume_stage, human_answer=message,
     ))
+    task.add_done_callback(_log_task_result)
     return {"success": True, "executionId": execution_id, "resumeStage": resume_stage}
 
 

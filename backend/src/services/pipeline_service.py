@@ -226,168 +226,179 @@ async def run_pipeline(
             except Exception:  # noqa: BLE001
                 pass
 
-        # 1) worktree — na retomada reusa a existente (preserva os commits); senao cria pristina
-        reuse = bool(resume_stage and card.worktree_path and Path(card.worktree_path).exists())
-        if reuse:
-            worktree = card.worktree_path
-        else:
-            try:
-                wt = await prepare_worktree(project.path, base_branch, card_id)
-            except Exception as e:  # noqa: BLE001
-                await finish_pause("falha ao preparar worktree", str(e))
-                return
-            if not wt.success or not wt.worktree_path:
-                await finish_pause("falha ao criar worktree", wt.error)
-                return
-            card.worktree_path = wt.worktree_path
-            card.branch_name = wt.branch_name
-            await s.commit()
-            worktree = wt.worktree_path
-
-        transitions = await repo._get_transitions_for_card(card)
-        iteration = 0
-        plan_text: Optional[str] = None
-        pending_answer = human_answer  # injetado apenas na primeira etapa da retomada
-        col = resume_stage or _first_stage(transitions, card.column_id)
-
-        # 2) laco de estagios
-        while col and _pipeline_handles(col):
-            prev = card.column_id
-            moved, err = await repo.move(card_id, col)
-            await s.commit()
-            if err:
-                await finish_pause(f"transicao invalida para {col}", err)
-                return
-            card = moved
-            await _broadcast_moved(card, prev, col)
-            execution.workflow_stage = col
-            await s.commit()
-
-            # validate_ci: push -> PR draft -> espera CI -> ready_to_merge (git/gh, nao um agente)
-            if col == "validate_ci":
-                await log.event("── estagio: validate_ci ──")
-                vres = await run_validate_ci(
-                    worktree=worktree, branch=card.branch_name or "", base_branch=base_branch,
-                    card=card, project=project, gm=gm, log=log, stage_fn=stage_fn,
-                    max_iterations=max_iterations,
-                )
-                if vres["status"] == "pause":
-                    await finish_pause(vres["reason"], vres.get("context"), question=vres.get("question"))
+        try:
+            # 1) worktree — na retomada reusa a existente (preserva os commits); senao cria pristina
+            reuse = bool(resume_stage and card.worktree_path and Path(card.worktree_path).exists())
+            if reuse:
+                worktree = card.worktree_path
+            else:
+                try:
+                    wt = await prepare_worktree(project.path, base_branch, card_id)
+                except Exception as e:  # noqa: BLE001
+                    await finish_pause("falha ao preparar worktree", str(e))
                     return
-                if vres.get("pr_url"):
-                    execution.result = vres["pr_url"]
-                    await s.commit()
-                col = next_active_column(transitions, "validate_ci")  # -> ready_to_merge (para)
-                continue
-            await log.event(f"── estagio: {col} ──")
-
-            extra: dict = {}
-            if col == "review":
-                extra["diff"] = await gm.diff_against_base(worktree, base_branch)
-            elif col == "implement" and plan_text:
-                extra["plan"] = plan_text
-            if pending_answer:
-                extra["human_answer"] = pending_answer
-                pending_answer = None
-            prompt = build_stage_prompt(col, card.title, card.description or "", worktree, extra)
-            res = await stage_fn(col, worktree, prompt, card_id=card_id, on_log=log,
-                                 model=stage_model_for_column(col, card))
-            await log.flush()
-            await account(res)
-            if res.interrupted:
-                await finish_pause(
-                    "interrompido pelo usuario", "O usuario parou a execucao para corrigir o rumo.",
-                    question="Você interrompeu o agente. O que devo ajustar ou fazer diferente?",
-                )
-                return
-            if not res.ok:
-                await finish_pause(f"erro no estagio {col}", res.error)
-                return
-
-            if col == "plan":
-                pend = parse_pending_questions(res.text)
-                if pend:
-                    await finish_pause("plan: pendencias de arquitetura", res.text[:1500],
-                                       question=_format_questions(pend))
+                if not wt.success or not wt.worktree_path:
+                    await finish_pause("falha ao criar worktree", wt.error)
                     return
-                plan_text = res.text
-                col = next_active_column(transitions, "plan")
+                card.worktree_path = wt.worktree_path
+                card.branch_name = wt.branch_name
+                await s.commit()
+                worktree = wt.worktree_path
 
-            elif col == "implement":
-                nh = detect_needs_human(res.text)
-                if nh:
-                    await finish_pause(
-                        "implement: needs_human", nh,
-                        question=f"O agente precisa da sua decisao para continuar:\n\n{nh}",
-                    )
+            transitions = await repo._get_transitions_for_card(card)
+            iteration = 0
+            plan_text: Optional[str] = None
+            pending_answer = human_answer  # injetado apenas na primeira etapa da retomada
+            col = resume_stage or _first_stage(transitions, card.column_id)
+
+            # 2) laco de estagios
+            while col and _pipeline_handles(col):
+                prev = card.column_id
+                moved, err = await repo.move(card_id, col)
+                await s.commit()
+                if err:
+                    await finish_pause(f"transicao invalida para {col}", err)
                     return
-                await gm.commit_all(worktree, f"wip: {card.title[:60]}")
-                col = next_active_column(transitions, "implement")
-
-            elif col == "review":
-                f = parse_review_findings(res.text)
-                blocking = len(f["blocks"]) + len(f["fixNow"])
-                if blocking > 0:
-                    if iteration >= max_iterations:
-                        await finish_pause(
-                            f"review nao convergiu apos {iteration} iteracoes", json.dumps(f)[:1500],
-                            question=(
-                                f"A revisao nao convergiu apos {iteration} tentativas de correcao. "
-                                "Como devo proceder? (ex.: aceitar como esta, priorizar um achado, mudar a abordagem)"
-                            ),
-                        )
-                        return
-                    iteration += 1
-                    prev = card.column_id
-                    moved, err = await repo.move(card_id, "implement")
-                    await s.commit()
-                    if err:
-                        await finish_pause("fix-loop: transicao invalida", err)
-                        return
-                    card = moved
-                    await _broadcast_moved(card, prev, "implement")
-                    await log.event(f"── fix-loop #{iteration}: implement ──")
-                    fix_prompt = build_stage_prompt(
-                        "implement", card.title, card.description or "", worktree, {"findings": f},
-                    )
-                    fix_res = await stage_fn("implement", worktree, fix_prompt, card_id=card_id, on_log=log,
-                                             model=stage_model_for_column("implement", card))
-                    await log.flush()
-                    await account(fix_res)
-                    if fix_res.interrupted:
-                        await finish_pause(
-                            "interrompido pelo usuario", "O usuario parou a correcao.",
-                            question="Você interrompeu. O que devo ajustar?",
-                        )
-                        return
-                    if not fix_res.ok:
-                        await finish_pause("erro no fix-loop", fix_res.error)
-                        return
-                    nh = detect_needs_human(fix_res.text)
-                    if nh:
-                        await finish_pause("fix-loop: needs_human", nh)
-                        return
-                    await gm.commit_all(worktree, f"fix: {card.title[:50]} #{iteration}")
-                    col = "review"  # re-revisa no topo do laco
-                    continue
-                col = next_active_column(transitions, "review")  # -> validate_ci
-
-        # 3) parada limpa na fronteira (ex.: ready_to_merge): avanca e encerra
-        if col and not _pipeline_handles(col) and card.column_id != col:
-            prev = card.column_id
-            moved, err = await repo.move(card_id, col)
-            await s.commit()
-            if not err:
                 card = moved
                 await _broadcast_moved(card, prev, col)
+                execution.workflow_stage = col
+                await s.commit()
 
-        await log.event(f"── pipeline concluido (parou em: {card.column_id}) ──")
-        execution.status = ExecutionStatus.SUCCESS
-        execution.is_active = False
-        execution.completed_at = datetime.utcnow()
-        execution.execution_cost = total_cost or None
-        await s.commit()
-        try:
-            await execution_ws_manager.notify_complete(card_id, "success", "pipeline")
-        except Exception:  # noqa: BLE001
-            pass
+                # validate_ci: push -> PR draft -> espera CI -> ready_to_merge (git/gh, nao um agente)
+                if col == "validate_ci":
+                    await log.event("── estagio: validate_ci ──")
+                    vres = await run_validate_ci(
+                        worktree=worktree, branch=card.branch_name or "", base_branch=base_branch,
+                        card=card, project=project, gm=gm, log=log, stage_fn=stage_fn,
+                        max_iterations=max_iterations,
+                    )
+                    if vres["status"] == "pause":
+                        await finish_pause(vres["reason"], vres.get("context"), question=vres.get("question"))
+                        return
+                    if vres.get("pr_url"):
+                        execution.result = vres["pr_url"]
+                        await s.commit()
+                    col = next_active_column(transitions, "validate_ci")  # -> ready_to_merge (para)
+                    continue
+                await log.event(f"── estagio: {col} ──")
+
+                extra: dict = {}
+                if col == "review":
+                    extra["diff"] = await gm.diff_against_base(worktree, base_branch)
+                elif col == "implement" and plan_text:
+                    extra["plan"] = plan_text
+                if pending_answer:
+                    extra["human_answer"] = pending_answer
+                    pending_answer = None
+                prompt = build_stage_prompt(col, card.title, card.description or "", worktree, extra)
+                res = await stage_fn(col, worktree, prompt, card_id=card_id, on_log=log,
+                                     model=stage_model_for_column(col, card))
+                await log.flush()
+                await account(res)
+                if res.interrupted:
+                    await finish_pause(
+                        "interrompido pelo usuario", "O usuario parou a execucao para corrigir o rumo.",
+                        question="Você interrompeu o agente. O que devo ajustar ou fazer diferente?",
+                    )
+                    return
+                if not res.ok:
+                    await finish_pause(f"erro no estagio {col}", res.error)
+                    return
+
+                if col == "plan":
+                    pend = parse_pending_questions(res.text)
+                    if pend:
+                        await finish_pause("plan: pendencias de arquitetura", res.text[:1500],
+                                           question=_format_questions(pend))
+                        return
+                    plan_text = res.text
+                    col = next_active_column(transitions, "plan")
+
+                elif col == "implement":
+                    nh = detect_needs_human(res.text)
+                    if nh:
+                        await finish_pause(
+                            "implement: needs_human", nh,
+                            question=f"O agente precisa da sua decisao para continuar:\n\n{nh}",
+                        )
+                        return
+                    await gm.commit_all(worktree, f"wip: {card.title[:60]}")
+                    col = next_active_column(transitions, "implement")
+
+                elif col == "review":
+                    f = parse_review_findings(res.text)
+                    blocking = len(f["blocks"]) + len(f["fixNow"])
+                    if blocking > 0:
+                        if iteration >= max_iterations:
+                            await finish_pause(
+                                f"review nao convergiu apos {iteration} iteracoes", json.dumps(f)[:1500],
+                                question=(
+                                    f"A revisao nao convergiu apos {iteration} tentativas de correcao. "
+                                    "Como devo proceder? (ex.: aceitar como esta, priorizar um achado, mudar a abordagem)"
+                                ),
+                            )
+                            return
+                        iteration += 1
+                        prev = card.column_id
+                        moved, err = await repo.move(card_id, "implement")
+                        await s.commit()
+                        if err:
+                            await finish_pause("fix-loop: transicao invalida", err)
+                            return
+                        card = moved
+                        await _broadcast_moved(card, prev, "implement")
+                        await log.event(f"── fix-loop #{iteration}: implement ──")
+                        fix_prompt = build_stage_prompt(
+                            "implement", card.title, card.description or "", worktree, {"findings": f},
+                        )
+                        fix_res = await stage_fn("implement", worktree, fix_prompt, card_id=card_id, on_log=log,
+                                                 model=stage_model_for_column("implement", card))
+                        await log.flush()
+                        await account(fix_res)
+                        if fix_res.interrupted:
+                            await finish_pause(
+                                "interrompido pelo usuario", "O usuario parou a correcao.",
+                                question="Você interrompeu. O que devo ajustar?",
+                            )
+                            return
+                        if not fix_res.ok:
+                            await finish_pause("erro no fix-loop", fix_res.error)
+                            return
+                        nh = detect_needs_human(fix_res.text)
+                        if nh:
+                            await finish_pause("fix-loop: needs_human", nh)
+                            return
+                        await gm.commit_all(worktree, f"fix: {card.title[:50]} #{iteration}")
+                        col = "review"  # re-revisa no topo do laco
+                        continue
+                    col = next_active_column(transitions, "review")  # -> validate_ci
+
+            # 3) parada limpa na fronteira (ex.: ready_to_merge): avanca e encerra
+            if col and not _pipeline_handles(col) and card.column_id != col:
+                prev = card.column_id
+                moved, err = await repo.move(card_id, col)
+                await s.commit()
+                if not err:
+                    card = moved
+                    await _broadcast_moved(card, prev, col)
+
+            await log.event(f"── pipeline concluido (parou em: {card.column_id}) ──")
+            execution.status = ExecutionStatus.SUCCESS
+            execution.is_active = False
+            execution.completed_at = datetime.utcnow()
+            execution.execution_cost = total_cost or None
+            await s.commit()
+            try:
+                await execution_ws_manager.notify_complete(card_id, "success", "pipeline")
+            except Exception:  # noqa: BLE001
+                pass
+        except Exception as e:  # noqa: BLE001 — rede de seguranca: run orfao nunca mais (A1)
+            try:
+                await finish_pause("erro interno do orquestrador", str(e))
+            except Exception as e2:  # noqa: BLE001 — ultimo recurso: marca a Execution direto
+                print(f"[pipeline] finish_pause falhou apos erro interno: {e2!r}")
+                execution.status = ExecutionStatus.ERROR
+                execution.workflow_error = f"erro interno: {e} | finish_pause: {e2}"[:1900]
+                execution.is_active = False
+                execution.completed_at = datetime.utcnow()
+                await s.commit()

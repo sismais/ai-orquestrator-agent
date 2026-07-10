@@ -202,3 +202,19 @@ async def test_logs_persisted(maker):
     async with maker() as s:
         logs = (await s.execute(select(ExecutionLog))).scalars().all()
     assert len(logs) > 0
+
+
+async def test_excecao_inesperada_pausa_o_card(maker):
+    """Excecao fora do stage_fn nao pode deixar a Execution RUNNING orfa (A1)."""
+    card_id = await _make_project_card(maker)
+
+    async def boom(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        raise RuntimeError("explodiu por dentro")
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=boom)
+
+    assert await _card_column(maker, card_id) == "paused"
+    ex = await _last_execution(maker, card_id)
+    assert ex.status.value == "paused"
+    assert ex.is_active is False
+    assert "erro interno" in (ex.workflow_error or "")
