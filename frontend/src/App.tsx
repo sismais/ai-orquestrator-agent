@@ -1,9 +1,7 @@
 import { useState, useRef, useEffect, useCallback } from 'react';
 import { useNavigate, useLocation } from 'react-router-dom';
 import { DragEndEvent, DragOverEvent, DragStartEvent, PointerSensor, useSensor, useSensors } from '@dnd-kit/core';
-import { Card as CardType, Column, ColumnId, ExecutionStatus, WorkflowStatus, WorkflowStage } from './types';
-import { useAgentExecution } from './hooks/useAgentExecution';
-import { useWorkflowAutomation } from './hooks/useWorkflowAutomation';
+import { Card as CardType, Column, ColumnId } from './types';
 import { useChat } from './hooks/useChat';
 import { useViewPersistence } from './hooks/useViewPersistence';
 import { useCardWebSocket, CardMovedMessage, CardUpdatedMessage, CardCreatedMessage } from './hooks/useCardWebSocket';
@@ -17,9 +15,6 @@ import KanbanPage from './pages/KanbanPage';
 import ChatPage from './pages/ChatPage';
 import SettingsPage from './pages/SettingsPage';
 import styles from './App.module.css';
-
-// Fase 3b: execucao migra para o runner no backend
-const AUTO_RUN_ON_DRAG = false;
 
 function App() {
   const { getSavedView, saveView } = useViewPersistence();
@@ -38,8 +33,6 @@ function App() {
   const [isLoading, setIsLoading] = useState(true);
   const [isArchivedCollapsed, setIsArchivedCollapsed] = useState(false);
   const [isCanceladoCollapsed, setIsCanceladoCollapsed] = useState(false);
-  const [initialExecutions, setInitialExecutions] = useState<Map<string, ExecutionStatus> | undefined>();
-  const [initialWorkflowStatuses, setInitialWorkflowStatuses] = useState<Map<string, WorkflowStatus> | undefined>();
   const [currentProjectId, setCurrentProjectId] = useState<string | null>(() => localStorage.getItem('orq.currentProjectId'));
   const [registryProjects, setRegistryProjects] = useState<RegistryProject[]>([]);
   const [boardColumns, setBoardColumns] = useState<Column[]>([]);
@@ -67,27 +60,8 @@ function App() {
     );
   }, []);
 
-  // Callback para atualizar cards quando uma execução completar
-  const handleExecutionComplete = async (cardId: string, status: ExecutionStatus) => {
-    if (status.status === 'success') {
-      try {
-        const updatedCard = await cardsApi.fetchCard(cardId);
-        setCards(prev => prev.map(card =>
-          card.id === cardId ? updatedCard : card
-        ));
-      } catch (error) {
-        console.error('[App] Failed to fetch updated card:', error);
-      }
-    }
-  };
-
-  const { executePlan, executeImplement, executeTest, executeReview, getExecutionStatus, registerCompletionCallback, executions, fetchLogsHistory, executeExpertTriage, executeExpertSync } = useAgentExecution({
-    initialExecutions,
-    onExecutionComplete: handleExecutionComplete,
-  });
-
   // Estado para controlar loading de experts
-  const [loadingExpertsCardId, setLoadingExpertsCardId] = useState<string | null>(null);
+  const [loadingExpertsCardId] = useState<string | null>(null);
   const {
     state: chatState,
     sessions: chatSessions,
@@ -97,7 +71,7 @@ function App() {
     deleteSession,
   } = useChat(currentProjectId, urlChatSessionId);
 
-  // Define moveCard and updateCardSpecPath BEFORE useWorkflowAutomation
+  // Atualiza a coluna do card no estado local (usado pelo drag e pelo WS)
   const moveCard = (cardId: string, newColumnId: ColumnId) => {
     setCards(prev =>
       prev.map(card =>
@@ -105,43 +79,6 @@ function App() {
       )
     );
   };
-
-  const updateCardSpecPath = (cardId: string, specPath: string) => {
-    setCards(prev =>
-      prev.map(card =>
-        card.id === cardId ? { ...card, specPath } : card
-      )
-    );
-  };
-
-  const updateCardExperts = (cardId: string, experts: CardType['experts']) => {
-    setCards(prev =>
-      prev.map(card =>
-        card.id === cardId ? { ...card, experts } : card
-      )
-    );
-  };
-
-  const {
-    runWorkflow,
-    getWorkflowStatus,
-    handleCompletedReview,
-    // clearWorkflowStatus, // Não está sendo usado no momento
-  } = useWorkflowAutomation({
-    executePlan,
-    executeImplement,
-    executeTest,
-    executeReview,
-    executeExpertTriage,
-    onCardMove: moveCard,
-    onSpecPathUpdate: updateCardSpecPath,
-    onExpertsUpdate: updateCardExperts,
-    onLoadingExpertsChange: setLoadingExpertsCardId,
-    initialStatuses: initialWorkflowStatuses,
-    cards,
-    registerCompletionCallback,
-    executions,
-  });
 
   // Toasts globais + contador de cards pausados (A3)
   const { toasts, addToast, removeToast } = useToast();
@@ -172,13 +109,7 @@ function App() {
       setCards(prev => prev.map(card =>
         card.id === message.cardId ? message.card : card
       ));
-
-      // Se for um card com workflow em andamento, pode precisar de ações adicionais
-      const workflowStatus = getWorkflowStatus(message.cardId);
-      if (workflowStatus && workflowStatus.stage !== 'idle') {
-        console.log(`[App] Card ${message.cardId} has active workflow, may need recovery`);
-      }
-    }, [getWorkflowStatus, addToast, currentProjectId]),
+    }, [addToast, currentProjectId]),
 
     onCardUpdated: useCallback((message: CardUpdatedMessage) => {
       console.log(`[App] Card updated via WebSocket: ${message.cardId}`);
@@ -225,94 +156,6 @@ function App() {
         // Load cards (scoped to the selected project, when one is set)
         const loadedCards = await cardsApi.fetchCards(currentProjectId ?? undefined);
         setCards(loadedCards);
-
-        // Construir mapa de execuções ativas e workflow statuses
-        // IMPORTANTE: Incluir cards em "done" para manter histórico de logs acessível
-        const executionsMap = new Map<string, ExecutionStatus>();
-        const workflowMap = new Map<string, WorkflowStatus>();
-
-        for (const card of loadedCards) {
-          // Carregar execução para TODOS os cards com activeExecution, incluindo os em "done"
-          if (card.activeExecution) {
-            console.log(`[App] Found card ${card.id} with activeExecution:`, card.activeExecution);
-
-            // Buscar logs completos da execução se estiver em andamento
-            if (card.activeExecution.status === 'running') {
-              console.log(`[App] Card ${card.id} is running, fetching logs...`);
-              try {
-                const logsData = await cardsApi.fetchLogs(card.id);
-                console.log(`[App] Fetched logs for card ${card.id}:`, logsData);
-                executionsMap.set(card.id, {
-                  cardId: card.id,
-                  status: logsData.status,
-                  startedAt: logsData.startedAt,
-                  completedAt: logsData.completedAt,
-                  logs: logsData.logs || [],
-                  result: logsData.result,
-                  workflowStage: logsData.workflowStage, // Incluir workflow stage
-                });
-              } catch (error) {
-                console.warn(`[App] Failed to fetch logs for card ${card.id}:`, error);
-                // Usar informações básicas da execução ativa
-                executionsMap.set(card.id, {
-                  cardId: card.id,
-                  status: card.activeExecution.status,
-                  startedAt: card.activeExecution.startedAt,
-                  completedAt: card.activeExecution.completedAt,
-                  logs: [],
-                  workflowStage: card.activeExecution.workflowStage, // Incluir workflow stage
-                });
-              }
-            } else {
-              // Para execuções completas, apenas usar as informações básicas
-              executionsMap.set(card.id, {
-                cardId: card.id,
-                status: card.activeExecution.status,
-                startedAt: card.activeExecution.startedAt,
-                completedAt: card.activeExecution.completedAt,
-                logs: [],
-                workflowStage: card.activeExecution.workflowStage, // Incluir workflow stage
-              });
-            }
-
-            // Restaurar workflow state se existir
-            const activeExecWithWorkflow = card.activeExecution as any;
-            if (activeExecWithWorkflow.workflowStage) {
-              // Mapear valores antigos para os novos (compatibilidade)
-              const stageMap: Record<string, WorkflowStage> = {
-                'plan': 'planning',
-                'implement': 'implementing',
-                'test': 'testing',
-                'test-implementation': 'testing',
-                'review': 'reviewing',
-                // Valores já corretos
-                'planning': 'planning',
-                'implementing': 'implementing',
-                'testing': 'testing',
-                'reviewing': 'reviewing',
-                'completed': 'completed',
-                'error': 'error',
-                'idle': 'idle',
-              };
-              const mappedStage = stageMap[activeExecWithWorkflow.workflowStage] || 'planning';
-
-              workflowMap.set(card.id, {
-                cardId: card.id,
-                stage: mappedStage,
-                currentColumn: card.columnId,
-                error: activeExecWithWorkflow.workflowError,
-              });
-            }
-          }
-        }
-
-        if (executionsMap.size > 0) {
-          setInitialExecutions(executionsMap);
-        }
-
-        if (workflowMap.size > 0) {
-          setInitialWorkflowStatuses(workflowMap);
-        }
       } catch (error) {
         console.error('[App] Failed to load cards:', error);
       } finally {
@@ -392,74 +235,6 @@ function App() {
       clearInterval(interval);
     };
   }, [hasActiveExecutions]); // Dependência mais estável
-
-  // Polling para monitorar merge automático em background
-  const mergingCardsRef = useRef<CardType[]>([]);
-
-  useEffect(() => {
-    // Atualizar ref
-    mergingCardsRef.current = cards.filter(c =>
-      c.mergeStatus === 'resolving' || c.mergeStatus === 'merging'
-    );
-
-    if (mergingCardsRef.current.length === 0) {
-      return; // Nada para monitorar
-    }
-
-    console.log(`[App] Monitoring ${mergingCardsRef.current.length} card(s) with merges in progress`);
-
-    const pollMergeStatus = async () => {
-      try {
-        const updatedCards = await cardsApi.fetchCards();
-        const currentMergingCards = mergingCardsRef.current;
-
-        for (const oldCard of currentMergingCards) {
-          const updatedCard = updatedCards.find(c => c.id === oldCard.id);
-
-          if (!updatedCard) continue;
-
-          // Se o merge foi completado com sucesso
-          if (updatedCard.mergeStatus === 'merged' && updatedCard.columnId === 'review') {
-            console.log(`[App] Merge completed for card ${updatedCard.id}, moving to Done`);
-
-            // Mover para done
-            await cardsApi.moveCard(updatedCard.id, 'done');
-
-            // Atualizar estado local
-            setCards(prev => prev.map(c =>
-              c.id === updatedCard.id
-                ? { ...updatedCard, columnId: 'done', mergeStatus: 'merged' }
-                : c
-            ));
-          }
-          // Se o merge falhou
-          else if (updatedCard.mergeStatus === 'failed') {
-            console.error(`[App] Merge failed for card ${updatedCard.id}`);
-
-            // Atualizar estado local com o status de falha
-            setCards(prev => prev.map(c =>
-              c.id === updatedCard.id
-                ? { ...updatedCard }
-                : c
-            ));
-          }
-          // Se ainda está resolvendo, atualizar o card
-          else if (updatedCard.mergeStatus === 'resolving') {
-            setCards(prev => prev.map(c =>
-              c.id === updatedCard.id
-                ? { ...updatedCard }
-                : c
-            ));
-          }
-        }
-      } catch (error) {
-        console.error('[App] Error polling merge status:', error);
-      }
-    };
-
-    const interval = setInterval(pollMergeStatus, 5000);
-    return () => clearInterval(interval);
-  }, [cards.filter(c => c.mergeStatus === 'resolving' || c.mergeStatus === 'merging').length]); // Dependência mais específica
 
   const sensors = useSensors(
     useSensor(PointerSensor, {
@@ -617,101 +392,8 @@ function App() {
       return;
     }
 
-    // Triggers baseados na transição
-    // Fase 3b: pipeline SDLC deixa de ser disparado pelo drag no browser;
-    // execução migra para o runner no backend. Ladder mantida (desligada) até lá.
-    if (AUTO_RUN_ON_DRAG) {
-      if (startColumn === 'backlog' && finalColumnId === 'plan') {
-        console.log(`[App] Card moved from backlog to plan: ${card.title}`);
-
-        // 1. Execute expert triage first (blocking)
-        setLoadingExpertsCardId(card.id);
-        console.log(`[App] Starting expert triage for card: ${card.title}`);
-        const triageResult = await executeExpertTriage(card);
-        setLoadingExpertsCardId(null);
-
-        // 2. Update card with identified experts
-        if (triageResult.success && Object.keys(triageResult.experts).length > 0) {
-          updateCardExperts(card.id, triageResult.experts);
-          console.log(`[App] Identified experts:`, Object.keys(triageResult.experts));
-        }
-
-        // 3. Execute plan with expert context
-        const cardWithExperts = { ...card, experts: triageResult.experts };
-        const result = await executePlan(cardWithExperts);
-        if (result.success && result.specPath) {
-          updateCardSpecPath(card.id, result.specPath);
-          console.log(`[App] Spec path saved: ${result.specPath}`);
-        }
-      } else if (startColumn === 'plan' && finalColumnId === 'implement') {
-        // Buscar o card atualizado (pode ter specPath agora)
-        const updatedCard = cards.find(c => c.id === activeId);
-        if (updatedCard?.specPath) {
-          console.log(`[App] Card moved from plan to implement: ${updatedCard.title}`);
-          console.log(`[App] Executing /implement with spec: ${updatedCard.specPath}`);
-          executeImplement(updatedCard);
-        } else {
-          alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
-          moveCard(activeId, startColumn);
-        }
-      } else if (startColumn === 'implement' && finalColumnId === 'test') {
-        // Trigger: implement → test - Executar /test-implementation
-        const updatedCard = cards.find(c => c.id === activeId);
-        if (updatedCard?.specPath) {
-          console.log(`[App] Card moved from implement to test: ${updatedCard.title}`);
-          console.log(`[App] Executing /test-implementation with spec: ${updatedCard.specPath}`);
-          executeTest(updatedCard);
-        } else {
-          alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
-          moveCard(activeId, startColumn);
-        }
-      } else if (startColumn === 'test' && finalColumnId === 'review') {
-        // Trigger: test → review - Executar /review
-        const updatedCard = cards.find(c => c.id === activeId);
-        if (updatedCard?.specPath) {
-          console.log(`[App] Card moved from test to review: ${updatedCard.title}`);
-          console.log(`[App] Executing /review with spec: ${updatedCard.specPath}`);
-          executeReview(updatedCard);
-        } else {
-          alert('Este card não possui um plano associado. Execute primeiro a etapa de planejamento.');
-          moveCard(activeId, startColumn);
-        }
-      } else if (startColumn === 'review' && finalColumnId === 'done') {
-        // Trigger: review → done - Fazer merge automático e sync de experts
-        const updatedCard = cards.find(c => c.id === activeId);
-        if (updatedCard?.branchName) {
-          console.log(`[App] Card moved from review to done: ${updatedCard.title}`);
-          console.log(`[App] Starting automatic merge for branch: ${updatedCard.branchName}`);
-
-          // Tentar fazer merge
-          const mergeResult = await handleCompletedReview(updatedCard.id);
-
-          if (mergeResult.success) {
-            console.log(`[App] Merge successful for card: ${updatedCard.title}`);
-          } else if (mergeResult.status === 'resolving') {
-            console.log(`[App] Merge has conflicts, AI is resolving automatically`);
-            // Card já está em done, merge será completado em background
-          } else {
-            console.error(`[App] Merge failed: ${mergeResult.error}`);
-            alert(`Falha ao fazer merge: ${mergeResult.error}\nO card foi movido para Done, mas o merge precisa ser feito manualmente.`);
-          }
-        } else {
-          console.log(`[App] Card has no branch, skipping merge`);
-        }
-
-        // Execute expert sync in background (non-blocking)
-        if (updatedCard?.experts && Object.keys(updatedCard.experts).length > 0) {
-          console.log(`[App] Starting expert sync for card: ${updatedCard.title}`);
-          executeExpertSync(updatedCard).then(result => {
-            if (result.success) {
-              console.log(`[App] Expert sync completed:`, result.syncedExperts);
-            } else {
-              console.error(`[App] Expert sync failed:`, result.error);
-            }
-          });
-        }
-      }
-    }
+    // Fase 3b: o pipeline SDLC deixou de ser disparado pelo drag no browser;
+    // a execucao (plan/implement/test/review/PR) roda no runner do backend via PipelineControls.
   };
 
   const renderView = () => {
@@ -732,14 +414,10 @@ function App() {
             onAddCard={addCard}
             onRemoveCard={removeCard}
             onUpdateCard={updateCard}
-            getExecutionStatus={getExecutionStatus}
-            getWorkflowStatus={getWorkflowStatus}
-            onRunWorkflow={runWorkflow}
             isArchivedCollapsed={isArchivedCollapsed}
             onToggleArchivedCollapse={() => setIsArchivedCollapsed(!isArchivedCollapsed)}
             isCanceladoCollapsed={isCanceladoCollapsed}
             onToggleCanceladoCollapse={() => setIsCanceladoCollapsed(!isCanceladoCollapsed)}
-            fetchLogsHistory={fetchLogsHistory}
             loadingExpertsCardId={loadingExpertsCardId}
             currentProjectId={currentProjectId}
             onProjectIdSwitch={setCurrentProjectId}

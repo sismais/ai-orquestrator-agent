@@ -69,15 +69,6 @@ export const API_ENDPOINTS = {
   // Logs
   get logs() { return `${API_CONFIG.BASE_URL}/api/logs`; },
 
-  // Execution endpoints
-  execution: {
-    get plan() { return `${API_CONFIG.BASE_URL}/api/execute-plan`; },
-    get implement() { return `${API_CONFIG.BASE_URL}/api/execute-implement`; },
-    get test() { return `${API_CONFIG.BASE_URL}/api/execute-test`; },
-    get review() { return `${API_CONFIG.BASE_URL}/api/execute-review`; },
-    get expertTriage() { return `${API_CONFIG.BASE_URL}/api/execute-expert-triage`; },
-  },
-
   // Git worktree isolation endpoints
   get branches() { return `${API_CONFIG.BASE_URL}/api/branches`; },
   get cleanupWorktrees() { return `${API_CONFIG.BASE_URL}/api/cleanup-orphan-worktrees`; },

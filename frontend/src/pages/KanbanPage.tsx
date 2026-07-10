@@ -1,5 +1,5 @@
 import { DndContext, DragOverlay, closestCorners } from '@dnd-kit/core';
-import { Card as CardType, Column, ColumnId, ExecutionStatus, WorkflowStatus } from '../types';
+import { Card as CardType, Column, ColumnId } from '../types';
 import { Board } from '../components/Board/Board';
 import { Card } from '../components/Card/Card';
 import { AddCard } from '../components/AddCard/AddCard';
@@ -16,14 +16,10 @@ interface KanbanPageProps {
   onAddCard: (title: string, description: string, columnId: ColumnId) => void;
   onRemoveCard: (cardId: string) => void;
   onUpdateCard: (card: CardType) => void;
-  getExecutionStatus: (cardId: string) => ExecutionStatus | undefined;
-  getWorkflowStatus: (cardId: string) => WorkflowStatus | undefined;
-  onRunWorkflow: (card: CardType) => void;
   isArchivedCollapsed: boolean;
   onToggleArchivedCollapse: () => void;
   isCanceladoCollapsed: boolean;
   onToggleCanceladoCollapse: () => void;
-  fetchLogsHistory?: (cardId: string) => Promise<{ cardId: string; history: any[] } | null>;
   loadingExpertsCardId?: string | null;
   currentProjectId: string | null;
   onProjectIdSwitch: (projectId: string) => void;
@@ -40,14 +36,10 @@ const KanbanPage = ({
   onAddCard,
   onRemoveCard,
   onUpdateCard,
-  getExecutionStatus,
-  getWorkflowStatus,
-  onRunWorkflow,
   isArchivedCollapsed,
   onToggleArchivedCollapse,
   isCanceladoCollapsed,
   onToggleCanceladoCollapse,
-  fetchLogsHistory,
   loadingExpertsCardId,
   currentProjectId,
   onProjectIdSwitch: _onProjectIdSwitch,
@@ -80,14 +72,10 @@ const KanbanPage = ({
             onAddCard={onAddCard}
             onRemoveCard={onRemoveCard}
             onUpdateCard={onUpdateCard}
-            getExecutionStatus={getExecutionStatus}
-            getWorkflowStatus={getWorkflowStatus}
-            onRunWorkflow={onRunWorkflow}
             isArchivedCollapsed={isArchivedCollapsed}
             onToggleArchivedCollapse={onToggleArchivedCollapse}
             isCanceladoCollapsed={isCanceladoCollapsed}
             onToggleCanceladoCollapse={onToggleCanceladoCollapse}
-            fetchLogsHistory={fetchLogsHistory}
             loadingExpertsCardId={loadingExpertsCardId}
           />
           <DragOverlay>

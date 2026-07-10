@@ -1,4 +1,4 @@
-import { Card as CardType, Column as ColumnType, ColumnId, ExecutionStatus, WorkflowStatus, ExecutionHistory } from '../../types';
+import { Card as CardType, Column as ColumnType, ColumnId } from '../../types';
 import { Column } from '../Column/Column';
 import styles from './Board.module.css';
 import { useRef, useEffect } from 'react';
@@ -9,18 +9,14 @@ interface BoardProps {
   onAddCard: (title: string, description: string, columnId: ColumnId) => void;
   onRemoveCard: (cardId: string) => void;
   onUpdateCard?: (card: CardType) => void;
-  getExecutionStatus?: (cardId: string) => ExecutionStatus | undefined;
-  getWorkflowStatus?: (cardId: string) => WorkflowStatus | undefined;
-  onRunWorkflow?: (card: CardType) => void;
   isArchivedCollapsed?: boolean;
   onToggleArchivedCollapse?: () => void;
   isCanceladoCollapsed?: boolean;
   onToggleCanceladoCollapse?: () => void;
-  fetchLogsHistory?: (cardId: string) => Promise<{ cardId: string; history: ExecutionHistory[] } | null>;
   loadingExpertsCardId?: string | null;
 }
 
-export function Board({ columns, cards, onAddCard, onRemoveCard, onUpdateCard, getExecutionStatus, getWorkflowStatus, onRunWorkflow, fetchLogsHistory, loadingExpertsCardId }: BoardProps) {
+export function Board({ columns, cards, onAddCard, onRemoveCard, onUpdateCard, loadingExpertsCardId }: BoardProps) {
   const boardRef = useRef<HTMLDivElement | null>(null);
   const footerRef = useRef<HTMLDivElement | null>(null);
 
@@ -79,10 +75,6 @@ export function Board({ columns, cards, onAddCard, onRemoveCard, onUpdateCard, g
             onAddCard={onAddCard}
             onRemoveCard={onRemoveCard}
             onUpdateCard={onUpdateCard}
-            getExecutionStatus={getExecutionStatus}
-            getWorkflowStatus={getWorkflowStatus}
-            onRunWorkflow={onRunWorkflow}
-            fetchLogsHistory={fetchLogsHistory}
             loadingExpertsCardId={loadingExpertsCardId}
           />
         ))}

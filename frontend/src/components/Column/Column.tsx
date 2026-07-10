@@ -1,5 +1,5 @@
 import { useDroppable } from '@dnd-kit/core';
-import { Card as CardType, Column as ColumnType, ColumnId, ExecutionStatus, WorkflowStatus, ExecutionHistory } from '../../types';
+import { Card as CardType, Column as ColumnType, ColumnId } from '../../types';
 import { Card } from '../Card/Card';
 import styles from './Column.module.css';
 
@@ -9,16 +9,12 @@ interface ColumnProps {
   onAddCard: (title: string, description: string, columnId: ColumnId) => void;
   onRemoveCard: (cardId: string) => void;
   onUpdateCard?: (card: CardType) => void;
-  getExecutionStatus?: (cardId: string) => ExecutionStatus | undefined;
-  getWorkflowStatus?: (cardId: string) => WorkflowStatus | undefined;
-  onRunWorkflow?: (card: CardType) => void;
   isCollapsed?: boolean;
   onToggleCollapse?: () => void;
-  fetchLogsHistory?: (cardId: string) => Promise<{ cardId: string; history: ExecutionHistory[] } | null>;
   loadingExpertsCardId?: string | null;
 }
 
-export function Column({ column, cards, onRemoveCard, onUpdateCard, getExecutionStatus, getWorkflowStatus, onRunWorkflow, isCollapsed, onToggleCollapse, fetchLogsHistory, loadingExpertsCardId }: ColumnProps) {
+export function Column({ column, cards, onRemoveCard, onUpdateCard, isCollapsed, onToggleCollapse, loadingExpertsCardId }: ColumnProps) {
   const { setNodeRef, isOver } = useDroppable({
     id: column.id,
   });
@@ -58,10 +54,6 @@ export function Column({ column, cards, onRemoveCard, onUpdateCard, getExecution
               card={card}
               onRemove={() => onRemoveCard(card.id)}
               onUpdateCard={onUpdateCard}
-              executionStatus={getExecutionStatus?.(card.id)}
-              workflowStatus={getWorkflowStatus?.(card.id)}
-              onRunWorkflow={onRunWorkflow}
-              fetchLogsHistory={fetchLogsHistory}
               isLoadingExperts={loadingExpertsCardId === card.id}
             />
           ))}
