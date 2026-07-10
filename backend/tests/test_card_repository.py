@@ -294,3 +294,14 @@ class TestCardRepository:
         # Updated fields should change
         assert updated_card.title == "[FIX] Updated Title"
         assert updated_card.description == "Updated description"
+
+
+@pytest.mark.asyncio
+async def test_get_workflow_for_card_com_fallback_dev(async_session):
+    """Sem workflow row, devolve colunas+transitions do seed dev (fallback)."""
+    from src.services.workflow_seed import DEV_COLUMNS, DEV_TRANSITIONS
+    repo = CardRepository(async_session)
+    card = await repo.create(CardCreate(title="T"), project_id=None)
+    columns, transitions = await repo._get_workflow_for_card(card)
+    assert columns == DEV_COLUMNS
+    assert transitions == DEV_TRANSITIONS

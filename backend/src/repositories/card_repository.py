@@ -111,11 +111,11 @@ class CardRepository:
         await self.session.flush()
         return True
 
-    async def _get_transitions_for_card(self, card) -> dict[str, list[str]]:
-        """Transições do workflow do projeto do card (fallback: workflow dev)."""
+    async def _resolve_workflow_row(self, card):
+        """Row do Workflow do projeto do card (None se nao existir no DB)."""
         from ..models.project_registry import Project
         from ..models.workflow import Workflow
-        from ..services.workflow_seed import DEV_WORKFLOW_ID, DEV_TRANSITIONS
+        from ..services.workflow_seed import DEV_WORKFLOW_ID
         workflow_id = DEV_WORKFLOW_ID
         if card.project_id:
             proj = (await self.session.execute(
@@ -123,10 +123,23 @@ class CardRepository:
             )).scalar_one_or_none()
             if proj and proj.workflow_id:
                 workflow_id = proj.workflow_id
-        wf = (await self.session.execute(
+        return (await self.session.execute(
             select(Workflow).where(Workflow.id == workflow_id)
         )).scalar_one_or_none()
+
+    async def _get_transitions_for_card(self, card) -> dict[str, list[str]]:
+        """Transições do workflow do projeto do card (fallback: workflow dev)."""
+        from ..services.workflow_seed import DEV_TRANSITIONS
+        wf = await self._resolve_workflow_row(card)
         return wf.transitions if wf else DEV_TRANSITIONS
+
+    async def _get_workflow_for_card(self, card) -> tuple[list, dict]:
+        """Colunas+transições do workflow do projeto do card (fallback: seed dev)."""
+        from ..services.workflow_seed import DEV_COLUMNS, DEV_TRANSITIONS
+        workflow = await self._resolve_workflow_row(card)
+        if workflow is None:
+            return DEV_COLUMNS, DEV_TRANSITIONS
+        return workflow.columns or DEV_COLUMNS, workflow.transitions or DEV_TRANSITIONS
 
     async def move(self, card_id: str, new_column_id: ColumnId) -> tuple[Optional[Card], Optional[str]]:
         """
