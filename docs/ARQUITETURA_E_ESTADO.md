@@ -112,6 +112,30 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - Specs/planos: `docs/superpowers/specs/2026-07-07-projeto-escopo-do-app-*.md` + `plans/2026-07-07-projeto-escopo-app-feature.md`
   e `plans/2026-07-07-remocao-subsistema-legado.md`.
 
+### Onda "Agora" da revisão estratégica (A1–A6) — feito 2026-07-09
+- **Robustez (A1):** try/except de topo em `run_pipeline` (erro interno → pausa, com traceback logado e
+  rollback no último recurso) + done-callback nas tasks de background; `startup_recovery.recover_orphan_executions`
+  no boot pausa Executions RUNNING órfãs de restart (guard: nunca derruba o boot).
+- **Falha-fechada (A2):** review sem JSON parseável re-pede 1x e pausa (nunca aprova —
+  `parse_review_findings_strict`; a tolerante delega para ela); estágio com turno vazio pausa; snippet
+  anti-parada-prematura apendado ao system prompt de todo estágio (`stage_runner.AUTONOMY_SNIPPET`, válvula de
+  escalação ancorada ao contrato do estágio); `build_stage_options` é o ponto único de options (plug futuro de
+  perfis por modelo — onda N1).
+- **Pausa visível (A3):** coluna `paused` é a **primeira** do board (seed do workflow virou **upsert** —
+  config-as-code); toast global de pausa (escopado ao projeto atual) + contador "aguardando você" no TopNav
+  (WS `card_moved`; `CardResponse` agora expõe `projectId`).
+- **Telemetria (A5):** `Execution` ganha tokens/`model_used` (do `ResultMessage.usage`) + `fix_iterations`;
+  expostos em `GET .../execution`; LogsModal mostra custo real do run; `costStats` do card prefere o
+  `execution_cost` real do SDK ao derivado por tokens.
+- **Chat (A6):** contexto Kanban dirigido pelo workflow config (inclui paused/validate_ci/ready_to_merge, com
+  `[id8]` do card), atividades escopadas por projeto, bloco "Projeto atual" no system prompt (projectId
+  obrigatório na criação de cards, worktrees em `.worktrees/card-<id8>/`, curls de histórico e resolução de id).
+- **Contexto (A4):** `Card.requested_by` + `Project.objective` (light migrations); header do prompt dos
+  estágios com projeto/objetivo/solicitante/`rules_file` do projeto (hardcode "AGENTS.md" removido do prompt);
+  contrato dos `.md` do DevKit (planner/implementer/reviewer) alinhado ao que o backend envia; campo
+  "Objetivo" no modal de novo projeto.
+- Spec de origem: `specs/2026-07-09-revisao-estrategica-plataforma.md` · Plano: `plans/2026-07-09-onda-agora-melhorias.md`.
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
