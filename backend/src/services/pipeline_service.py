@@ -195,6 +195,12 @@ async def run_pipeline(
         log = _LogSink(s, exec_id, card_id)
         gm = GitWorkspaceManager(project.path)
         base_branch = project.base_branch or "main"
+        stage_context = {
+            "project_name": project.name,
+            "objective": getattr(project, "objective", None),
+            "rules_file": project.rules_file or "AGENTS.md",
+            "requested_by": getattr(card, "requested_by", None),
+        }
         total_cost = 0.0
         iteration = 0
         plan_text: Optional[str] = None
@@ -303,7 +309,7 @@ async def run_pipeline(
                     continue
                 await log.event(f"── estagio: {col} ──")
 
-                extra: dict = {}
+                extra: dict = {"context": stage_context}
                 if col == "review":
                     extra["diff"] = await gm.diff_against_base(worktree, base_branch)
                 elif col == "implement" and plan_text:
@@ -407,7 +413,8 @@ async def run_pipeline(
                         await _broadcast_moved(card, prev, "implement")
                         await log.event(f"── fix-loop #{iteration}: implement ──")
                         fix_prompt = build_stage_prompt(
-                            "implement", card.title, card.description or "", worktree, {"findings": f},
+                            "implement", card.title, card.description or "", worktree,
+                            {"findings": f, "context": stage_context},
                         )
                         fix_res = await stage_fn("implement", worktree, fix_prompt, card_id=card_id, on_log=log,
                                                  model=stage_model_for_column("implement", card))

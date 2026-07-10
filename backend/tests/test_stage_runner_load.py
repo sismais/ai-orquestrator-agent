@@ -36,6 +36,24 @@ def test_build_prompt_implement_fix_lists_findings():
     assert "bug X" in p and "commit" in p.lower()
 
 
+def test_prompt_inclui_contexto_do_projeto():
+    from src.services.stage_runner import build_stage_prompt
+    ctx = {"project_name": "GMS Web", "objective": "ERP para gestao de oficinas",
+           "rules_file": "REGRAS.md", "requested_by": "PO Maria"}
+    p = build_stage_prompt("implement", "Titulo", "Desc", "/wt", {"context": ctx})
+    assert "GMS Web" in p
+    assert "ERP para gestao de oficinas" in p
+    assert "REGRAS.md" in p
+    assert "AGENTS.md" not in p          # hardcode removido: usa o rules_file do projeto
+    assert "PO Maria" in p
+
+
+def test_prompt_sem_contexto_usa_default_agents_md():
+    from src.services.stage_runner import build_stage_prompt
+    p = build_stage_prompt("implement", "Titulo", "Desc", "/wt", {})
+    assert "AGENTS.md" in p
+
+
 def test_build_stage_options_inclui_snippet_de_autonomia():
     from src.services.stage_runner import build_stage_options
     opts = build_stage_options("implement", "/tmp/wt", "opus-4.8")

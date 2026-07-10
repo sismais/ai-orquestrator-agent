@@ -267,6 +267,34 @@ async def test_tokens_modelos_e_iteracoes_persistidos(maker):
     assert "opus-4.8" in (ex.model_used or "")
 
 
+async def test_prompt_do_estagio_recebe_contexto_do_projeto(maker):
+    """A4: objetivo do projeto e solicitante chegam ao prompt de todos os estagios."""
+    async with maker() as s:
+        from sqlalchemy import select as _sel
+        p = (await s.execute(_sel(Project).where(Project.id == "p1"))).scalar_one_or_none()
+        if p is None:
+            s.add(Project(id="p1", name="proj", path="/tmp/proj", workflow_id="dev",
+                          base_branch="main", objective="ERP de gestao"))
+        else:
+            p.objective = "ERP de gestao"
+        repo = CardRepository(s)
+        card = await repo.create(CardCreate(title="Tarefa X", requestedBy="CEO"), project_id="p1")
+        await s.commit()
+        card_id = card.id
+
+    seen: dict[str, list] = {}
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        seen.setdefault(stage_key, []).append(prompt)
+        text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text)
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    for stage in ("plan", "implement", "review"):
+        assert "ERP de gestao" in seen[stage][0], stage
+        assert "CEO" in seen[stage][0], stage
+
+
 async def test_excecao_inesperada_pausa_o_card(maker):
     """Excecao fora do stage_fn nao pode deixar a Execution RUNNING orfa (A1)."""
     card_id = await _make_project_card(maker)

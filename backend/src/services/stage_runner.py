@@ -92,7 +92,19 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
     """Monta o prompt do usuario para o estagio (o role vem do system prompt)."""
     extra = extra or {}
     task = f"{title}. {description}".strip().rstrip(".")
-    header = f"Voce trabalha no repositorio em `{worktree}` (worktree isolada do card)."
+    ctx = extra.get("context") or {}
+    rules_file = ctx.get("rules_file") or "AGENTS.md"
+    ctx_lines = [f"Voce trabalha no repositorio em `{worktree}` (worktree isolada do card)."]
+    if ctx.get("project_name"):
+        ctx_lines.append(f"Projeto: {ctx['project_name']}.")
+    if ctx.get("objective"):
+        ctx_lines.append(f"Objetivo do projeto: {ctx['objective']}")
+    if ctx.get("requested_by"):
+        ctx_lines.append(
+            f"Solicitante do card: {ctx['requested_by']} — calibre profundidade e comunicacao para esse perfil."
+        )
+    ctx_lines.append(f"Regras do projeto: siga o `{rules_file}` se existir na worktree.")
+    header = "\n".join(ctx_lines)
     answer = extra.get("human_answer")
     answer_block = (
         f"\n\nO humano respondeu a uma pausa anterior — considere isto acima de tudo:\n\"{answer}\"\n"
@@ -123,7 +135,7 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
         return (
             f"{header}\n\nTarefa: {task}{answer_block}{plan_block}\n\n"
             "Implemente editando o codigo e criando/atualizando testes quando fizer sentido. "
-            "Siga o AGENTS.md do projeto se existir. NAO faca commit. "
+            "NAO faca commit. "
             "Ao terminar, reporte os arquivos mudados e `status: done` (ou `needs_human` com o motivo)."
         )
 
