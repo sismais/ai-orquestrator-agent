@@ -84,6 +84,25 @@ async def answer_card(project_id: str, card_id: str, body: AnswerRequest,
 
     # comentario do humano no thread do card
     await ActivityRepository(db).add_comment(card_id, "human", message)
+    # memoria de decisoes (N3): pareia a resposta humana com a ultima pergunta do agente
+    try:
+        from ..models.activity_log import ActivityLog, ActivityType
+        from ..repositories.decision_repository import DecisionRepository
+        last_q = (await db.execute(
+            select(ActivityLog).where(
+                ActivityLog.card_id == card_id,
+                ActivityLog.activity_type == ActivityType.COMMENTED,
+                ActivityLog.user_id == "agent",
+            ).order_by(ActivityLog.timestamp.desc())
+        )).scalars().first()
+        await DecisionRepository(db).add(
+            project_id=project_id, card_id=card_id,
+            question=(last_q.description if last_q else "(pergunta nao registrada)")[:2000],
+            decision=message[:2000], source="human", stage=last.workflow_stage,
+        )
+        await db.commit()
+    except Exception:  # noqa: BLE001 — memoria e best-effort, nunca bloqueia a retomada
+        pass
     resume_stage = _resume_stage_from(last.workflow_stage)
     execution_id = await create_execution(db, card_id, card.title)
 
