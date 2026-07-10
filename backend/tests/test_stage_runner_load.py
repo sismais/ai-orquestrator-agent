@@ -68,3 +68,13 @@ def test_build_stage_options_sem_model_usa_default_do_cli():
     from src.services.stage_runner import build_stage_options
     opts = build_stage_options("plan", "/tmp/wt", None)
     assert getattr(opts, "model", None) is None
+
+
+def test_build_stage_options_apende_prompt_do_perfil(monkeypatch):
+    from src.config.model_ids import ModelProfile
+    from src.config import model_ids
+    from src.services.stage_runner import build_stage_options
+    monkeypatch.setitem(model_ids.MODEL_PROFILES, "teste-x",
+                        ModelProfile("claude-teste", prompt_append="\nSNIPPET-DO-PERFIL"))
+    opts = build_stage_options("plan", "/wt", "teste-x")
+    assert "SNIPPET-DO-PERFIL" in opts.system_prompt["append"]

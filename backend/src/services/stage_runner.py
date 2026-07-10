@@ -21,7 +21,7 @@ from claude_agent_sdk import (
 
 from . import session_registry as sessions
 from .runner_service import DEVKIT_CLAUDE
-from ..config.model_ids import resolve_model_id
+from ..config.model_ids import get_profile, resolve_model_id
 
 DEVKIT_AGENTS = DEVKIT_CLAUDE / "agents"
 
@@ -48,17 +48,19 @@ AUTONOMY_SNIPPET = (
 
 
 def build_stage_options(stage_key: str, worktree: str, model: "str | None") -> ClaudeAgentOptions:
-    """Ponto unico de montagem das options do estagio (futuro plug de perfis por modelo)."""
+    """Ponto unico de montagem das options do estagio (perfis por modelo — N1)."""
     body, tools = load_stage_agent(stage_key)
+    profile = get_profile(model) if model else None
+    append = body + AUTONOMY_SNIPPET + (profile.prompt_append if profile else "")
     options_kwargs = dict(
         cwd=worktree,
         setting_sources=["project"],
-        system_prompt={"type": "preset", "preset": "claude_code", "append": body + AUTONOMY_SNIPPET},
+        system_prompt={"type": "preset", "preset": "claude_code", "append": append},
         allowed_tools=tools,
         permission_mode="acceptEdits",
     )
     if model:
-        options_kwargs["model"] = resolve_model_id(model)
+        options_kwargs["model"] = profile.model_id
     return ClaudeAgentOptions(**options_kwargs)
 
 
@@ -181,21 +183,51 @@ class StageResult:
     error: Optional[str] = None
     interrupted: bool = False
     usage: Optional[dict] = None
+    used_model: Optional[str] = None
 
 
-async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optional[str] = None,
-                    on_log=None, model: Optional[str] = None) -> StageResult:
-    """Roda um estagio numa sessao streaming (ClaudeSDKClient) — interrompivel (Stop) via registry.
+# Status HTTP que valem 1 retry no mesmo modelo (rate limit / erro de servidor).
+_TRANSIENT_HTTP = {408, 429, 500, 502, 503, 504, 529}
 
-    Registra a sessao em `session_registry[card_id]` enquanto roda, para a camada HTTP conseguir
-    `interrupt()`/`say()`. on_log(str) opcional (sync ou async). `model` (alias de UI, ex.: "opus-4.8")
-    e opcional — quando ausente, mantem o comportamento atual (sem `model=` no SDK, usa default do CLI).
+
+def _classify_result(result_msg, last_assistant_stop_reason: "str | None") -> str:
+    """Classifica o fim do turno: 'ok' | 'refusal' | 'transient' | 'error'.
+
+    Campos do claude-agent-sdk 0.2.110: ResultMessage.stop_reason/is_error/subtype/
+    api_error_status; AssistantMessage.stop_reason (a recusa pode aparecer em qualquer um).
+    Turno sem ResultMessage = stream truncado -> 'error'.
     """
-    options = build_stage_options(stage_key, worktree, model)
+    if getattr(result_msg, "stop_reason", None) == "refusal" or last_assistant_stop_reason == "refusal":
+        return "refusal"
+    if result_msg is None:
+        return "error"
+    if getattr(result_msg, "is_error", False):
+        status = getattr(result_msg, "api_error_status", None)
+        if status in _TRANSIENT_HTTP:
+            return "transient"
+        return "error"
+    return "ok"
 
+
+@dataclass
+class _AttemptOutcome:
+    classification: str            # ok | refusal | transient | error
+    text: str = ""
+    cost_usd: Optional[float] = None
+    usage: Optional[dict] = None
+    interrupted: bool = False
+    error: Optional[str] = None
+
+
+async def _run_single_attempt(stage_key: str, worktree: str, prompt: str,
+                              card_id: "str | None", on_log, model_alias: "str | None") -> _AttemptOutcome:
+    """UMA sessao SDK: conecta, roda o turno, classifica o fim. Sem politica de retry aqui."""
+    options = build_stage_options(stage_key, worktree, model_alias)
     texts: list[str] = []
     cost = None
     usage = None
+    result_msg = None
+    last_stop = None
     client = ClaudeSDKClient(options)
     try:
         await client.connect()
@@ -204,6 +236,7 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optiona
         await client.query(prompt)
         async for message in client.receive_response():
             if isinstance(message, AssistantMessage):
+                last_stop = getattr(message, "stop_reason", None) or last_stop
                 for block in message.content:
                     if isinstance(block, TextBlock) and block.text:
                         texts.append(block.text)
@@ -212,13 +245,15 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optiona
                             if inspect.isawaitable(r):
                                 await r
             elif isinstance(message, ResultMessage):
+                result_msg = message
                 cost = getattr(message, "total_cost_usd", None)
                 usage = getattr(message, "usage", None) or None
     except Exception as e:  # noqa: BLE001
         interrupted = bool(card_id and sessions.was_interrupted(card_id))
-        return StageResult(
-            ok=interrupted, text="\n".join(texts), cost_usd=cost,
-            error=None if interrupted else str(e), interrupted=interrupted, usage=usage,
+        return _AttemptOutcome(
+            classification="ok" if interrupted else "error",
+            text="\n".join(texts), cost_usd=cost, usage=usage,
+            interrupted=interrupted, error=None if interrupted else str(e),
         )
     finally:
         if card_id:
@@ -231,4 +266,73 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optiona
     interrupted = bool(card_id and sessions.was_interrupted(card_id))
     if card_id:
         sessions.clear_interrupt(card_id)
-    return StageResult(ok=True, text="\n".join(texts), cost_usd=cost, interrupted=interrupted, usage=usage)
+    classification = _classify_result(result_msg, last_stop)
+    error = None
+    if classification != "ok" and result_msg is not None:
+        detail = getattr(result_msg, "errors", None) or getattr(result_msg, "result", None)
+        error = f"{getattr(result_msg, 'subtype', '?')} | {detail}" if detail else getattr(result_msg, "subtype", "erro")
+    return _AttemptOutcome(
+        classification=classification, text="\n".join(texts), cost_usd=cost,
+        usage=usage, interrupted=interrupted, error=error,
+    )
+
+
+async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optional[str] = None,
+                    on_log=None, model: Optional[str] = None) -> StageResult:
+    """Roda um estagio com resiliencia (N1): recusa -> 1 retry no modelo de fallback do
+    perfil; erro transiente (HTTP 429/5xx) -> 1 retry no mesmo modelo; interrupcao nunca
+    re-tenta. Custo/usage somados entre tentativas; `used_model` = alias que produziu o
+    resultado final. Assinatura estavel (contrato stage_fn do pipeline/validate_ci).
+    """
+    total_cost = 0.0
+    total_usage: dict = {}
+
+    def _merge(outcome: _AttemptOutcome) -> None:
+        nonlocal total_cost
+        if outcome.cost_usd:
+            total_cost += float(outcome.cost_usd)
+        if isinstance(outcome.usage, dict):
+            for k, v in outcome.usage.items():
+                if isinstance(v, (int, float)):
+                    total_usage[k] = total_usage.get(k, 0) + v
+
+    async def _note(msg: str) -> None:
+        if on_log:
+            r = on_log(msg)
+            if inspect.isawaitable(r):
+                await r
+
+    alias = model
+    transient_retried = False
+    fallback_used = False
+    for _ in range(3):  # teto duro: 1 tentativa + 1 retry transiente + 1 fallback
+        outcome = await _run_single_attempt(stage_key, worktree, prompt, card_id, on_log, alias)
+        _merge(outcome)
+        if outcome.interrupted:
+            return StageResult(ok=True, text=outcome.text, cost_usd=total_cost or None,
+                               interrupted=True, usage=total_usage or None, used_model=alias)
+        if outcome.classification == "ok":
+            return StageResult(ok=True, text=outcome.text, cost_usd=total_cost or None,
+                               usage=total_usage or None, used_model=alias)
+        if outcome.classification == "transient" and not transient_retried:
+            transient_retried = True
+            await _note(f"\n[orquestrador] erro transiente da API ({outcome.error}) — re-tentando...\n")
+            continue
+        if outcome.classification == "refusal" and not fallback_used:
+            fallback = get_profile(alias).fallback_alias if alias else None
+            if fallback:
+                fallback_used = True
+                await _note(f"\n[orquestrador] recusa do modelo `{alias}` — re-tentando com `{fallback}` (perfil de fallback)\n")
+                alias = fallback
+                continue
+            return StageResult(ok=False, text=outcome.text, cost_usd=total_cost or None,
+                               error=f"recusa do modelo `{alias}` (sem fallback no perfil)",
+                               usage=total_usage or None, used_model=alias)
+        # refusal com fallback ja usado, transient repetido, ou error definitivo
+        err = outcome.error or outcome.classification
+        if outcome.classification == "refusal":
+            err = f"recusa persistente (modelos: {model} -> {alias})"
+        return StageResult(ok=False, text=outcome.text, cost_usd=total_cost or None,
+                           error=err, usage=total_usage or None, used_model=alias)
+    return StageResult(ok=False, error="teto de tentativas do estagio excedido",
+                       cost_usd=total_cost or None, usage=total_usage or None, used_model=alias)
