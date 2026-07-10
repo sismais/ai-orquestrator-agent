@@ -57,3 +57,15 @@ async def test_running_orfa_vira_paused_e_card_pausa(maker):
 async def test_sem_orfas_nao_faz_nada(maker):
     count = await recover_orphan_executions(session_maker=maker)
     assert count == 0
+
+
+async def test_card_ja_pausado_nao_move_mas_pausa_execution(maker):
+    card_id = await _card_running_em(maker, "paused")
+    count = await recover_orphan_executions(session_maker=maker)
+    assert count == 1
+    async with maker() as s:
+        ex = (await s.execute(select(Execution).where(Execution.card_id == card_id))).scalars().first()
+        assert ex.status == ExecutionStatus.PAUSED
+        assert ex.is_active is False
+        card = await CardRepository(s).get_by_id(card_id)
+        assert card.column_id == "paused"
