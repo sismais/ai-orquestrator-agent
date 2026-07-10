@@ -42,6 +42,9 @@ class Execution(Base):
     # Telemetria de autonomia (A5): iteracoes do fix-loop deste run
     fix_iterations = Column(Integer, nullable=True)
 
+    # Trilha decidida pela triagem (N2): 'leve' | 'padrao' (None = run sem triagem)
+    track = Column(String, nullable=True)
+
     # Relacionamentos
     card = relationship("Card", back_populates="executions")
     logs = relationship("ExecutionLog", back_populates="execution", cascade="all, delete-orphan")

@@ -56,6 +56,17 @@ async def test_seed_atualiza_workflow_existente(maker):
     assert len(wf2.columns) == len(DEV_COLUMNS)
 
 
+async def test_transicao_backlog_implement_existe(maker):
+    """Trilha leve (N2) exige backlog -> implement no config (e o seed upsert propaga)."""
+    from src.services.workflow_seed import DEV_TRANSITIONS
+    assert "implement" in DEV_TRANSITIONS["backlog"]
+    async with maker() as s:
+        await seed_dev_workflow(s)
+    async with maker() as s:
+        wf = (await session_get(s)).scalar_one()
+    assert "implement" in wf.transitions["backlog"]
+
+
 async def test_seed_is_idempotent(maker):
     async with maker() as s:
         await seed_dev_workflow(s)

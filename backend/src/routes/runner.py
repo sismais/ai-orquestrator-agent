@@ -141,6 +141,7 @@ async def get_card_execution(project_id: str, card_id: str, db: AsyncSession = D
             "prUrl": execution.result if (execution.result or "").startswith("http") else None,
             "costUsd": float(execution.execution_cost) if execution.execution_cost else None,
             "fixIterations": execution.fix_iterations,
+            "track": execution.track,
             "modelUsed": execution.model_used,
             "totalTokens": execution.total_tokens,
             "isActive": execution.is_active,

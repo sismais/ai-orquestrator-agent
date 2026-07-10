@@ -259,10 +259,11 @@ async def test_tokens_modelos_e_iteracoes_persistidos(maker):
 
     assert await _card_column(maker, card_id) == "ready_to_merge"
     ex = await _last_execution(maker, card_id)
-    # 5 estagios (plan, implement, review, fix-implement, re-review) x (100 in + 50 out)
-    assert ex.input_tokens == 500
-    assert ex.output_tokens == 250
-    assert ex.total_tokens == 750
+    # 6 chamadas (triage, plan, implement, review, fix-implement, re-review) x (100 in + 50 out)
+    # — N2 adicionou a triagem no inicio de todo run novo partindo do backlog.
+    assert ex.input_tokens == 600
+    assert ex.output_tokens == 300
+    assert ex.total_tokens == 900
     assert ex.fix_iterations == 1
     assert "opus-4.8" in (ex.model_used or "")
 
@@ -308,6 +309,101 @@ async def test_account_prefere_modelo_real_do_fallback(maker):
     ex = await _last_execution(maker, card_id)
     assert "sonnet-5" in (ex.model_used or "")
     assert "opus-4.8" in (ex.model_used or "")
+
+
+async def test_triagem_leve_pula_o_plan(maker):
+    """N2: router diz 'leve' -> pipeline comeca no implement (sem plan) e registra a trilha."""
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({
+        "triage": ['{"trilha": "leve", "porque": "typo de um arquivo"}'],
+        "review": ['{"blocks":[],"fixNow":[],"suggestions":[]}'],
+    })
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+    assert counts.get("triage") == 1
+    assert counts.get("plan") is None            # pulou o plan
+    assert counts.get("implement") == 1
+    ex = await _last_execution(maker, card_id)
+    assert ex.track == "leve"
+
+
+async def test_triagem_padrao_segue_fluxo_completo(maker):
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({
+        "triage": ['{"trilha": "padrao", "porque": "feature com arquitetura"}'],
+        "review": ['{"blocks":[],"fixNow":[],"suggestions":[]}'],
+    })
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert counts.get("plan") == 1
+    ex = await _last_execution(maker, card_id)
+    assert ex.track == "padrao"
+
+
+async def test_triagem_nao_parseavel_cai_em_padrao(maker):
+    """Triagem e advisory: lixo/erro nunca bloqueia — default padrao."""
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({
+        "triage": ["nao sei classificar isso"],
+        "review": ['{"blocks":[],"fixNow":[],"suggestions":[]}'],
+    })
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert counts.get("plan") == 1
+    ex = await _last_execution(maker, card_id)
+    assert ex.track == "padrao"
+
+
+async def test_triagem_com_erro_nao_pausa_cai_em_padrao(maker):
+    card_id = await _make_project_card(maker)
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        if stage_key == "triage":
+            return StageResult(ok=False, error="explodiu na triagem")
+        text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text)
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "ready_to_merge"   # nao pausou
+    ex = await _last_execution(maker, card_id)
+    assert ex.track == "padrao"
+
+
+async def test_triagem_interrompida_pausa(maker):
+    card_id = await _make_project_card(maker)
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        if stage_key == "triage":
+            return StageResult(ok=True, text="", interrupted=True)
+        return StageResult(ok=True, text=f"{stage_key} ok")
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert await _card_column(maker, card_id) == "paused"
+
+
+async def test_retomada_nao_re_tria(maker):
+    """Resume (resume_stage) NUNCA roda triagem de novo."""
+    card_id = await _make_project_card(maker)
+    async with maker() as s:
+        await CardRepository(s).move(card_id, "paused")
+        await s.commit()
+    fake, counts = make_stage_fn({"review": ['{"blocks":[],"fixNow":[]}']})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake,
+                                        resume_stage="implement", human_answer="segue")
+    assert counts.get("triage") is None
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+
+
+async def test_card_fora_do_backlog_nao_tria(maker):
+    """Card posicionado manualmente (override humano) nao passa por triagem."""
+    card_id = await _make_project_card(maker)
+    async with maker() as s:
+        await CardRepository(s).move(card_id, "plan")
+        await s.commit()
+    fake, counts = make_stage_fn({"review": ['{"blocks":[],"fixNow":[]}']})
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert counts.get("triage") is None
+    assert counts.get("plan") == 1
 
 
 async def test_excecao_inesperada_pausa_o_card(maker):

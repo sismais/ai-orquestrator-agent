@@ -30,7 +30,7 @@ DEV_COLUMNS = [
 
 # Caminho feliz + fix-loop (review->implement) + pausa a partir de qualquer etapa ativa.
 DEV_TRANSITIONS = {
-    "backlog": ["plan", "paused"],
+    "backlog": ["plan", "implement", "paused"],
     "plan": ["implement", "paused"],
     "implement": ["review", "paused"],
     "review": ["validate_ci", "implement", "paused"],

@@ -29,6 +29,7 @@ from ..services.findings import (
     detect_needs_human,
     parse_pending_questions,
     parse_review_findings_strict,
+    parse_track_verdict,
 )
 from ..services.runner_service import prepare_worktree
 from ..services.stage_runner import (
@@ -40,6 +41,7 @@ from ..services.workflow_rules import next_active_column
 
 DEFAULT_MAX_ITERATIONS = 4
 _LOG_FLUSH_CHARS = 800
+TRIAGE_MODEL = "haiku-4.5"  # triagem e barata; recusa cai no fallback do perfil (N1)
 
 # Colunas que o pipeline executa: estagios de agente + validate_ci (git/gh, tratado a parte).
 _AGENT_STAGES = ("plan", "implement", "review")
@@ -278,6 +280,31 @@ async def run_pipeline(
             transitions = await repo._get_transitions_for_card(card)
             pending_answer = human_answer  # injetado apenas na primeira etapa da retomada
             col = resume_stage or _first_stage(transitions, card.column_id)
+
+            # Triagem de complexidade (N2): so em run novo partindo do backlog. Advisory:
+            # erro/lixo -> padrao (nunca bloqueia); so interrupcao do usuario pausa.
+            if resume_stage is None and card.column_id == "backlog":
+                await log.event("── triagem: classificando a complexidade ──")
+                triage_prompt = build_stage_prompt(
+                    "triage", card.title, card.description or "", worktree, {"context": stage_context},
+                )
+                tri = await stage_fn("triage", worktree, triage_prompt, card_id=card_id, on_log=log,
+                                     model=TRIAGE_MODEL)
+                await log.flush()
+                await account(tri, TRIAGE_MODEL)
+                if tri.interrupted:
+                    await finish_pause(
+                        "interrompido pelo usuario", "O usuario parou a execucao durante a triagem.",
+                        question="Você interrompeu o agente. O que devo ajustar ou fazer diferente?",
+                    )
+                    return
+                verdict = parse_track_verdict(tri.text if tri.ok else "")
+                track = verdict["trilha"]
+                execution.track = track
+                await s.commit()
+                await log.event(f"── trilha: {track} — {verdict['porque'] or 'default conservador'} ──")
+                if track == "leve":
+                    col = "implement"
 
             # 2) laco de estagios
             while col and _pipeline_handles(col):

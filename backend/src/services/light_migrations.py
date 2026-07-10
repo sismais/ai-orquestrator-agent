@@ -13,6 +13,7 @@ _COLUMNS = [
     ("executions", "fix_iterations", "INTEGER"),
     ("cards", "requested_by", "VARCHAR(120)"),
     ("projects", "objective", "TEXT"),
+    ("executions", "track", "VARCHAR(10)"),
 ]
 
 
