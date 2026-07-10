@@ -77,6 +77,11 @@ async def lifespan(app: FastAPI):
         await seed_dev_workflow(_s)
     print("[Server] Dev workflow seeded")
 
+    from .services.startup_recovery import recover_orphan_executions
+    recovered = await recover_orphan_executions()
+    if recovered:
+        print(f"[Server] {recovered} execucao(oes) orfa(s) de restart pausada(s)")
+
     yield
 
     # Shutdown
