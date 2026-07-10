@@ -27,6 +27,7 @@ export function PipelineControls({ card }: Props) {
   const [completedAt, setCompletedAt] = useState<string | undefined>();
   const [wsCardId, setWsCardId] = useState<string | null>(null);
   const [prUrl, setPrUrl] = useState<string | null>(null);
+  const [runMeta, setRunMeta] = useState<{ costUsd?: number | null; totalTokens?: number | null } | null>(null);
 
   const onLog = useCallback((msg: { logType: string; content: string; timestamp: string }) => {
     const type: ExecutionLog['type'] = msg.logType === 'error'
@@ -69,7 +70,10 @@ export function PipelineControls({ card }: Props) {
     if (card.columnId !== 'ready_to_merge' || !projectId || prUrl) return;
     let alive = true;
     getExecution(projectId, card.id).then(state => {
-      if (alive && state.execution?.prUrl) setPrUrl(state.execution.prUrl);
+      if (alive && state.execution?.prUrl) {
+        setPrUrl(state.execution.prUrl);
+        setRunMeta({ costUsd: state.execution.costUsd, totalTokens: state.execution.totalTokens });
+      }
     }).catch(() => {});
     return () => { alive = false; };
   }, [card.columnId, card.id, projectId, prUrl]);
@@ -111,6 +115,7 @@ export function PipelineControls({ card }: Props) {
           setStatus((state.execution.status as RawStatus) || 'idle');
           setStartedAt(state.execution.startedAt || undefined);
           setCompletedAt(state.execution.completedAt || undefined);
+          setRunMeta({ costUsd: state.execution.costUsd, totalTokens: state.execution.totalTokens });
         }
         setLogs(state.logs);
         if (state.execution?.isActive) setWsCardId(card.id);
@@ -180,6 +185,8 @@ export function PipelineControls({ card }: Props) {
         logs={logs}
         startedAt={startedAt}
         completedAt={completedAt}
+        runCostUsd={runMeta?.costUsd ?? undefined}
+        runTotalTokens={runMeta?.totalTokens ?? undefined}
       />
     </>
   );

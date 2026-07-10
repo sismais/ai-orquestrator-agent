@@ -13,6 +13,9 @@ export interface PipelineExecution {
   workflowError?: string | null;
   prUrl?: string | null;
   costUsd?: number | null;
+  fixIterations?: number | null;
+  modelUsed?: string | null;
+  totalTokens?: number | null;
   isActive?: boolean;
   startedAt?: string | null;
   completedAt?: string | null;
