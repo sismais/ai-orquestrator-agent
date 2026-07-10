@@ -41,8 +41,9 @@ AUTONOMY_SNIPPET = (
     "Voce opera de forma autonoma dentro de um pipeline; o usuario nao acompanha em tempo real. "
     "Antes de encerrar o turno, verifique seu ultimo paragrafo: se for um plano, uma analise, uma "
     "pergunta retorica ou uma promessa de trabalho nao feito, execute esse trabalho AGORA com tool "
-    "calls em vez de encerrar. Encerre somente com o resultado final no formato pedido — ou com "
-    "`needs_human`/`pendingQuestions` quando a decisao for genuinamente humana."
+    "calls em vez de encerrar. Encerre somente com o resultado final no formato pedido — ou, "
+    "quando a decisao for genuinamente humana, com o sinal de escalacao definido nas SUAS "
+    "instrucoes acima (`status: needs_human` ou bloco `pendingQuestions`, conforme o seu estagio)."
 )
 
 
