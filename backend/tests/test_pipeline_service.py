@@ -240,6 +240,33 @@ async def test_review_json_na_segunda_tentativa_aprova(maker):
     assert counts.get("review") == 2
 
 
+async def test_tokens_modelos_e_iteracoes_persistidos(maker):
+    """A5: usage do ResultMessage + modelos por etapa + fix_iterations ficam na Execution."""
+    card_id = await _make_project_card(maker)
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        text = ('{"blocks":[{"titulo":"x"}],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok")
+        # segunda revisao aprova
+        if stage_key == "review" and fake.review_calls > 0:
+            text = '{"blocks":[],"fixNow":[]}'
+        if stage_key == "review":
+            fake.review_calls += 1
+        return StageResult(ok=True, text=text, cost_usd=0.01,
+                           usage={"input_tokens": 100, "output_tokens": 50})
+    fake.review_calls = 0
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+    ex = await _last_execution(maker, card_id)
+    # 5 estagios (plan, implement, review, fix-implement, re-review) x (100 in + 50 out)
+    assert ex.input_tokens == 500
+    assert ex.output_tokens == 250
+    assert ex.total_tokens == 750
+    assert ex.fix_iterations == 1
+    assert "opus-4.8" in (ex.model_used or "")
+
+
 async def test_excecao_inesperada_pausa_o_card(maker):
     """Excecao fora do stage_fn nao pode deixar a Execution RUNNING orfa (A1)."""
     card_id = await _make_project_card(maker)

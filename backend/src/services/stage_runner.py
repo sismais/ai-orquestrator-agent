@@ -168,6 +168,7 @@ class StageResult:
     cost_usd: Optional[float] = None
     error: Optional[str] = None
     interrupted: bool = False
+    usage: Optional[dict] = None
 
 
 async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optional[str] = None,
@@ -182,6 +183,7 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optiona
 
     texts: list[str] = []
     cost = None
+    usage = None
     client = ClaudeSDKClient(options)
     try:
         await client.connect()
@@ -199,11 +201,12 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optiona
                                 await r
             elif isinstance(message, ResultMessage):
                 cost = getattr(message, "total_cost_usd", None)
+                usage = getattr(message, "usage", None) or None
     except Exception as e:  # noqa: BLE001
         interrupted = bool(card_id and sessions.was_interrupted(card_id))
         return StageResult(
             ok=interrupted, text="\n".join(texts), cost_usd=cost,
-            error=None if interrupted else str(e), interrupted=interrupted,
+            error=None if interrupted else str(e), interrupted=interrupted, usage=usage,
         )
     finally:
         if card_id:
@@ -216,4 +219,4 @@ async def run_stage(stage_key: str, worktree: str, prompt: str, card_id: Optiona
     interrupted = bool(card_id and sessions.was_interrupted(card_id))
     if card_id:
         sessions.clear_interrupt(card_id)
-    return StageResult(ok=True, text="\n".join(texts), cost_usd=cost, interrupted=interrupted)
+    return StageResult(ok=True, text="\n".join(texts), cost_usd=cost, interrupted=interrupted, usage=usage)

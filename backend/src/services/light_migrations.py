@@ -10,6 +10,7 @@ from sqlalchemy.ext.asyncio import AsyncEngine
 # (tabela, coluna, definicao SQL) a garantir
 _COLUMNS = [
     ("cards", "project_id", "VARCHAR(36)"),
+    ("executions", "fix_iterations", "INTEGER"),
 ]
 
 
@@ -18,6 +19,8 @@ async def run_light_migrations(engine: AsyncEngine) -> None:
         for table, column, ddl in _COLUMNS:
             rows = await conn.execute(text(f"PRAGMA table_info({table})"))
             existing = {r[1] for r in rows}  # r[1] = nome da coluna
+            if not existing:
+                continue  # tabela nao existe ainda — o create_all a cria ja com a coluna
             if column not in existing:
                 await conn.execute(text(f"ALTER TABLE {table} ADD COLUMN {column} {ddl}"))
 

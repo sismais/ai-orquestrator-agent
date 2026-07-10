@@ -39,6 +39,9 @@ class Execution(Base):
     # Campo para custo da execução
     execution_cost = Column(Numeric(10, 6), nullable=True)  # Até 10 dígitos, 6 decimais
 
+    # Telemetria de autonomia (A5): iteracoes do fix-loop deste run
+    fix_iterations = Column(Integer, nullable=True)
+
     # Relacionamentos
     card = relationship("Card", back_populates="executions")
     logs = relationship("ExecutionLog", back_populates="execution", cascade="all, delete-orphan")

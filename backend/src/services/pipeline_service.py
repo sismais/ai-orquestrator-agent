@@ -196,11 +196,33 @@ async def run_pipeline(
         gm = GitWorkspaceManager(project.path)
         base_branch = project.base_branch or "main"
         total_cost = 0.0
+        iteration = 0
+        plan_text: Optional[str] = None
+        tokens = {"input": 0, "output": 0}
+        models_used: set[str] = set()
 
-        async def account(res):
+        async def account(res, model_alias: "str | None" = None):
             nonlocal total_cost
-            if res is not None and res.cost_usd:
+            if res is None:
+                return
+            if res.cost_usd:
                 total_cost += float(res.cost_usd)
+            u = getattr(res, "usage", None)
+            if isinstance(u, dict):
+                tokens["input"] += int(u.get("input_tokens") or 0) \
+                    + int(u.get("cache_creation_input_tokens") or 0) \
+                    + int(u.get("cache_read_input_tokens") or 0)
+                tokens["output"] += int(u.get("output_tokens") or 0)
+            if model_alias:
+                models_used.add(model_alias)
+
+        def persist_run_stats() -> None:
+            execution.input_tokens = tokens["input"] or None
+            execution.output_tokens = tokens["output"] or None
+            execution.total_tokens = (tokens["input"] + tokens["output"]) or None
+            execution.model_used = ",".join(sorted(models_used)) or None
+            execution.fix_iterations = iteration
+            execution.execution_cost = total_cost or None
 
         async def finish_pause(reason: str, context: Optional[str], question: Optional[str] = None) -> None:
             await log.event(f"PAUSE: {reason}")
@@ -220,7 +242,7 @@ async def run_pipeline(
             execution.workflow_error = f"{reason} | {context or ''}"[:1900]
             execution.is_active = False
             execution.completed_at = datetime.utcnow()
-            execution.execution_cost = total_cost or None
+            persist_run_stats()
             await s.commit()
             try:
                 await execution_ws_manager.notify_complete(card_id, "paused", "pipeline", error=reason)
@@ -247,8 +269,6 @@ async def run_pipeline(
                 worktree = wt.worktree_path
 
             transitions = await repo._get_transitions_for_card(card)
-            iteration = 0
-            plan_text: Optional[str] = None
             pending_answer = human_answer  # injetado apenas na primeira etapa da retomada
             col = resume_stage or _first_stage(transitions, card.column_id)
 
@@ -295,7 +315,7 @@ async def run_pipeline(
                 res = await stage_fn(col, worktree, prompt, card_id=card_id, on_log=log,
                                      model=stage_model_for_column(col, card))
                 await log.flush()
-                await account(res)
+                await account(res, stage_model_for_column(col, card))
                 if res.interrupted:
                     await finish_pause(
                         "interrompido pelo usuario", "O usuario parou a execucao para corrigir o rumo.",
@@ -346,7 +366,7 @@ async def run_pipeline(
                         res = await stage_fn("review", worktree, retry_prompt, card_id=card_id, on_log=log,
                                              model=stage_model_for_column("review", card))
                         await log.flush()
-                        await account(res)
+                        await account(res, stage_model_for_column("review", card))
                         if res.interrupted:
                             await finish_pause(
                                 "interrompido pelo usuario",
@@ -392,7 +412,7 @@ async def run_pipeline(
                         fix_res = await stage_fn("implement", worktree, fix_prompt, card_id=card_id, on_log=log,
                                                  model=stage_model_for_column("implement", card))
                         await log.flush()
-                        await account(fix_res)
+                        await account(fix_res, stage_model_for_column("implement", card))
                         if fix_res.interrupted:
                             await finish_pause(
                                 "interrompido pelo usuario", "O usuario parou a correcao.",
@@ -428,7 +448,7 @@ async def run_pipeline(
             execution.status = ExecutionStatus.SUCCESS
             execution.is_active = False
             execution.completed_at = datetime.utcnow()
-            execution.execution_cost = total_cost or None
+            persist_run_stats()
             await s.commit()
             try:
                 await execution_ws_manager.notify_complete(card_id, "success", "pipeline")
