@@ -156,6 +156,19 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - Trilha + justificativa nos logs do run; `Execution.track` persistida e exposta em `GET .../execution`.
 - Plano: `plans/2026-07-10-onda-n2-router-complexidade.md`.
 
+### Onda N4 — dispatcher dirigido pelo config — feito 2026-07-10
+- O laço do pipeline despacha pelo **`agentKey`** das colunas do workflow (antes: `_AGENT_STAGES`
+  hardcoded — colunas novas não executavam). `None` = fronteira; `validate-ci` = handler git/gh;
+  `implement`/`review` mantêm semânticas especiais (commit+needs_human; fix-loop); qualquer outro
+  agentKey mapeado roda como **estágio genérico** (pausa em pendingQuestions/needs_human; saída
+  **encadeada** ao implement — generaliza o plan_text). agentKey desconhecido → pausa com motivo.
+- Pausa via **`isPausedState`** do config (`workflow_rules.pause_columns_from`); `CardRepository.
+  _get_workflow_for_card` resolve columns+transitions (fallback dev).
+- Agentes SDD órfãos plugáveis: `specify`/`clarify`/`tasks` em `STAGE_AGENTS` + prompt genérico.
+  Workflow custom com coluna `spec` **executa** (testado); o `dev` seedado não muda de comportamento.
+- Pausa e retomada resolvem a coluna pelo config (fix do review).
+- Plano: `plans/2026-07-10-onda-n4-dispatcher-config.md`.
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
