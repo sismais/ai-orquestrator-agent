@@ -115,6 +115,7 @@ export interface Card {
   // Campo para auto-limpeza
   completedAt?: string; // ISO timestamp quando o card foi movido para Done
   experts?: CardExperts; // Experts identificados para este card
+  projectId?: string; // Projeto dono do card (usado p/ escopar toasts/UI por projeto)
 }
 
 export interface Column {

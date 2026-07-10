@@ -171,6 +171,8 @@ class CardResponse(BaseModel):
     experts: Optional[Dict[str, Dict]] = Field(None, alias="experts")
     # Dependencias para execucao paralela
     dependencies: Optional[List[str]] = Field(default_factory=list)
+    # Projeto dono do card (o broadcast WS é global; o front usa isto p/ escopar UI por projeto)
+    project_id: Optional[str] = Field(None, alias="projectId")
 
     @property
     def is_finalized(self) -> bool:

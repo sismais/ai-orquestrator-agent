@@ -153,12 +153,18 @@ function App() {
     onCardMoved: useCallback(async (message: CardMovedMessage) => {
       console.log(`[App] Card moved via WebSocket: ${message.cardId}`);
 
-      // Avisar quando um card pausa e passa a aguardar resposta do usuário
-      if (message.toColumn === 'paused' && message.fromColumn !== 'paused') {
+      // Avisar quando um card pausa e passa a aguardar resposta do usuário.
+      // O broadcast WS é global — só avisa se o card for do projeto atual (ou sem projeto).
+      const cardProject = message.card?.projectId;
+      if (
+        message.toColumn === 'paused' &&
+        message.fromColumn !== 'paused' &&
+        (!cardProject || cardProject === currentProjectId)
+      ) {
         addToast({
           type: 'info',
           title: '⏸ Aguardando você',
-          message: `"${message.card.title}" pausou e precisa da sua resposta.`,
+          message: `"${message.card?.title ?? 'Card'}" pausou e precisa da sua resposta.`,
         });
       }
 
@@ -172,7 +178,7 @@ function App() {
       if (workflowStatus && workflowStatus.stage !== 'idle') {
         console.log(`[App] Card ${message.cardId} has active workflow, may need recovery`);
       }
-    }, [getWorkflowStatus, addToast]),
+    }, [getWorkflowStatus, addToast, currentProjectId]),
 
     onCardUpdated: useCallback((message: CardUpdatedMessage) => {
       console.log(`[App] Card updated via WebSocket: ${message.cardId}`);

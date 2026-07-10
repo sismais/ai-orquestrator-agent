@@ -11,7 +11,7 @@ export function useToast() {
   const [toasts, setToasts] = useState<Toast[]>([]);
 
   const addToast = useCallback((toast: Omit<Toast, 'id'>) => {
-    const id = Date.now().toString();
+    const id = crypto.randomUUID();
     setToasts(prev => [...prev, { ...toast, id }]);
 
     // Auto-remove apos 5 segundos
