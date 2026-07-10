@@ -180,6 +180,16 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - **Decisões reinjetadas:** bloco "Decisões anteriores" nos prompts de planejamento (plan + genéricos).
 - Plano: `plans/2026-07-10-onda-n3-escalacao-memoria.md`.
 
+### Onda N5 — send_to_user + auditoria de tool calls — feito 2026-07-10
+- **Auditoria total:** as tool calls do agente (Read/Edit/Bash/…) viram logs tipados `tool`
+  (`stage_runner._format_tool_use`) — antes só o texto era registrado; erros de tool também.
+  `_LogSink.__call__` aceita `log_type` e serializa writes com `asyncio.Lock`.
+- **Progresso:** tool in-process **`send_to_user`** (SDK MCP, padrão Anthropic 2) plugada por run
+  via `build_stage_options(progress_cb=)`; emite logs `progress` ao card sem encerrar o turno;
+  `PROGRESS_SNIPPET` instrui o uso no system prompt (definir a tool não basta).
+- Front: LogsModal e PipelineControls renderizam `tool`/`progress` distintamente.
+- Plano: `plans/2026-07-10-onda-n5-send-to-user-auditoria.md`.
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
