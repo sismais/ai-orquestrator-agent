@@ -90,6 +90,19 @@ async def patch_project(project_id: str, body: ProjectPatchBody, db: AsyncSessio
     return {"project": _to_dict(p)}
 
 
+@router.get("/{project_id}/decisions")
+async def list_decisions(project_id: str, limit: int = 50, db: AsyncSession = Depends(get_db)):
+    """Memoria de decisoes do projeto (N3): pares pergunta->decisao, mais recentes primeiro."""
+    from ..repositories.decision_repository import DecisionRepository
+    rows = await DecisionRepository(db).recent_for_project(project_id, limit=min(limit, 200))
+    return {"decisions": [
+        {"id": r.id, "cardId": r.card_id, "question": r.question, "decision": r.decision,
+         "source": r.source, "score": r.score, "sources": r.sources, "stage": r.stage,
+         "createdAt": r.created_at.isoformat() if r.created_at else None}
+        for r in rows
+    ]}
+
+
 @router.delete("/{project_id}")
 async def delete_project(project_id: str, db: AsyncSession = Depends(get_db)):
     repo = ProjectRepository(db)

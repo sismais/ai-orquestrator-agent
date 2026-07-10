@@ -169,6 +169,17 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - Pausa e retomada resolvem a coluna pelo config (fix do review).
 - Plano: `plans/2026-07-10-onda-n4-dispatcher-config.md`.
 
+### Onda N3 — gate de escalação + memória de decisões — feito 2026-07-10
+- Tabela **`decisions`** por projeto (pergunta→decisão, `human`|`clarifier`, score/fontes/etapa);
+  resposta humana do `/answer` vira Decision automaticamente; `GET /api/registry/projects/{pid}/decisions`.
+- **Gate de escalação:** `pendingQuestions` de estágios de planejamento passam pelo clarifier
+  (score 0–3 do Pause-or-Decide + decisões passadas) ANTES de pausar: decidido com fonte → o
+  estágio re-roda 1x com as decisões (canal do human_answer) e a decisão é persistida; só o
+  restante chega ao humano. Fail-closed: clarifier com erro/lixo → pausa com tudo. `needs_human`
+  do implement NÃO passa pelo gate (conservador por design).
+- **Decisões reinjetadas:** bloco "Decisões anteriores" nos prompts de planejamento (plan + genéricos).
+- Plano: `plans/2026-07-10-onda-n3-escalacao-memoria.md`.
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
