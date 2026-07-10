@@ -21,7 +21,7 @@ from claude_agent_sdk import (
 
 from . import session_registry as sessions
 from .runner_service import DEVKIT_CLAUDE
-from ..config.model_ids import get_profile, resolve_model_id
+from ..config.model_ids import get_profile
 
 DEVKIT_AGENTS = DEVKIT_CLAUDE / "agents"
 

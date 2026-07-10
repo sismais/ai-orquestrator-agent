@@ -136,6 +136,17 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
   "Objetivo" no modal de novo projeto.
 - Spec de origem: `specs/2026-07-09-revisao-estrategica-plataforma.md` · Plano: `plans/2026-07-09-onda-agora-melhorias.md`.
 
+### Onda N1 — perfis por modelo + recusa com fallback — feito 2026-07-10
+- `config/model_ids.py` virou **registry de perfis** (`ModelProfile`: model_id, fallback_alias,
+  prompt_append); `resolve_model_id`/`ALIAS_TO_MODEL_ID` preservados como compat.
+- `stage_runner.run_stage` virou laço de política sobre `_run_single_attempt`: fim de turno
+  **classificado** (`_classify_result` sobre `ResultMessage.stop_reason/is_error/api_error_status`
+  do SDK 0.2.110) — **recusa → 1 retry no modelo de fallback do perfil** (ex.: fable-5 → opus-4.8),
+  erro transiente (HTTP 429/5xx) → 1 retry no mesmo modelo, interrupção nunca re-tenta; custo/usage
+  somados entre tentativas; `StageResult.used_model` = modelo real (telemetria registra pós-fallback).
+- ci-triage roda com modelo explícito (`fix_model`). **fable-5 habilitado nos pickers.**
+- Plano: `plans/2026-07-10-onda-n1-perfis-modelo.md`.
+
 ### DevKit (a camada de agentes)
 - Vive em `devkit/.claude/` (`skills/`, `agents/`, `commands/`), migrado do repo de plugins
   `sismais-ai-plugins-private`.
