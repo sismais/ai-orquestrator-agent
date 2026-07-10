@@ -8,6 +8,7 @@ transmite os logs pro board. NAO abre PR nem faz merge (isso e 3c).
 Roda em background (o endpoint dispara e retorna na hora). Abre sua propria sessao de DB.
 """
 
+import asyncio
 import json
 import traceback
 from datetime import datetime
@@ -92,27 +93,44 @@ class _LogSink:
         self._buf: list[str] = []
         self._size = 0
         self._seq = 0
+        # Serializa os writes (persist+WS) na sessao do pipeline: o handler do send_to_user
+        # (N5) pode interleaver com o drain de texto do receive_response. Cuidado com
+        # re-entrancia: flush/event chamam _emit_locked (ja dentro do lock); _emit publico
+        # pega o lock — nunca chame _emit de dentro de flush/event.
+        self._lock = asyncio.Lock()
 
-    async def __call__(self, text: str) -> None:
+    async def __call__(self, text: str, log_type: str = "info") -> None:
+        if log_type != "info":
+            # tool/progress: drena o buffer de texto e emite imediatamente (ordem preservada,
+            # sem esperar o buffer de 800 chars de texto).
+            await self.flush()
+            await self._emit(log_type, text)
+            return
         self._buf.append(text)
         self._size += len(text)
         if self._size >= _LOG_FLUSH_CHARS:
             await self.flush()
 
     async def flush(self) -> None:
-        if not self._buf:
-            return
-        chunk = "".join(self._buf)
-        self._buf.clear()
-        self._size = 0
-        await self._emit("info", chunk)
+        async with self._lock:
+            if not self._buf:
+                return
+            chunk = "".join(self._buf)
+            self._buf.clear()
+            self._size = 0
+            await self._emit_locked("info", chunk)
 
     async def event(self, text: str) -> None:
         """Marcador de estagio (drena o buffer antes p/ manter a ordem)."""
         await self.flush()
-        await self._emit("system", text)
+        async with self._lock:
+            await self._emit_locked("system", text)
 
     async def _emit(self, log_type: str, content: str) -> None:
+        async with self._lock:
+            await self._emit_locked(log_type, content)
+
+    async def _emit_locked(self, log_type: str, content: str) -> None:
         self.s.add(ExecutionLog(
             execution_id=self.eid, type=log_type, content=content, sequence=self._seq,
         ))

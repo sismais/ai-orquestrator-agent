@@ -88,6 +88,22 @@ async def _last_execution(maker, card_id):
         )).scalars().first()
 
 
+async def test_logsink_aceita_tipo_e_persiste(maker):
+    """_LogSink.__call__(text, log_type) persiste ExecutionLog com o tipo (N5)."""
+    from src.services.pipeline_service import _LogSink
+    from src.models.execution import Execution, ExecutionLog, ExecutionStatus
+    from sqlalchemy import select
+    async with maker() as s:
+        ex = Execution(card_id="c1", status=ExecutionStatus.RUNNING, command="pipeline", is_active=True)
+        s.add(ex)
+        await s.flush()
+        sink = _LogSink(s, ex.id, "c1")
+        await sink("li o arquivo X", "tool")
+        await sink.flush()
+        rows = (await s.execute(select(ExecutionLog).where(ExecutionLog.execution_id == ex.id))).scalars().all()
+    assert any(r.type == "tool" and "arquivo X" in r.content for r in rows)
+
+
 async def test_happy_path_lands_on_validate_ci(maker):
     card_id = await _make_project_card(maker)
     fake, counts = make_stage_fn({"review": ['{"blocks":[],"fixNow":[],"suggestions":[]}']})

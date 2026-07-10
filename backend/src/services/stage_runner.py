@@ -16,6 +16,8 @@ from claude_agent_sdk import (
     ClaudeSDKClient,
     AssistantMessage,
     TextBlock,
+    ToolUseBlock,
+    ToolResultBlock,
     ResultMessage,
 )
 
@@ -203,6 +205,20 @@ def _format_findings(findings: dict) -> str:
     return "\n".join(lines) if lines else "(sem achados)"
 
 
+_TOOL_INPUT_HINT = {
+    "Edit": ("file_path",), "Write": ("file_path",), "Read": ("file_path",),
+    "Bash": ("command",), "Glob": ("pattern",), "Grep": ("pattern",),
+}
+
+
+def _format_tool_use(name: str, tool_input: dict) -> str:
+    """Resumo de 1 linha de uma tool call para o log de auditoria (sem despejar payload)."""
+    hint_keys = _TOOL_INPUT_HINT.get(name, ())
+    parts = [str(tool_input.get(k)) for k in hint_keys if tool_input.get(k)]
+    detail = f": {parts[0]}" if parts else ""
+    return f"{name}{detail}"[:200]
+
+
 @dataclass
 class StageResult:
     ok: bool
@@ -272,6 +288,20 @@ async def _run_single_attempt(stage_key: str, worktree: str, prompt: str,
                             r = on_log(block.text)
                             if inspect.isawaitable(r):
                                 await r
+                    elif isinstance(block, ToolUseBlock) and on_log:
+                        # N5: a tool call do agente vira log tipado 'tool' (auditoria total).
+                        r = on_log(f"🔧 {_format_tool_use(block.name, block.input or {})}", "tool")
+                        if inspect.isawaitable(r):
+                            await r
+            elif type(message).__name__ == "UserMessage":
+                # N5: erros de tool chegam em UserMessage/ToolResultBlock — defensivo por
+                # __name__ p/ nao quebrar se o SDK entregar o erro noutro formato.
+                for block in getattr(message, "content", []) or []:
+                    if isinstance(block, ToolResultBlock) and getattr(block, "is_error", False) and on_log:
+                        content = block.content if isinstance(block.content, str) else str(block.content)
+                        r = on_log(f"⚠️ tool falhou: {content[:200]}", "tool")
+                        if inspect.isawaitable(r):
+                            await r
             elif isinstance(message, ResultMessage):
                 result_msg = message
                 cost = getattr(message, "total_cost_usd", None)

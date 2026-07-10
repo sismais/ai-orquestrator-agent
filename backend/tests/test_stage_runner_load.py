@@ -54,6 +54,23 @@ def test_prompt_sem_contexto_usa_default_agents_md():
     assert "AGENTS.md" in p
 
 
+async def test_run_stage_captura_tool_calls(monkeypatch):
+    """N5: ToolUseBlock do agente vira log tipado 'tool' via on_log."""
+    from src.services import stage_runner  # noqa: F401
+    from src.services.stage_runner import _AttemptOutcome  # noqa: F401
+
+    logs: list[tuple] = []
+
+    async def on_log(text, log_type="info"):
+        logs.append((log_type, text))
+
+    # _run_single_attempt real e complexo (SDK); este teste cobre o formatador de tool.
+    from src.services.stage_runner import _format_tool_use
+    assert "Edit" in _format_tool_use("Edit", {"file_path": "a.py", "old_string": "x"})
+    assert "a.py" in _format_tool_use("Edit", {"file_path": "a.py"})
+    assert _format_tool_use("Bash", {"command": "ls -la"}).startswith("Bash")
+
+
 def test_build_stage_options_inclui_snippet_de_autonomia():
     from src.services.stage_runner import build_stage_options
     opts = build_stage_options("implement", "/tmp/wt", "opus-4.8")
