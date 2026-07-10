@@ -538,3 +538,25 @@ async def test_resume_com_etapa_inexistente_no_workflow_segue_do_inicio_ativo(ma
                                         resume_stage="plan", human_answer="segue")
     assert counts.get("specify") == 1                          # retomou da primeira coluna ativa
     assert await _card_column(maker, card_id) == "entregue"    # e foi ate o fim
+
+
+async def test_decisoes_anteriores_chegam_ao_prompt_do_plan(maker):
+    """N3: decisoes de cards passados do MESMO projeto entram no prompt de planejamento."""
+    card_id = await _make_project_card(maker)
+    async with maker() as s:
+        from src.repositories.decision_repository import DecisionRepository
+        await DecisionRepository(s).add(project_id="p1", card_id="outro-card",
+                                        question="Qual ORM?", decision="SQLAlchemy 2 async",
+                                        source="human", stage="plan")
+        await s.commit()
+
+    seen: dict[str, list] = {}
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        seen.setdefault(stage_key, []).append(prompt)
+        text = '{"blocks":[],"fixNow":[]}' if stage_key == "review" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text)
+
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    assert "SQLAlchemy 2 async" in seen["plan"][0]
+    assert "SQLAlchemy 2 async" not in seen["implement"][0]

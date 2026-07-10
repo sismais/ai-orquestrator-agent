@@ -23,6 +23,7 @@ from ..models.execution import Execution, ExecutionLog, ExecutionStatus
 from ..models.project_registry import Project
 from ..repositories.activity_repository import ActivityRepository
 from ..repositories.card_repository import CardRepository
+from ..repositories.decision_repository import DecisionRepository, format_decisions_block
 from ..services.card_ws import card_ws_manager
 from ..services.execution_ws import execution_ws_manager
 from ..services.findings import (
@@ -225,6 +226,11 @@ async def run_pipeline(
         columns, transitions = await repo._get_workflow_for_card(card)
         pause_cols = pause_columns_from(columns)
         pause_col = next((c["key"] for c in columns if c.get("isPausedState")), "paused")
+        # Memoria de decisoes (N3): carregada UMA vez; reinjetada nos prompts de planejamento
+        # e consultada pelo gate de escalacao antes de acionar o humano.
+        decisions_block = format_decisions_block(
+            await DecisionRepository(s).recent_for_project(project_id, limit=10)
+        )
         total_cost = 0.0
         iteration = 0
         chain_parts: list[str] = []  # saidas dos estagios genericos, encadeadas ate o implement
@@ -391,6 +397,8 @@ async def run_pipeline(
                 if pending_answer:
                     extra["human_answer"] = pending_answer
                     pending_answer = None
+                if decisions_block and agent_key not in ("implement", "review"):
+                    extra["decisions"] = decisions_block
                 prompt = build_stage_prompt(agent_key, card.title, card.description or "", worktree, extra)
                 res = await stage_fn(agent_key, worktree, prompt, card_id=card_id, on_log=log,
                                      model=stage_model_for_agent(agent_key, card))

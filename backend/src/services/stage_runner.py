@@ -117,6 +117,10 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
         f"\n\nO humano respondeu a uma pausa anterior — considere isto acima de tudo:\n\"{answer}\"\n"
         if answer else ""
     )
+    # Memoria de decisoes (N3): so os estagios de PLANEJAMENTO recebem o bloco
+    # (implement/review/ci-triage/triage nao — foco e nao re-perguntar o decidido).
+    decisions = extra.get("decisions")
+    decisions_block = f"\n\n{decisions}\n" if decisions else ""
 
     if stage_key == "plan":
         # Planner e read-only (Read/Glob/Grep): devolve o plano como TEXTO (nao escreve arquivo no repo).
@@ -125,7 +129,7 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
         chain = extra.get("chain")
         chain_block = f"\n\nMaterial dos estagios anteriores:\n{chain}\n" if chain else ""
         return (
-            f"{header}\n\nTarefa: {task}{answer_block}{chain_block}\n\n"
+            f"{header}\n\nTarefa: {task}{answer_block}{decisions_block}{chain_block}\n\n"
             "Produza o conteudo do plano de implementacao (abordagem, arquivos afetados, reuso, riscos), "
             "derivando do que ja existe no projeto. Responda com o plano em markdown. "
             "Se uma decisao de arquitetura nao tiver base no projeto, devolva tambem um bloco JSON "
@@ -180,7 +184,7 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
     chain = extra.get("chain")
     chain_block = f"\n\nMaterial dos estagios anteriores:\n{chain}\n" if chain else ""
     return (
-        f"{header}\n\nTarefa: {task}{answer_block}{chain_block}\n\n"
+        f"{header}\n\nTarefa: {task}{answer_block}{decisions_block}{chain_block}\n\n"
         "Execute o SEU estagio conforme suas instrucoes e responda com o resultado em markdown. "
         "Se uma decisao nao tiver base no projeto, devolva tambem um bloco JSON "
         '`{ "pendingQuestions": [ { "question": "...", "context": "..." } ] }` ao final.'

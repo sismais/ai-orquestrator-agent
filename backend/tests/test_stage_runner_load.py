@@ -109,3 +109,15 @@ def test_build_stage_options_apende_prompt_do_perfil(monkeypatch):
                         ModelProfile("claude-teste", prompt_append="\nSNIPPET-DO-PERFIL"))
     opts = build_stage_options("plan", "/wt", "teste-x")
     assert "SNIPPET-DO-PERFIL" in opts.system_prompt["append"]
+
+
+def test_prompt_de_planejamento_inclui_decisoes_anteriores():
+    from src.services.stage_runner import build_stage_prompt
+    extra = {"decisions": "Decisoes anteriores deste projeto...\n- P: Qual banco?\n  D: SQLite"}
+    for stage in ("plan", "specify"):
+        p = build_stage_prompt(stage, "T", "D", "/wt", extra)
+        assert "Qual banco?" in p, stage
+    # implement/review NAO recebem o bloco (foco: planejamento)
+    for stage in ("implement", "review"):
+        p = build_stage_prompt(stage, "T", "D", "/wt", extra)
+        assert "Qual banco?" not in p, stage
