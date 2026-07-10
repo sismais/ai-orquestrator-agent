@@ -84,6 +84,23 @@ def test_prompt_do_triage_pede_json_de_trilha():
     assert "NAO implemente" in p
 
 
+def test_agentes_sdd_mapeados():
+    from src.services.stage_runner import load_stage_agent
+    for key, filename_hint in (("specify", "specifier"), ("clarify", "clarifier"), ("tasks", "tasker")):
+        body, tools = load_stage_agent(key)
+        assert body.strip(), key
+        assert tools == ["Read", "Glob", "Grep"], key
+
+
+def test_prompt_generico_encadeia_saidas_anteriores():
+    from src.services.stage_runner import build_stage_prompt
+    p = build_stage_prompt("specify", "Feature X", "detalhe", "/wt",
+                           {"chain": "SAIDA-DO-ESTAGIO-ANTERIOR"})
+    assert "Feature X" in p
+    assert "SAIDA-DO-ESTAGIO-ANTERIOR" in p
+    assert "pendingQuestions" in p          # valvula de escalacao padrao dos estagios genericos
+
+
 def test_build_stage_options_apende_prompt_do_perfil(monkeypatch):
     from src.config.model_ids import ModelProfile
     from src.config import model_ids

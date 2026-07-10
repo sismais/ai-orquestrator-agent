@@ -32,6 +32,10 @@ STAGE_AGENTS: dict[str, tuple[str, list[str]]] = {
     "review": ("sismais-dev-reviewer", ["Read", "Glob", "Grep", "Bash"]),
     "ci-triage": ("sismais-dev-ci-triage", ["Read", "Glob", "Grep", "Bash"]),
     "triage": ("sismais-dev-router", ["Read", "Glob", "Grep"]),
+    # Estagios SDD genericos (N4): plugaveis via agentKey nas colunas de workflows custom
+    "specify": ("sismais-dev-specifier", ["Read", "Glob", "Grep"]),
+    "clarify": ("sismais-dev-clarifier", ["Read", "Glob", "Grep"]),
+    "tasks": ("sismais-dev-tasker", ["Read", "Glob", "Grep"]),
 }
 
 
@@ -168,8 +172,16 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
             'Devolva SO o JSON { "trilha": "leve" | "padrao", "porque": "..." }.'
         )
 
-    # fallback generico
-    return f"{header}\n\nTarefa: {task}"
+    # Estagio generico (colunas custom / SDD): o papel vem do system prompt (.md do agente);
+    # a saida do(s) estagio(s) anterior(es) chega encadeada como material de referencia.
+    chain = extra.get("chain")
+    chain_block = f"\n\nMaterial dos estagios anteriores:\n{chain}\n" if chain else ""
+    return (
+        f"{header}\n\nTarefa: {task}{answer_block}{chain_block}\n\n"
+        "Execute o SEU estagio conforme suas instrucoes e responda com o resultado em markdown. "
+        "Se uma decisao nao tiver base no projeto, devolva tambem um bloco JSON "
+        '`{ "pendingQuestions": [ { "question": "...", "context": "..." } ] }` ao final.'
+    )
 
 
 def _format_findings(findings: dict) -> str:
