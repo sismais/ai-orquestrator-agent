@@ -196,6 +196,8 @@ class ChatService:
                             lines.append(f"  - \"{card_title}\" criado ({time_str})")
                         elif act["type"] == "commented":
                             lines.append(f"  - \"{card_title}\" comentado ({time_str})")
+                        elif act["type"] == "completed":
+                            lines.append(f"  - \"{card_title}\" concluido ({time_str})")
                         else:
                             lines.append(f"  - \"{card_title}\" {act['type']} ({time_str})")
 
@@ -219,6 +221,8 @@ class ChatService:
             "- Historico de um card: `curl -s http://localhost:3001/api/activities/card/<cardId>` "
             "(comentarios/decisoes) e `curl -s http://localhost:3001/api/projects/"
             f"{project_id}/cards/<cardId>/execution` (ultimo run + logs).\n"
+            "- Os ids no contexto abaixo estao abreviados ([id8]); para obter o cardId completo "
+            f"use `curl -s \"http://localhost:3001/api/cards?projectId={project_id}\"`.\n"
         )
         if kanban_context:
             return f"{DEFAULT_SYSTEM_PROMPT}{project_block}\n\n{kanban_context}"

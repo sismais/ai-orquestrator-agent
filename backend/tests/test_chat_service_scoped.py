@@ -67,6 +67,10 @@ async def test_contexto_inclui_colunas_do_workflow_real(maker, monkeypatch):
     ctx = await cs.ChatService()._get_kanban_context("p1")
     assert "Tarefa pausada" in ctx
     assert "Aguardando merge" in ctx
+    # So o renderer de colunas produz estas linhas (os titulos tambem vazam
+    # pela secao de atividades, entao os asserts acima nao bastam sozinhos):
+    assert "Paused (1)" in ctx
+    assert "Ready to merge (1)" in ctx
 
 
 async def test_atividades_escopadas_por_projeto(maker, monkeypatch):
