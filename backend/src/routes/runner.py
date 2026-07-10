@@ -1,6 +1,7 @@
 """Rota do runner (Fase 3b): dispara o pipeline orquestrado e consulta o run."""
 
 import asyncio
+import traceback
 
 from fastapi import APIRouter, Depends, HTTPException
 from pydantic import BaseModel
@@ -24,7 +25,8 @@ def _log_task_result(task: asyncio.Task) -> None:
         return
     exc = task.exception()
     if exc:
-        print(f"[runner] pipeline task morreu com excecao nao tratada: {exc!r}")
+        print("[runner] pipeline task morreu com excecao nao tratada:")
+        traceback.print_exception(type(exc), exc, exc.__traceback__)
 
 
 class AnswerRequest(BaseModel):

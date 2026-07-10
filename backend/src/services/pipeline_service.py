@@ -9,6 +9,7 @@ Roda em background (o endpoint dispara e retorna na hora). Abre sua propria sess
 """
 
 import json
+import traceback
 from datetime import datetime
 from pathlib import Path
 from typing import Optional
@@ -393,10 +394,15 @@ async def run_pipeline(
             except Exception:  # noqa: BLE001
                 pass
         except Exception as e:  # noqa: BLE001 — rede de seguranca: run orfao nunca mais (A1)
+            print(f"[pipeline] erro interno:\n{traceback.format_exc()}")
             try:
                 await finish_pause("erro interno do orquestrador", str(e))
             except Exception as e2:  # noqa: BLE001 — ultimo recurso: marca a Execution direto
                 print(f"[pipeline] finish_pause falhou apos erro interno: {e2!r}")
+                try:
+                    await s.rollback()
+                except Exception:  # noqa: BLE001
+                    pass
                 execution.status = ExecutionStatus.ERROR
                 execution.workflow_error = f"erro interno: {e} | finish_pause: {e2}"[:1900]
                 execution.is_active = False

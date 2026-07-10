@@ -218,3 +218,4 @@ async def test_excecao_inesperada_pausa_o_card(maker):
     assert ex.status.value == "paused"
     assert ex.is_active is False
     assert "erro interno" in (ex.workflow_error or "")
+    assert "explodiu por dentro" in (ex.workflow_error or "")
