@@ -8,12 +8,15 @@ por projeto).
 from typing import Dict, List, AsyncGenerator
 from datetime import datetime, timezone
 import uuid
+from sqlalchemy import select
 from ..agent_chat import get_claude_agent, DEFAULT_SYSTEM_PROMPT
 from ..database import async_session_maker
+from ..models.workflow import Workflow
 from ..repositories.card_repository import CardRepository
 from ..repositories.activity_repository import ActivityRepository
 from ..repositories.chat_repository import ChatRepository
 from ..repositories.project_repository import ProjectRepository
+from ..services.workflow_seed import DEV_COLUMNS
 
 
 class ChatService:
@@ -142,73 +145,61 @@ class ChatService:
             async with async_session_maker() as session:
                 card_repo = CardRepository(session)
                 activity_repo = ActivityRepository(session)
+                project = await ProjectRepository(session).get_by_id(project_id)
 
-                # Fetch cards scoped to the project
                 cards = await card_repo.get_all(project_id=project_id)
+                activities = await activity_repo.get_recent_activities(limit=5, project_id=project_id)
 
-                # Fetch recent activities
-                activities = await activity_repo.get_recent_activities(limit=5)
+                # Colunas vem do workflow config do projeto (fallback: seed dev)
+                workflow_id = (project.workflow_id if project else None) or "dev"
+                wf = (await session.execute(
+                    select(Workflow).where(Workflow.id == workflow_id)
+                )).scalar_one_or_none()
+                wf_columns = sorted(wf.columns, key=lambda c: c.get("order", 0)) if wf else DEV_COLUMNS
 
-                # Group cards by column
-                columns: Dict[str, List] = {
-                    "backlog": [], "plan": [], "implement": [],
-                    "test": [], "review": [], "done": [],
-                    "completed": [], "archived": [], "cancelado": []
+                emojis = {
+                    "paused": "⏸", "backlog": "📋", "plan": "📝", "implement": "🔨",
+                    "review": "👀", "validate_ci": "🧪", "ready_to_merge": "🔀", "done": "✅",
                 }
-
+                by_col: Dict[str, List] = {c["key"]: [] for c in wf_columns}
                 for card in cards:
-                    if card.column_id in columns:
-                        columns[card.column_id].append(card)
+                    by_col.setdefault(card.column_id, []).append(card)
 
-                # Build context
                 lines = ["=== KANBAN STATUS ==="]
+                for col in wf_columns:
+                    col_cards = by_col.get(col["key"], [])
+                    if not col_cards:
+                        continue
+                    emoji = emojis.get(col["key"], "▪")
+                    lines.append(f"\n{emoji} {col['label']} ({len(col_cards)}):")
+                    for card in col_cards[:5]:
+                        time_str = self._format_relative_time(card.created_at)
+                        lines.append(f"  - [{card.id[:8]}] \"{card.title}\" ({time_str})")
+                        if card.description:
+                            lines.append(f"    -> {self._truncate(card.description, 60)}")
 
-                # Active columns (excluding completed, archived, cancelado)
-                column_config = [
-                    ("backlog", "Backlog", "📋"),
-                    ("plan", "Plan", "📝"),
-                    ("implement", "Implement", "🔨"),
-                    ("test", "Test", "🧪"),
-                    ("review", "Review", "👀"),
-                    ("done", "Done", "✅"),
-                ]
-
-                for col_id, col_name, emoji in column_config:
-                    col_cards = columns[col_id]
-                    if col_cards:
-                        lines.append(f"\n{emoji} {col_name} ({len(col_cards)}):")
-                        for card in col_cards[:5]:  # Limit to 5 cards per column
-                            time_str = self._format_relative_time(card.created_at)
-                            lines.append(f"  - \"{card.title}\" ({time_str})")
-                            if card.description:
-                                desc = self._truncate(card.description, 60)
-                                lines.append(f"    -> {desc}")
-
-                # Summary
-                active_cols = ["backlog", "plan", "implement", "test", "review", "done"]
-                summary = " | ".join([f"{len(columns[c])} {c}" for c in active_cols])
+                summary = " | ".join(
+                    f"{len(by_col.get(c['key'], []))} {c['key']}" for c in wf_columns
+                )
                 lines.append(f"\n📊 Resumo: {summary}")
 
-                # Recent activities
                 if activities:
-                    lines.append("\n🕐 Ultimas atividades:")
+                    lines.append("\n🕐 Ultimas atividades (deste projeto):")
                     for act in activities[:5]:
                         time_str = self._format_relative_time(
                             datetime.fromisoformat(act["timestamp"])
                         )
                         card_title = self._truncate(act["cardTitle"], 30)
-
                         if act["type"] == "moved":
                             lines.append(f"  - \"{card_title}\" movido para {act['toColumn']} ({time_str})")
-                        elif act["type"] == "completed":
-                            lines.append(f"  - \"{card_title}\" concluido ({time_str})")
                         elif act["type"] == "created":
                             lines.append(f"  - \"{card_title}\" criado ({time_str})")
+                        elif act["type"] == "commented":
+                            lines.append(f"  - \"{card_title}\" comentado ({time_str})")
                         else:
                             lines.append(f"  - \"{card_title}\" {act['type']} ({time_str})")
 
                 lines.append("===================")
-
                 return "\n".join(lines)
 
         except Exception as e:
@@ -216,13 +207,22 @@ class ChatService:
             return ""
 
     async def get_system_prompt(self, project_id: str) -> str:
-        """Get system prompt with kanban context scoped to the project"""
+        """System prompt: base + bloco do projeto atual + contexto Kanban (tudo escopado)."""
         kanban_context = await self._get_kanban_context(project_id)
-
+        project_block = (
+            "\n\n## Projeto atual\n"
+            f"- projectId: {project_id}\n"
+            f"- Ao criar cards via API, SEMPRE inclua \"projectId\": \"{project_id}\" no JSON "
+            "(sem isso o card fica sem projeto e nao aparece no board).\n"
+            "- As worktrees dos cards em execucao vivem em `.worktrees/card-<id8>/` na raiz do "
+            "projeto (seu cwd) — voce pode ler o codigo delas com Read/Glob/Grep.\n"
+            "- Historico de um card: `curl -s http://localhost:3001/api/activities/card/<cardId>` "
+            "(comentarios/decisoes) e `curl -s http://localhost:3001/api/projects/"
+            f"{project_id}/cards/<cardId>/execution` (ultimo run + logs).\n"
+        )
         if kanban_context:
-            return f"{DEFAULT_SYSTEM_PROMPT}\n\n{kanban_context}"
-
-        return DEFAULT_SYSTEM_PROMPT
+            return f"{DEFAULT_SYSTEM_PROMPT}{project_block}\n\n{kanban_context}"
+        return f"{DEFAULT_SYSTEM_PROMPT}{project_block}"
 
     async def send_message(
         self,

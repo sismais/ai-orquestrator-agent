@@ -72,7 +72,7 @@ class ActivityRepository:
         )
 
     async def get_recent_activities(
-        self, limit: int = 10, offset: int = 0
+        self, limit: int = 10, offset: int = 0, project_id: Optional[str] = None
     ) -> list[dict[str, Any]]:
         """
         Get recent activities with card information.
@@ -80,6 +80,7 @@ class ActivityRepository:
         Args:
             limit: Maximum number of activities to return
             offset: Number of activities to skip
+            project_id: If set, only activities from cards of this project
 
         Returns:
             List of activity dictionaries with card info
@@ -88,6 +89,11 @@ class ActivityRepository:
             select(ActivityLog, Card.title, Card.description)
             .join(Card, ActivityLog.card_id == Card.id)
             .where(Card.archived == False)  # Only show activities from non-archived cards
+        )
+        if project_id:
+            query = query.where(Card.project_id == project_id)
+        query = (
+            query
             .order_by(desc(ActivityLog.timestamp))
             .limit(limit)
             .offset(offset)

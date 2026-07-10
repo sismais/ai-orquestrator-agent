@@ -127,7 +127,7 @@ You CAN create cards in the Kanban board! When the user asks to:
 - "preciso fazer X" (implies a task)
 - "create a card/task"
 
-Use the Bash tool to call the API directly:
+Use the Bash tool to call the API directly (replace PROJECT_ID with the projectId from the "Projeto atual" section below):
 
 ```bash
 curl -s -X POST http://localhost:3001/api/cards \
@@ -135,9 +135,9 @@ curl -s -X POST http://localhost:3001/api/cards \
   -d '{
     "title": "TITULO_AQUI",
     "description": "DESCRICAO_AQUI",
+    "projectId": "PROJECT_ID",
     "modelPlan": "opus-4.8",
     "modelImplement": "sonnet-5",
-    "modelTest": "haiku-4.5",
     "modelReview": "haiku-4.5"
   }'
 ```
@@ -145,7 +145,6 @@ curl -s -X POST http://localhost:3001/api/cards \
 ### Model defaults (use unless user specifies otherwise):
 - Plan: opus-4.8 (best for planning)
 - Implement: sonnet-5 (good balance)
-- Test: haiku-4.5 (fast for tests)
 - Review: haiku-4.5 (fast for review)
 
 ### Available models:
