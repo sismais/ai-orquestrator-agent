@@ -76,6 +76,32 @@
   background: color-mix(in srgb, var(--accent-primary, #6d5efc) 25%, transparent);
 }
 
+.checkMergeButton {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 8px;
+  margin-left: 6px;
+  padding: 6px 12px;
+  border: 1px solid var(--border, #3a3a45);
+  border-radius: 6px;
+  font-size: 12px;
+  font-weight: 600;
+  cursor: pointer;
+  background: var(--surface-2, #2a2a35);
+  color: var(--text, #e6e6ef);
+  transition: opacity 0.15s ease;
+}
+
+.checkMergeButton:hover:not(:disabled) {
+  opacity: 0.9;
+}
+
+.checkMergeButton:disabled {
+  opacity: 0.7;
+  cursor: default;
+}
+
 .runButton:hover:not(:disabled),
 .logsButton:hover {
   opacity: 0.9;

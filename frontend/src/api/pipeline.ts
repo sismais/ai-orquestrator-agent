@@ -83,6 +83,17 @@ export async function getCardComments(cardId: string): Promise<CardComment[]> {
     .reverse(); // endpoint devolve desc; queremos cronologico
 }
 
+/** Detecta se o PR do card foi mergeado no GitHub; se sim, o backend move o card para done. */
+export async function checkMerge(projectId: string, cardId: string): Promise<{ merged: boolean; state?: string }> {
+  try {
+    const response = await fetch(`${base(projectId, cardId)}/check-merge`, { method: 'POST' });
+    if (!response.ok) return { merged: false };
+    return await response.json();
+  } catch {
+    return { merged: false }; // resiliente: erro de rede nunca quebra o poll
+  }
+}
+
 /** Ultimo run do card + logs persistidos (para reload/historico do painel). */
 export async function getExecution(projectId: string, cardId: string): Promise<PipelineExecutionState> {
   const response = await fetch(`${base(projectId, cardId)}/execution`);

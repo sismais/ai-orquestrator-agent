@@ -1,6 +1,6 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useExecutionWebSocket } from '../../hooks/useExecutionWebSocket';
-import { runPipeline, getExecution, stopPipeline } from '../../api/pipeline';
+import { runPipeline, getExecution, stopPipeline, checkMerge } from '../../api/pipeline';
 import { LogsModal } from '../LogsModal';
 import type { Card as CardType, ExecutionLog } from '../../types';
 import styles from './PipelineControls.module.css';
@@ -28,6 +28,7 @@ export function PipelineControls({ card }: Props) {
   const [wsCardId, setWsCardId] = useState<string | null>(null);
   const [prUrl, setPrUrl] = useState<string | null>(null);
   const [runMeta, setRunMeta] = useState<{ costUsd?: number | null; totalTokens?: number | null } | null>(null);
+  const [checkingMerge, setCheckingMerge] = useState(false);
 
   const onLog = useCallback((msg: { logType: string; content: string; timestamp: string }) => {
     const type: ExecutionLog['type'] =
@@ -80,6 +81,23 @@ export function PipelineControls({ card }: Props) {
     }).catch(() => {});
     return () => { alive = false; };
   }, [card.columnId, card.id, projectId, prUrl]);
+
+  // Detecta o merge do PR (feito no GitHub); se merged, o backend move o card -> done (chega via WS).
+  const handleCheckMerge = useCallback(async () => {
+    if (!projectId) return;
+    setCheckingMerge(true);
+    try {
+      await checkMerge(projectId, card.id);
+    } catch { /* ignore */ }
+    finally { setCheckingMerge(false); }
+  }, [projectId, card.id]);
+
+  // Poll leve enquanto o card esta em ready_to_merge (montado); limpa no unmount / troca de coluna.
+  useEffect(() => {
+    if (card.columnId !== 'ready_to_merge' || !projectId) return;
+    const id = setInterval(() => { handleCheckMerge(); }, 20000);
+    return () => clearInterval(id);
+  }, [card.columnId, projectId, handleCheckMerge]);
 
   const handleStop = useCallback(async (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -173,6 +191,18 @@ export function PipelineControls({ card }: Props) {
         >
           🔗 Ver PR
         </a>
+      )}
+
+      {card.columnId === 'ready_to_merge' && (
+        <button
+          className={styles.checkMergeButton}
+          onClick={(e) => { e.stopPropagation(); handleCheckMerge(); }}
+          disabled={checkingMerge}
+          title="Verificar se o PR ja foi mergeado no GitHub (o card fecha sozinho quando for)"
+        >
+          {checkingMerge && <span className={styles.spinner} />}
+          {checkingMerge ? 'Verificando...' : 'Verificar merge'}
+        </button>
       )}
 
       {(isRunning || logs.length > 0 || status !== 'idle' || !!card.branchName) && card.columnId !== 'backlog' && (
