@@ -29,8 +29,8 @@ async def test_get_dev_workflow(client):
     assert r.status_code == 200, r.text
     wf = r.json()["workflow"]
     keys = [c["key"] for c in wf["columns"]]
-    assert keys == ["backlog", "plan", "implement", "review",
-                    "validate_ci", "ready_to_merge", "done", "paused"]
+    assert keys == ["paused", "backlog", "plan", "implement", "review",
+                    "validate_ci", "ready_to_merge", "done"]
     assert "implement" in wf["transitions"]["review"]
 
 

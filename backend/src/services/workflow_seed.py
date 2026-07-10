@@ -8,23 +8,24 @@ from ..models.workflow import Workflow
 DEV_WORKFLOW_ID = "dev"
 
 # Coluna: key, label, agentKey (None = manual/backend), provider, model, flags
+# 'paused' e a PRIMEIRA coluna do board: cards aguardando humano ficam visiveis sem scroll.
 DEV_COLUMNS = [
-    {"key": "backlog", "label": "Backlog", "order": 0, "agentKey": None,
-     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
-    {"key": "plan", "label": "Plan", "order": 1, "agentKey": "plan",
-     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
-    {"key": "implement", "label": "Implement", "order": 2, "agentKey": "implement",
-     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
-    {"key": "review", "label": "Review", "order": 3, "agentKey": "review",
-     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
-    {"key": "validate_ci", "label": "Validate/CI", "order": 4, "agentKey": "validate-ci",
-     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
-    {"key": "ready_to_merge", "label": "Ready to merge", "order": 5, "agentKey": None,
-     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
-    {"key": "done", "label": "Done", "order": 6, "agentKey": None,
-     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": True},
-    {"key": "paused", "label": "Paused", "order": 7, "agentKey": None,
+    {"key": "paused", "label": "Paused", "order": 0, "agentKey": None,
      "provider": "claude", "model": None, "isPausedState": True, "isTerminal": False},
+    {"key": "backlog", "label": "Backlog", "order": 1, "agentKey": None,
+     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
+    {"key": "plan", "label": "Plan", "order": 2, "agentKey": "plan",
+     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
+    {"key": "implement", "label": "Implement", "order": 3, "agentKey": "implement",
+     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
+    {"key": "review", "label": "Review", "order": 4, "agentKey": "review",
+     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
+    {"key": "validate_ci", "label": "Validate/CI", "order": 5, "agentKey": "validate-ci",
+     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
+    {"key": "ready_to_merge", "label": "Ready to merge", "order": 6, "agentKey": None,
+     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": False},
+    {"key": "done", "label": "Done", "order": 7, "agentKey": None,
+     "provider": "claude", "model": None, "isPausedState": False, "isTerminal": True},
 ]
 
 # Caminho feliz + fix-loop (review->implement) + pausa a partir de qualquer etapa ativa.
@@ -41,16 +42,19 @@ DEV_TRANSITIONS = {
 
 
 async def seed_dev_workflow(session: AsyncSession) -> None:
-    """Cria o workflow dev se ainda nao existir (idempotente)."""
-    existing = await session.execute(
+    """Cria OU atualiza o workflow dev (config-as-code: o seed e a fonte de verdade;
+    nao ha CRUD de workflow, entao mudancas de config chegam ao DB por aqui)."""
+    existing = (await session.execute(
         select(Workflow).where(Workflow.id == DEV_WORKFLOW_ID)
-    )
-    if existing.scalar_one_or_none() is not None:
-        return
-    session.add(Workflow(
-        id=DEV_WORKFLOW_ID,
-        name="Desenvolvimento (DevKit)",
-        columns=DEV_COLUMNS,
-        transitions=DEV_TRANSITIONS,
-    ))
+    )).scalar_one_or_none()
+    if existing is None:
+        session.add(Workflow(
+            id=DEV_WORKFLOW_ID,
+            name="Desenvolvimento (DevKit)",
+            columns=DEV_COLUMNS,
+            transitions=DEV_TRANSITIONS,
+        ))
+    else:
+        existing.columns = DEV_COLUMNS
+        existing.transitions = DEV_TRANSITIONS
     await session.commit()
