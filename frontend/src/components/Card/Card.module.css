@@ -13,6 +13,10 @@
   display: flex;
   flex-direction: column;
   gap: 12px;
+  /* A lista .cards da coluna e um scroll container (overflow-y: auto): o card NAO pode
+     encolher para caber (flex-shrink default espremia o card ao min-height e colapsava
+     o .content, cortando o titulo) — a lista rola, o card mantem a altura natural. */
+  flex-shrink: 0;
 }
 
 /* Limit card height and allow internal scrolling for overflowing content */
