@@ -61,7 +61,7 @@ const MODEL_CARDS: ModelCardData[] = [
     label: 'Fable 5',
     provider: 'anthropic',
     tagline: 'Creative and narrative tasks',
-    performance: 'Beta',
+    performance: 'Novo',
     icon: '📖',
     accent: 'fable'
   }
