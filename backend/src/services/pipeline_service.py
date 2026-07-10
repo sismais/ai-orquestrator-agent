@@ -332,17 +332,21 @@ async def run_pipeline(
                         # falha-fechada: reviewer sem JSON re-explica o contrato e tenta 1x (A2)
                         await log.event("review sem JSON parseavel — re-pedindo o veredito")
                         retry_prompt = prompt + (
-                            "\n\nSua resposta anterior nao continha o JSON de achados. Responda AGORA "
-                            'somente com o JSON {"blocks": [...], "fixNow": [...], "suggestions": [...]} '
-                            "(arrays vazios se o diff estiver aprovado)."
+                            "\n\nIMPORTANTE: sua resposta DEVE terminar com o JSON "
+                            '{"blocks": [...], "fixNow": [...], "suggestions": [...]} '
+                            "(arrays vazios se o diff estiver aprovado). "
+                            "Nao ha veredito valido sem esse JSON."
                         )
                         res = await stage_fn("review", worktree, retry_prompt, card_id=card_id, on_log=log,
                                              model=stage_model_for_column("review", card))
                         await log.flush()
                         await account(res)
                         if res.interrupted:
-                            await finish_pause("interrompido pelo usuario",
-                                               "O usuario parou a execucao para corrigir o rumo.")
+                            await finish_pause(
+                                "interrompido pelo usuario",
+                                "O usuario parou a execucao para corrigir o rumo.",
+                                question="Você interrompeu o agente. O que devo ajustar ou fazer diferente?",
+                            )
                             return
                         if not res.ok:
                             await finish_pause("erro no re-pedido do review", res.error)
