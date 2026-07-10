@@ -111,6 +111,20 @@ def parse_ci_verdict(text: str) -> dict:
     return {"verdict": "related", "porque": ""}
 
 
+def parse_track_verdict(text: str) -> dict:
+    """Extrai {trilha, porque} do router de triagem. Default conservador: 'padrao'
+    se nao parsear ou valor desconhecido (na duvida, trilha completa — criterio do router)."""
+    if text:
+        obj = _last_matching(text, lambda o: "trilha" in o)
+        if obj is not None:
+            t = str(obj.get("trilha", "")).lower()
+            return {
+                "trilha": "leve" if t == "leve" else "padrao",
+                "porque": obj.get("porque") or obj.get("why") or "",
+            }
+    return {"trilha": "padrao", "porque": ""}
+
+
 _NEEDS_HUMAN_RE = re.compile(
     r'(?:"?status"?\s*[:=]\s*"?needs_human"?|needs[_\s-]?human)',
     re.IGNORECASE,

@@ -31,6 +31,7 @@ STAGE_AGENTS: dict[str, tuple[str, list[str]]] = {
     "implement": ("sismais-dev-implementer", ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]),
     "review": ("sismais-dev-reviewer", ["Read", "Glob", "Grep", "Bash"]),
     "ci-triage": ("sismais-dev-ci-triage", ["Read", "Glob", "Grep", "Bash"]),
+    "triage": ("sismais-dev-router", ["Read", "Glob", "Grep"]),
 }
 
 
@@ -157,6 +158,14 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
             f"{header}\n\nUma check de CI falhou. Julgue se a falha e causada pelo diff. "
             'Devolva SO o JSON `{ "verdict": "related" | "unrelated", "porque": "..." }`.\n\n'
             f"Log da CI:\n```\n{ci_log}\n```\n\nDiff do PR:\n```diff\n{diff}\n```"
+        )
+
+    if stage_key == "triage":
+        return (
+            f"{header}\n\nTarefa do card: {task}\n\n"
+            "Classifique a complexidade desta tarefa (trilha `leve` ou `padrao`) com um scan "
+            "rapido do repositorio. NAO implemente nada. "
+            'Devolva SO o JSON { "trilha": "leve" | "padrao", "porque": "..." }.'
         )
 
     # fallback generico

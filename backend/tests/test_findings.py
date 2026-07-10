@@ -62,3 +62,16 @@ def test_needs_human_detected():
 
 def test_needs_human_absent():
     assert detect_needs_human("status: done, tudo certo") is None
+
+
+def test_parse_track_verdict_leve_e_padrao():
+    from src.services.findings import parse_track_verdict
+    assert parse_track_verdict('{"trilha": "leve", "porque": "typo"}') == {"trilha": "leve", "porque": "typo"}
+    assert parse_track_verdict('bla ```json\n{"trilha": "padrao", "porque": "feature"}\n```')["trilha"] == "padrao"
+
+
+def test_parse_track_verdict_default_conservador():
+    from src.services.findings import parse_track_verdict
+    assert parse_track_verdict("")["trilha"] == "padrao"
+    assert parse_track_verdict("sem json aqui")["trilha"] == "padrao"
+    assert parse_track_verdict('{"trilha": "turbo"}')["trilha"] == "padrao"   # valor desconhecido

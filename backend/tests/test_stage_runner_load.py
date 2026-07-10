@@ -70,6 +70,20 @@ def test_build_stage_options_sem_model_usa_default_do_cli():
     assert getattr(opts, "model", None) is None
 
 
+def test_triage_mapeado_em_stage_agents():
+    from src.services.stage_runner import load_stage_agent
+    body, tools = load_stage_agent("triage")
+    assert "leve" in body and "padrao" in body
+    assert tools == ["Read", "Glob", "Grep"]
+
+
+def test_prompt_do_triage_pede_json_de_trilha():
+    from src.services.stage_runner import build_stage_prompt
+    p = build_stage_prompt("triage", "Corrigir typo no botao", "so o texto", "/wt", {})
+    assert "trilha" in p
+    assert "NAO implemente" in p
+
+
 def test_build_stage_options_apende_prompt_do_perfil(monkeypatch):
     from src.config.model_ids import ModelProfile
     from src.config import model_ids
