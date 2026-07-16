@@ -2,7 +2,7 @@
 
 > **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) or superpowers:executing-plans to implement this plan task-by-task. Steps use checkbox (`- [ ]`) syntax for tracking.
 
-**Goal:** Implementar os 6 pacotes "Agora" da revisão estratégica (`docs/specs/2026-07-09-revisao-estrategica-plataforma.md`): blindar o loop (A1), review falha-fechada + anti-parada-prematura (A2), notificação de pausa (A3), telemetria de autonomia/custo (A5), higiene do chat (A6) e contexto real no prompt (A4).
+**Goal:** Implementar os 6 pacotes "Agora" da revisão estratégica (`docs/sismais-devkit/specs/2026-07-09-revisao-estrategica-plataforma.md`): blindar o loop (A1), review falha-fechada + anti-parada-prematura (A2), notificação de pausa (A3), telemetria de autonomia/custo (A5), higiene do chat (A6) e contexto real no prompt (A4).
 
 **Architecture:** Todas as mudanças são incrementais sobre o pipeline existente (`pipeline_service`/`stage_runner`) e sobre o chat (`chat_service`/`agent_chat`), sem tocar no fluxo provado além dos pontos citados. Backend testado com pytest (padrão de `tests/test_pipeline_service.py`: engine SQLite in-memory + `stage_fn` fake + git stubado). Frontend validado com `npx tsc --noEmit` (gate do repo; há ~7 erros pré-existentes `Cannot find namespace 'NodeJS'` — confira que não introduziu novos).
 
@@ -24,12 +24,12 @@ Baseline conhecido: `test_project_manager.py`/`test_test_result_analyzer.py` tê
 ### Task 0: Commitar o spec da revisão estratégica
 
 **Files:**
-- Commit: `docs/specs/2026-07-09-revisao-estrategica-plataforma.md` (untracked)
+- Commit: `docs/sismais-devkit/specs/2026-07-09-revisao-estrategica-plataforma.md` (untracked)
 
 - [ ] **Step 0.1: Commit**
 
 ```bash
-git add docs/specs/2026-07-09-revisao-estrategica-plataforma.md docs/plans/2026-07-09-onda-agora-melhorias.md
+git add docs/sismais-devkit/specs/2026-07-09-revisao-estrategica-plataforma.md docs/sismais-devkit/plans/2026-07-09-onda-agora-melhorias.md
 git commit -m "docs: revisão estratégica da plataforma + plano da onda Agora"
 ```
 

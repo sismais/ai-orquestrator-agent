@@ -109,7 +109,7 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 - **CLAUDE.md do projeto-alvo carrega no chat** (verificado empírico): `setting_sources=["user","project"]` + cwd = raiz do
   projeto carregam o `CLAUDE.md` e resolvem os `@imports` (ex.: `@AGENTS.md`). O pipeline usa o preset `claude_code` +
   `setting_sources=["project"]` (carrega igual), mas roda em worktree → só enxerga arquivos **commitados**.
-- Specs/planos: `docs/specs/2026-07-07-projeto-escopo-do-app-*.md` + `plans/2026-07-07-projeto-escopo-app-feature.md`
+- Specs/planos: `docs/sismais-devkit/specs/2026-07-07-projeto-escopo-do-app-*.md` + `plans/2026-07-07-projeto-escopo-app-feature.md`
   e `plans/2026-07-07-remocao-subsistema-legado.md`.
 
 ### Onda "Agora" da revisão estratégica (A1–A6) — feito 2026-07-09
@@ -248,9 +248,9 @@ com logs, parando no **ready-to-merge** para o humano aprovar/mergear. Nunca faz
 
 ## Design/planos versionados (superpowers) — começar por aqui ao retomar
 
-- Specs: `docs/specs/` — design por fase (painel, Fase 2/3a/3b/3c, interação humana, chat-stop, projeto=escopo do app).
-- Planos: `docs/plans/` — por fase (1 → 3d) + a feature "projeto = escopo do app" (feature + remoção do legado).
-- Notas: `docs/notes/` — **`2026-06-17-fork-code-map.md`** (mapa do código p/ as próximas fases,
+- Specs: `docs/sismais-devkit/specs/` — design por fase (painel, Fase 2/3a/3b/3c, interação humana, chat-stop, projeto=escopo do app).
+- Planos: `docs/sismais-devkit/plans/` — por fase (1 → 3d) + a feature "projeto = escopo do app" (feature + remoção do legado).
+- Notas: `docs/sismais-devkit/notes/` — **`2026-06-17-fork-code-map.md`** (mapa do código p/ as próximas fases,
   com pontos de acoplamento) e `2026-06-17-spike-skill-loading.md` (como o SDK carrega o DevKit em worktree).
 
 ## Arquivos-chave (atualizados)

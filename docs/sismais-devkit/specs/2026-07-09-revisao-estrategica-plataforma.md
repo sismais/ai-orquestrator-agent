@@ -4,7 +4,7 @@
 **Método:** análise somente-leitura (sem implementação), executada com Claude Code + Fable 5. Estado atual
 verificado no código por 10 frentes de exploração paralelas com regra de grounding (`arquivo:linha` lido nesta
 sessão); evidências conferidas por amostragem por um subagente verificador de contexto limpo.
-**Prompt de origem:** `docs/prompts/2026-07-09-revisao-estrategica-plataforma.prompt.md`
+**Prompt de origem:** `docs/sismais-devkit/prompts/2026-07-09-revisao-estrategica-plataforma.prompt.md`
 
 > **Convenção de grounding:** toda afirmação sobre o estado atual cita `arquivo:linha` verificado. O que foi
 > procurado e não existe está marcado como **não encontrado** (com a busca feita). Nada abaixo é inferido do

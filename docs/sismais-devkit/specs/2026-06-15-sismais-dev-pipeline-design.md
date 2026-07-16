@@ -117,7 +117,7 @@ Namespace `/sismais-dev-*` é o guarda-chuva do suite: o loop de review e o pain
 
 ## Artefatos e estado
 
-**Onde vivem:** no **projeto-alvo** (são entregáveis dele), em `docs/<raiz-configurável>/<feature-slug>/`. Raiz default proposta: `docs/sismais-dev/` (evita colisão com `docs/specs/`); definida ao plugar no gms-mobile e configurável por projeto.
+**Onde vivem:** no **projeto-alvo** (são entregáveis dele), em `docs/<raiz-configurável>/<feature-slug>/`. Raiz default proposta: `docs/sismais-dev/` (evita colisão com `docs/sismais-devkit/specs/`); definida ao plugar no gms-mobile e configurável por projeto.
 
 ```
 docs/sismais-dev/<feature-slug>/
@@ -185,7 +185,7 @@ Nota sobre o sub-projeto 2 (loop): o plugin oficial `anthropics/claude-plugins-o
 - **Pausa em excesso ou de menos.** Mitigação: calibrar o limiar do Pause-or-Decide numa amostra real do gms-mobile (faz parte do critério de aceitação).
 - **Saída genérica** (não usa o conhecimento do projeto). Mitigação: estágios obrigados a citar as skills/docs/código consultados; revisão do critério de aceitação cobre isso.
 - **Ferramenta Workflow exige opt-in explícito por invocação.** Mitigação: na v0.1, o motor determinístico pode ser um runner de estágios leve dentro da skill orquestradora (despacho direto de sub-agentes), reservando a ferramenta Workflow para quando o usuário optar. Decisão de plano.
-- **Colisão de raiz de artefatos** com `docs/specs/` ou outros. Mitigação: raiz configurável; default `docs/sismais-dev/`.
+- **Colisão de raiz de artefatos** com `docs/sismais-devkit/specs/` ou outros. Mitigação: raiz configurável; default `docs/sismais-dev/`.
 - **Schema exato de comandos/agents empacotados em plugin** a confirmar contra a doc do Claude Code (mesma cautela aplicada no `hello-internal`). Decisão de plano.
 
 ## Critérios de aceitação da v0.1

@@ -65,7 +65,7 @@ Detalhes, testes e gotchas (Windows, processos na 3001, repo-alvo de teste):
 | [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md) | Como rodar, testar, smoke do runner, gotchas |
 | [docs/ARQUITETURA_E_ESTADO.md](docs/ARQUITETURA_E_ESTADO.md) | Arquitetura e estado atual (fases/ondas) |
 | [devkit/README.md](devkit/README.md) | Camada de agentes + regra de fonte única (devkit-core) |
-| [docs/specs/](docs/specs/) | Histórico de decisões de design |
+| [docs/sismais-devkit/specs/](docs/sismais-devkit/specs/) | Histórico de decisões de design |
 
 **Modo terminal (sem painel):** os mesmos agentes rodam como plugins do Claude Code
 (CLI/VS Code) — interativo, zero infra, um repo por vez. Ver
