@@ -1,9 +1,14 @@
 # devkit/ — camada de agentes do DevKit
 
-Skills, comandos e subagentes do **Sismais AI DevKit**, migrados do marketplace privado
-(`sismais-ai-plugins-private`) para viver aqui. **Não** são mais um plugin instalável em
-`~/.claude`: o **orquestrador (backend) os carrega localmente via `claude-agent-sdk`** por
-run, apontando o `cwd` para a worktree do projeto-alvo.
+Skills, comandos e subagentes do **Sismais AI DevKit**. O **orquestrador (backend) os carrega
+localmente via `claude-agent-sdk`** por run, apontando o `cwd` para a worktree do projeto-alvo.
+
+> **Fonte única (2026-07-16):** os `agents/*.md` e `schemas/` são **cópias sincronizadas** do
+> `devkit-core/` do repo `sismais-ai-plugins-private` — **não edite aqui**; edite lá e rode
+> `node devkit-core/sync.mjs --platform <este repo>`. O sync grava
+> `devkit-core.manifest.json` e o teste `backend/tests/test_devkit_core_contract.py` falha
+> se as cópias divergirem do manifest (anti-drift). Design:
+> `docs/superpowers/specs/2026-07-16-devkit-core-e-entrega-rapida-design.md`.
 
 ## O que tem aqui (`.claude/`)
 

@@ -1,0 +1,7 @@
+Contexto da revisão: {"stage": "review", "iteration": 2}
+
+Primeira passada (rascunho, ignorar):
+{"blocks": [{"titulo": "rascunho antigo", "porque": "não vale"}], "fixNow": "não é array"}
+
+Resultado final:
+{"blocks": [], "fixNow": [], "suggestions": [{"titulo": "Nome mais claro para o service", "porque": "legibilidade"}]}

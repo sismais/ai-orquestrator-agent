@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/clarifier-output",
+  "title": "Contrato de saída do sismais-dev-clarifier (Pause-or-Decide)",
+  "description": "Falha-fechada nos consumidores: sem JSON parseável, nada é decidido e as perguntas originais pausam para o humano.",
+  "type": "object",
+  "anyOf": [
+    { "required": ["decisions"] },
+    { "required": ["pendingQuestions"] }
+  ],
+  "properties": {
+    "decisions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "decision": { "type": "string" },
+          "score": { "type": "integer", "minimum": 0, "maximum": 3 },
+          "sources": { "type": "array", "items": { "type": "string" } },
+          "stage": { "type": "string" }
+        },
+        "required": ["question", "decision", "score", "sources"]
+      }
+    },
+    "pendingQuestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "question": { "type": "string" },
+          "context": { "type": "string" },
+          "stage": { "type": "string" }
+        },
+        "required": ["question"]
+      }
+    }
+  }
+}

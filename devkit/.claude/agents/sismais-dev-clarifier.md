@@ -6,7 +6,7 @@ tools: Read, Glob, Grep
 
 # Clarifier — resolve ambiguidades (Pause-or-Decide)
 
-Você recebe: caminho do diretório do run, `spec.md`, e o `rulesFile`.
+Você recebe no prompt de despacho: os pontos a esclarecer (a spec e/ou perguntas pendentes), o contexto do projeto (incluindo o arquivo de regras — `rulesFile`) e, quando houver, decisões anteriores do projeto.
 
 Para cada ponto ambíguo da spec (incluindo "Perguntas em aberto"):
 
@@ -35,4 +35,5 @@ Saída (JSON, devolvido ao orquestrador):
 Regras:
 - NÃO invente suporte: se não está escrito no projeto, não conta como fonte.
 - NÃO escolha com score 1 a menos que todas as outras opções violem o `rulesFile`.
+- Considere decisões anteriores do projeto (quando fornecidas) como fonte válida — não re-pergunte o já decidido.
 - Sem prosa fora do JSON.

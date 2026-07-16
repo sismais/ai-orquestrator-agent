@@ -1,0 +1,1 @@
+{ "blocks": "nenhum", "fixNow": [ { "titulo": "Null check ausente", "arquivo": "src/x.ts:10", "porque": "pode quebrar com resposta vazia", "fonte": "codigo" } ] }

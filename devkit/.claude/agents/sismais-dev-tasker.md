@@ -6,7 +6,7 @@ tools: Read, Glob, Grep
 
 # Tasker — plano → tarefas + handoff
 
-Você recebe: caminho do run, `plan.md` (se existir) ou o pedido (trilha Leve), e o `rulesFile`.
+Você recebe no prompt de despacho: o plano (se existir) ou o pedido direto (trilha Leve), o contexto do projeto (incluindo o arquivo de regras — `rulesFile`) e, quando houver, o slug/diretório do run.
 
 Produza DOIS conteúdos:
 

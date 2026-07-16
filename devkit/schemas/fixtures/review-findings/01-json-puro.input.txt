@@ -1,0 +1,11 @@
+{
+  "blocks": [
+    { "titulo": "Query sem filtro de tenant", "arquivo": "src/db/orders.ts:42", "porque": "SELECT sem company_id viola isolamento multi-tenant", "fonte": "AGENTS.md" }
+  ],
+  "fixNow": [
+    { "titulo": "Erro engolido no catch", "arquivo": "src/sync/push.ts:88", "porque": "catch vazio esconde falha de sync", "fonte": "codigo" }
+  ],
+  "suggestions": [
+    { "titulo": "Extrair helper de formatação", "porque": "duplicado em 3 arquivos" }
+  ]
+}

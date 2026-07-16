@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/ci-triage-verdict",
+  "title": "Contrato de saída do sismais-dev-ci-triage",
+  "description": "Default conservador nos consumidores: sem JSON parseável ou verdict desconhecido → 'related' (tenta corrigir em vez de ignorar falha real).",
+  "type": "object",
+  "properties": {
+    "verdict": { "enum": ["related", "unrelated"] },
+    "porque": { "type": "string" }
+  },
+  "required": ["verdict"]
+}

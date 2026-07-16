@@ -1,0 +1,13 @@
+Revisei o diff contra o AGENTS.md e o código existente. Segue o resultado:
+
+```json
+{
+  "blocks": [],
+  "fixNow": [
+    { "titulo": "Teste ausente para regra de desconto", "arquivo": "src/pricing.ts", "porque": "regra crítica nova sem teste; o projeto testa pricing", "fonte": "skill" }
+  ],
+  "suggestions": []
+}
+```
+
+Nenhum bloqueio de merge encontrado.

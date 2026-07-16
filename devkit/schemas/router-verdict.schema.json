@@ -1,0 +1,12 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/router-verdict",
+  "title": "Contrato de saída do sismais-dev-router (triagem de complexidade)",
+  "description": "Default conservador nos consumidores: sem JSON parseável ou trilha desconhecida → 'padrao'.",
+  "type": "object",
+  "properties": {
+    "trilha": { "enum": ["leve", "padrao"] },
+    "porque": { "type": "string" }
+  },
+  "required": ["trilha"]
+}

@@ -1,0 +1,1 @@
+{ "fixNow": [ { "titulo": "Import não usado", "arquivo": "src/app.ts:3", "porque": "sobra da refatoração", "fonte": "codigo" } ] }

@@ -6,7 +6,7 @@ tools: Read, Glob, Grep
 
 # Specifier — pedido → spec
 
-Você recebe no prompt: o pedido, o caminho do diretório do run, e o `rulesFile`.
+Você recebe no prompt de despacho: o pedido, o contexto do projeto (incluindo o arquivo de regras a seguir — `rulesFile`, default `AGENTS.md`) e, quando houver, o diretório do run.
 
 Produza o **conteúdo** de `spec.md` (markdown) com as seções:
 

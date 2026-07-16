@@ -1,0 +1,32 @@
+{
+  "source": "sismais-ai-plugins-private/devkit-core",
+  "note": "Gerado por devkit-core/sync.mjs — nao edite os arquivos listados aqui; edite o core e re-sincronize.",
+  "files": {
+    ".claude/agents/sismais-dev-ci-triage.md": "d3ddfd20e89574349960d49eeb8269d6f68adcb5bb3bca68821403f6ab65176a",
+    ".claude/agents/sismais-dev-clarifier.md": "9a72cea368bb0a7ad2fd3f3b3372f88f9d024d9bdacfaf87532ff76b089d4328",
+    ".claude/agents/sismais-dev-implementer.md": "580603b566c99ffa00f8222e8cb3be0be582dee22f37099de58a750190d9afdd",
+    ".claude/agents/sismais-dev-planner.md": "e8f13f07e21d15dd0db9f5e519869e802bcdd936bdc7ebc331134a41a7d4ff0e",
+    ".claude/agents/sismais-dev-reviewer.md": "49261562d01163c12b6ddd3fa4bab1e41c26a71b095a7316af9f3b912fad8ea6",
+    ".claude/agents/sismais-dev-router.md": "b97afaeb7da9790399c28a981bdfb8a885c485bf2e6ce6d728f7ab79ae2e1dde",
+    ".claude/agents/sismais-dev-specifier.md": "fbb79bc7037a7207d9e4f2d773586237de1c03ea8dbf6981c31a149f5f8530cb",
+    ".claude/agents/sismais-dev-tasker.md": "f0ceabfd473055f0d21ed02716073cc13dc75e3977922628fcd4b1bfff118176",
+    "schemas/ci-triage-verdict.schema.json": "9cb906476b555018b669a0479ac386bd3da3e93188c11de91ac3d8d6d77abae7",
+    "schemas/clarifier-output.schema.json": "6390adcc8b5874f80a4b8f5c56540d527c09a24044e15ad2ae236645d9e8dd29",
+    "schemas/fixtures/review-findings/01-json-puro.expected.json": "b52e9bc641b616b7e5a27aaae64fb5198d2eaf99cdde65168277f2bbfb9829f4",
+    "schemas/fixtures/review-findings/01-json-puro.input.txt": "b52e9bc641b616b7e5a27aaae64fb5198d2eaf99cdde65168277f2bbfb9829f4",
+    "schemas/fixtures/review-findings/02-cerca-com-prosa.expected.json": "2490aa47ae9344cb85b016b740af986f627fd76452b3fede8806ec452dea042c",
+    "schemas/fixtures/review-findings/02-cerca-com-prosa.input.txt": "190ed39ac88fec6c7a1eb199b965fd7290cc20279226da3f5c62af411b25d2b9",
+    "schemas/fixtures/review-findings/03-baldes-parciais.expected.json": "0675c7d31287288d7afad2b5b29c02a03c04bbf82f3f95bd33a0625b7dd6bc91",
+    "schemas/fixtures/review-findings/03-baldes-parciais.input.txt": "11f5cfb8cbb91b7a167818a806997a2a41c49e818da8ea9f85975954edc09fe4",
+    "schemas/fixtures/review-findings/04-so-prosa.expected.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+    "schemas/fixtures/review-findings/04-so-prosa.input.txt": "90940223eebe0dfa0fcd8079e678b3ed383ee77dbdc54d9c4c209f87a49e10fe",
+    "schemas/fixtures/review-findings/05-vazio.expected.json": "38e0b9de817f645c4bec37c0d4a3e58baecccb040f5718dc069a72c7385a0bed",
+    "schemas/fixtures/review-findings/05-vazio.input.txt": "01ba4719c80b6fe911b091a7c05124b64eeece964e09c058ef8f9805daca546b",
+    "schemas/fixtures/review-findings/06-ultimo-objeto-vence.expected.json": "8a3a9c6387dfc1a9b75f3906ff1dbdb0ab28fee06d28ed7250dbadcb8b19c9e1",
+    "schemas/fixtures/review-findings/06-ultimo-objeto-vence.input.txt": "5dab17808af4cc9b0a8550b7213c0954d06b62403ebb1012b5c61557d7b36d0e",
+    "schemas/fixtures/review-findings/07-balde-nao-array.expected.json": "9e317f9d6c1aedfb0d6b82e0297f9f60a1d98d1f8196b298a685b32c07c4ff62",
+    "schemas/fixtures/review-findings/07-balde-nao-array.input.txt": "27e0cca73b85bad59fcd62ef612261eeb9394d7491da27d3703c7468e586eb9b",
+    "schemas/review-findings.schema.json": "ba3a343c310fc5fe51ee437e8182643c9e508dc1bb183e38c9c1af9866758829",
+    "schemas/router-verdict.schema.json": "5f70402bbe39fe96e2901b023167afce47e955817b352d52ef6cad3c6465ce4e"
+  }
+}

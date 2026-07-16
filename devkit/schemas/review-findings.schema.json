@@ -1,0 +1,39 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/review-findings",
+  "title": "Contrato de saída do sismais-dev-reviewer (e de reviewCommand plugável)",
+  "description": "Falha-fechada nos consumidores: texto sem um objeto JSON contendo ao menos um dos baldes NÃO pode aprovar o diff.",
+  "type": "object",
+  "anyOf": [
+    { "required": ["blocks"] },
+    { "required": ["fixNow"] },
+    { "required": ["suggestions"] }
+  ],
+  "properties": {
+    "blocks": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "fixNow": { "type": "array", "items": { "$ref": "#/$defs/finding" } },
+    "suggestions": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "titulo": { "type": "string" },
+          "porque": { "type": "string" }
+        },
+        "required": ["titulo"]
+      }
+    }
+  },
+  "$defs": {
+    "finding": {
+      "type": "object",
+      "properties": {
+        "titulo": { "type": "string" },
+        "arquivo": { "type": "string" },
+        "porque": { "type": "string" },
+        "fonte": { "type": "string" }
+      },
+      "required": ["titulo", "porque"]
+    }
+  }
+}

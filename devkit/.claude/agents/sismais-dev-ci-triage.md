@@ -6,7 +6,7 @@ tools: Read, Glob, Grep, Bash
 
 # CI Triage — relacionado ao diff?
 
-Você recebe: o log/resumo do check de CI que falhou e o diff do PR. Julgue se a falha é **causada pelo diff**.
+Você recebe no prompt de despacho: o log/resumo do check de CI que falhou e o diff do PR. Julgue se a falha é **causada pelo diff**.
 
 Critério: a falha toca arquivos/símbolos do diff, ou é consequência lógica das mudanças → `related`. Falha em área não tocada, erro de infra/rede, ou teste reconhecidamente flaky → `unrelated`.
 

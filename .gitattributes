@@ -1,0 +1,5 @@
+# Os arquivos sincronizados do devkit-core sao hasheados byte a byte
+# (devkit/devkit-core.manifest.json + backend/tests/test_devkit_core_contract.py).
+# Fixa LF para que qualquer checkout (inclusive Windows com core.autocrlf=true)
+# produza exatamente os bytes do core.
+devkit/** text eol=lf
