@@ -1,6 +1,6 @@
 # Painel — Fase 2b-1: Backend project-scoped (API de registro + workflow + cards) — Plano
 
-> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development. Steps usam checkbox (`- [ ]`). Parte **2b-1** (backend durável, aditivo) da Fase 2 (ver `docs/superpowers/specs/2026-07-02-panel-fase2-multiprojeto-workflow-design.md`). O **2b-2** (frontend: seletor, board dirigido por config, `projectId` nas chamadas, e validação de move por config) vem depois. **Adiado p/ Fase 3:** remover `database_manager`/ativo-global de vez, escopar `execute-*`, remover `ActiveProject`.
+> **For agentic workers:** REQUIRED SUB-SKILL: superpowers:subagent-driven-development. Steps usam checkbox (`- [ ]`). Parte **2b-1** (backend durável, aditivo) da Fase 2 (ver `docs/specs/2026-07-02-panel-fase2-multiprojeto-workflow-design.md`). O **2b-2** (frontend: seletor, board dirigido por config, `projectId` nas chamadas, e validação de move por config) vem depois. **Adiado p/ Fase 3:** remover `database_manager`/ativo-global de vez, escopar `execute-*`, remover `ActiveProject`.
 
 **Goal:** Expor no backend, de forma **aditiva e sem quebrar o que existe**: (1) API de registro de projetos (CRUD sobre a tabela `Project`), (2) API de workflow (`GET` da config), (3) cards filtrando por `project_id` opcional.
 

@@ -54,7 +54,7 @@ ai-orquestrator-agent/
 ├── frontend/    # React + @dnd-kit — board: seletor de projeto, colunas, logs ao vivo
 ├── devkit/      # DevKit: skills/commands/agents (.claude/) + helpers — os "agentes" das etapas
 ├── docs/        # docs do projeto (inclui agent-sdk-*.md do upstream — referência de integração)
-└── docs/superpowers/{specs,plans}/   # nossos specs/planos (este doc + DevKit migrado)
+└── docs/{specs,plans}/   # nossos specs/planos (este doc + DevKit migrado)
 ```
 O DevKit não é plugin distribuído; o **orquestrador carrega as skills localmente** para o SDK (mecanismo exato — user-scope, dir de skills do SDK, ou copiar pra worktree — a fechar no plano, usando `docs/agent-sdk-skills.md`/`agent-sdk-slash-commands.md`).
 
@@ -101,7 +101,7 @@ Estado transversal **Paused/needs-human**: o Pause-or-Decide (tarefa ambígua, d
 
 - **Reusar:** os **agentes** — skills `specify/clarify/plan/tasks` + `implementer/reviewer/ci-triage` — vão para `devkit/`.
 - **Substituir (não migram como estão):** a **orquestração e o estado** (`sismais-dev-loop` `SKILL.md`, `run-state.mjs`, `loop-state.mjs`) são substituídos pelo backend (Card/Execution no banco).
-- **Docs:** a SPEC/planos do DevKit vão para `docs/superpowers/{specs,plans}/` deste repo.
+- **Docs:** a SPEC/planos do DevKit vão para `docs/{specs,plans}/` deste repo.
 - **Repo de plugins:** remover/deprecar o DevKit de lá (decidir no plano). `hello-internal` e futuros plugins de setor permanecem.
 
 ## Stack

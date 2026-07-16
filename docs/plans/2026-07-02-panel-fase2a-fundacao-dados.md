@@ -1,6 +1,6 @@
 # Painel — Fase 2a: Fundação de Dados (banco único + config) — Plano de Implementação
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans. Steps usam checkbox (`- [ ]`). **Esta é a Fase 2a** (fundação de dados) da Fase 2 (ver `docs/superpowers/specs/2026-07-02-panel-fase2-multiprojeto-workflow-design.md`). A **Fase 2b** (rotas project-scoped + seletor + board dirigido por config no frontend) ganha plano próprio depois.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recomendado) ou superpowers:executing-plans. Steps usam checkbox (`- [ ]`). **Esta é a Fase 2a** (fundação de dados) da Fase 2 (ver `docs/specs/2026-07-02-panel-fase2-multiprojeto-workflow-design.md`). A **Fase 2b** (rotas project-scoped + seletor + board dirigido por config no frontend) ganha plano próprio depois.
 
 **Goal:** Consolidar num **banco único SQLite** (no repo, via `.env`), com tabelas `Project` (registro) e `Workflow` (config semeada), e `project_id` na tabela `cards` — sem quebrar o boot e com testes da lógica nova.
 

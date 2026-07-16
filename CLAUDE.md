@@ -15,7 +15,7 @@ reforma — o grosso do legado já foi **cortado** (algum resíduo inerte pode e
   fases + roadmap**, arquivos-chave, bugs de baseline.
 - **`docs/DESENVOLVIMENTO.md`** — como rodar backend (:3001) / frontend (:5173), testes, **gotchas**
   (zumbis na porta, WAL, `.env`), repo-alvo de teste, fluxo git.
-- **`docs/superpowers/{specs,plans,notes}/`** — design/planos por fase; nota **`fork-code-map.md`** mapeia
+- **`docs/{specs,plans,notes}/`** — design/planos por fase; nota **`fork-code-map.md`** mapeia
   o código para as próximas fases. Ao retomar uma fase, comece pelo spec/plan dela.
 
 ## Regras sempre ativas
@@ -29,7 +29,7 @@ reforma — o grosso do legado já foi **cortado** (algum resíduo inerte pode e
 - **DevKit** vive em `devkit/.claude/`; o runner **NÃO copia** pra worktree — o papel de cada estágio vem do
   `system_prompt` (lê o `.md` do agente), e a worktree fica pristina (o `.claude` do projeto commita normal).
 - **Método de evolução:** superpowers (brainstorm → spec → plano → execução com review). Specs/planos em
-  `docs/superpowers/`. Trabalho **direto na `main`** deste fork privado.
+  `docs/`. Trabalho **direto na `main`** deste fork privado.
 - **Preserve o que funciona.** Remoção de algo existente é sempre item explícito e planejado, nunca embutida.
 
 ## Rodar (resumo)

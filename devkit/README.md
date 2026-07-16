@@ -8,7 +8,7 @@ localmente via `claude-agent-sdk`** por run, apontando o `cwd` para a worktree d
 > `node devkit-core/sync.mjs --platform <este repo>`. O sync grava
 > `devkit-core.manifest.json` e o teste `backend/tests/test_devkit_core_contract.py` falha
 > se as cópias divergirem do manifest (anti-drift). Design:
-> `docs/superpowers/specs/2026-07-16-devkit-core-e-entrega-rapida-design.md`.
+> `docs/specs/2026-07-16-devkit-core-e-entrega-rapida-design.md`.
 
 ## O que tem aqui (`.claude/`)
 
@@ -21,7 +21,7 @@ localmente via `claude-agent-sdk`** por run, apontando o `cwd` para a worktree d
 
 - **Scripts de estado** (`scripts/run-state.mjs`, `loop-state.mjs`): a orquestração e o estado
   saem do skill e passam para o **backend** (tabelas `Card`/`Execution`), conforme o design
-  (`docs/superpowers/specs/2026-06-17-ai-orquestrador-panel-design.md`). Por isso as chamadas
+  (`docs/specs/2026-06-17-ai-orquestrador-panel-design.md`). Por isso as chamadas
   `node "${CLAUDE_PLUGIN_ROOT}/scripts/*.mjs"` que ainda aparecem nos `SKILL.md` ficam **inertes**
   sob o SDK (`${CLAUDE_PLUGIN_ROOT}` nem é definido fora do marketplace) — o **runner do backend
   as substitui na Fase 3**. O `sismais-dev-loop/SKILL.md` serve, até lá, como referência da
@@ -30,4 +30,4 @@ localmente via `claude-agent-sdk`** por run, apontando o `cwd` para a worktree d
 ## Origem / crédito
 
 Migrado de `sismais/sismais-ai-plugins-private` (plugins `sismais-dev` e `sismais-dev-loop`).
-Histórico de design e planos em `docs/superpowers/{specs,plans}/`.
+Histórico de design e planos em `docs/{specs,plans}/`.

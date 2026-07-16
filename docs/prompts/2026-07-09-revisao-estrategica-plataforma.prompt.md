@@ -1,7 +1,7 @@
 ---
 proposito: Prompt de revisão estratégica da plataforma (análise de gap entre visão de produto e estado atual)
 execucao: Claude Code + Fable 5, effort xhigh, sessão somente-análise (sem implementação)
-resultado: docs/superpowers/specs/2026-07-09-revisao-estrategica-plataforma.md
+resultado: docs/specs/2026-07-09-revisao-estrategica-plataforma.md
 ---
 # Revisão estratégica da plataforma de orquestração de agentes
 
@@ -18,9 +18,9 @@ A plataforma é **multi-modelo por design**: opera vários LLMs (configuráveis 
 Antes de qualquer análise, leia nesta ordem:
 
 1. `docs/ARQUITETURA_E_ESTADO.md` — arquitetura ativa, fases concluídas, o que foi removido
-2. `docs/superpowers/notes/2026-06-17-fork-code-map.md` — mapa do código
+2. `docs/notes/2026-06-17-fork-code-map.md` — mapa do código
 3. `docs/DESENVOLVIMENTO.md` — como rodar e gotchas
-4. Specs/planos em `docs/superpowers/{specs,plans}/` conforme precisar de detalhe por fase (OBS: podem estar obsoletos)
+4. Specs/planos em `docs/{specs,plans}/` conforme precisar de detalhe por fase (OBS: podem estar obsoletos)
 
 É um fork do Zenflow em reforma: não confie em comportamento legado. O que os docs dizem que foi removido, foi removido.
 
@@ -96,7 +96,7 @@ Regras da análise:
 
 ## Saída
 
-Crie `docs/superpowers/specs/2026-07-09-revisao-estrategica-plataforma.md` com:
+Crie `docs/specs/2026-07-09-revisao-estrategica-plataforma.md` com:
 
 - **Resumo do estado atual** (o checkpoint de 5 linhas).
 - **Sumário executivo** (≤ 10 linhas): as 3–5 melhorias que mais aumentam autonomia e fluidez.

@@ -1,6 +1,6 @@
 # Painel — Fase 1: Fundação & De-risk — Plano de Implementação
 
-> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) ou superpowers:executing-plans. Steps usam checkbox (`- [ ]`). **Esta é a Fase 1 de 4** (ver `docs/superpowers/specs/2026-06-17-ai-orquestrador-panel-design.md`). Fases 2–4 (multi-projeto+workflow-config, runner no backend, board) ganham plano próprio depois.
+> **For agentic workers:** REQUIRED SUB-SKILL: Use superpowers:subagent-driven-development (recommended) ou superpowers:executing-plans. Steps usam checkbox (`- [ ]`). **Esta é a Fase 1 de 4** (ver `docs/specs/2026-06-17-ai-orquestrador-panel-design.md`). Fases 2–4 (multi-projeto+workflow-config, runner no backend, board) ganham plano próprio depois.
 
 **Goal:** Deixar o fork rodando enxuto localmente, com o DevKit migrado pra `devkit/`, o **spike de skill-loading no SDK confirmado empiricamente** (dentro de uma worktree), rebrand + LICENSE, e um mapa do código pras próximas fases.
 
@@ -162,12 +162,12 @@ cp -r /d/Sismais/Fontes/ai-orquestrator-agent/devkit/.claude /d/Sismais/Fontes/_
 ```
 Ajustar o spike (`setting_sources=["project"]`) e rodar de novo. Registrar qual abordagem funcionou.
 
-- [ ] **Step 6: Documentar o resultado** — criar `docs/superpowers/notes/2026-06-17-spike-skill-loading.md` com: abordagem vencedora (user-scope × worktree-copy), o comando que funcionou, e a decisão pro backend (como o runner vai disponibilizar as skills por run).
+- [ ] **Step 6: Documentar o resultado** — criar `docs/notes/2026-06-17-spike-skill-loading.md` com: abordagem vencedora (user-scope × worktree-copy), o comando que funcionou, e a decisão pro backend (como o runner vai disponibilizar as skills por run).
 
 - [ ] **Step 7: Limpar a worktree de teste + commit**
 ```bash
 cd /d/Sismais/Fontes/gms-mobile && git worktree remove /d/Sismais/Fontes/_spike-wt --force; git branch -D spike-skill-loading
-cd /d/Sismais/Fontes/ai-orquestrator-agent && git add spike/ docs/superpowers/notes/ && git commit -m "spike(sdk): confirma carregamento de skill do DevKit em worktree"
+cd /d/Sismais/Fontes/ai-orquestrator-agent && git add spike/ docs/notes/ && git commit -m "spike(sdk): confirma carregamento de skill do DevKit em worktree"
 ```
 
 ---
@@ -181,7 +181,7 @@ cd /d/Sismais/Fontes/ai-orquestrator-agent && git add spike/ docs/superpowers/no
 > foram ADIADOS para a Fase 3** (decisão do usuário): acoplam ao núcleo que a Fase 3 reescreve
 > (`agent.py:525`→`live_broadcast_service`; `chat_service`→`orchestrator`; Gemini interleaved no
 > `agent.py`). Ficam inertes até lá (`ORCHESTRATOR_ENABLED=false`; Gemini não ofertado).
-> Pontos de acoplamento e arquivos catalogados em `docs/superpowers/notes/2026-06-17-fork-code-map.md`.
+> Pontos de acoplamento e arquivos catalogados em `docs/notes/2026-06-17-fork-code-map.md`.
 
 - [ ] **Step 1: Qdrant + embeddings**
 - Remover `docker-compose.yml` (só sobe o Qdrant).
@@ -232,7 +232,7 @@ git commit -m "chore(brand): renomeia para Sismais AI Orquestrador + LICENSE (MI
 ## Task 6: Mapa do código (entrega pras Fases 2–4)
 
 **Files:**
-- Create: `docs/superpowers/notes/2026-06-17-fork-code-map.md`
+- Create: `docs/notes/2026-06-17-fork-code-map.md`
 
 - [ ] **Step 1: Escrever o mapa** com os pontos que as próximas fases vão tocar (consolidando as análises):
   - **Máquina de estados/colunas (hardcoded em 3 lugares):** `frontend/src/types/index.ts` (`COLUMNS`, `ALLOWED_TRANSITIONS`, `isValidTransition`), `backend/src/repositories/card_repository.py` (`ALLOWED_TRANSITIONS`), `backend/src/schemas/card.py` (`ColumnId`). → Fase 2 (workflow como config) unifica os três + o mapa coluna→comando.
@@ -246,7 +246,7 @@ git commit -m "chore(brand): renomeia para Sismais AI Orquestrador + LICENSE (MI
 
 - [ ] **Step 2: Commit**
 ```bash
-git add docs/superpowers/notes/2026-06-17-fork-code-map.md
+git add docs/notes/2026-06-17-fork-code-map.md
 git commit -m "docs(mapa): mapa do codigo do fork para as Fases 2-4"
 ```
 

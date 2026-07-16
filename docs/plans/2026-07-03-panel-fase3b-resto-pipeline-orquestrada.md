@@ -1,7 +1,7 @@
 # Fase 3b-resto — Pipeline orquestrada pelo backend — Plano de Implementação
 
 > **Para workers agênticos:** SUB-SKILL: use subagent-driven-development (ou executing-plans) tarefa a tarefa.
-> Spec: `docs/superpowers/specs/2026-07-03-panel-fase3b-resto-pipeline-orquestrada-design.md`.
+> Spec: `docs/specs/2026-07-03-panel-fase3b-resto-pipeline-orquestrada-design.md`.
 
 **Objetivo:** o backend dirige o card por `plan → implement → review` (fix-loop, pause, avanço de coluna), executando
 o agente de estágio do DevKit por coluna numa worktree reusada, com logs em streaming pro board.
