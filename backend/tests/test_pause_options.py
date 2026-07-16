@@ -9,7 +9,19 @@ import json
 from unittest.mock import AsyncMock, MagicMock
 
 from src.repositories.activity_repository import ActivityRepository
-from src.services.pipeline_service import _format_questions, _pending_options
+from src.services.pipeline_service import _format_questions, _needs_human_question, _pending_options
+
+
+def test_needs_human_question_match_curto_usa_o_relato():
+    text = "Analisei a tarefa.\n\nO tom do texto nao esta definido: formal ou descontraido?\n\n**status: needs_human**"
+    q = _needs_human_question("**status: needs_human**", text)
+    assert "formal ou descontraido" in q
+
+
+def test_needs_human_question_match_informativo_e_mantido():
+    nh = "status: needs_human — o tom do README nao esta definido (formal vs descontraido); decida e eu sigo."
+    q = _needs_human_question(nh, "relato longo..." * 100)
+    assert nh in q
 
 
 def test_pending_options_uma_pergunta_com_options():

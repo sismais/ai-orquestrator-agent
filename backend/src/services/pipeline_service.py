@@ -160,6 +160,17 @@ def _format_questions(pend: list) -> str:
     return "\n".join(lines)
 
 
+def _needs_human_question(nh: str, full_text: str) -> str:
+    """Pergunta legivel para a pausa por needs_human.
+
+    `detect_needs_human` devolve so a LINHA do match (as vezes literalmente
+    '**status: needs_human**') — sem o motivo, o humano nao tem como responder.
+    Inclui o fim do relato do agente, onde motivo/pergunta costumam estar."""
+    tail = (full_text or "").strip()[-600:]
+    body = tail if len(nh.strip()) < 60 and tail else nh
+    return f"O agente precisa da sua decisao para continuar:\n\n{body}"
+
+
 def _pending_options(pend: list) -> "Optional[list[str]]":
     """Respostas sugeridas para renderizar como chips no card pausado.
 
@@ -470,7 +481,7 @@ async def run_pipeline(
                     if nh:
                         await finish_pause(
                             "implement: needs_human", nh,
-                            question=f"O agente precisa da sua decisao para continuar:\n\n{nh}",
+                            question=_needs_human_question(nh, res.text),
                         )
                         return
                     await gm.commit_all(worktree, f"wip: {card.title[:60]}")
@@ -676,7 +687,7 @@ async def run_pipeline(
                     nh = detect_needs_human(res.text)
                     if nh:
                         await finish_pause(f"{agent_key}: needs_human", nh,
-                                           question=f"O agente precisa da sua decisao para continuar:\n\n{nh}")
+                                           question=_needs_human_question(nh, res.text))
                         return
                     chain_parts.append(f"## Saida do estagio {agent_key}\n{res.text}")
                     col = next_active_column(transitions, col, pause_cols)
