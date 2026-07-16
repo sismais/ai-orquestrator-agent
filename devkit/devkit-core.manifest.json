@@ -27,6 +27,7 @@
     "schemas/fixtures/review-findings/07-balde-nao-array.expected.json": "9e317f9d6c1aedfb0d6b82e0297f9f60a1d98d1f8196b298a685b32c07c4ff62",
     "schemas/fixtures/review-findings/07-balde-nao-array.input.txt": "27e0cca73b85bad59fcd62ef612261eeb9394d7491da27d3703c7468e586eb9b",
     "schemas/review-findings.schema.json": "ba3a343c310fc5fe51ee437e8182643c9e508dc1bb183e38c9c1af9866758829",
-    "schemas/router-verdict.schema.json": "5f70402bbe39fe96e2901b023167afce47e955817b352d52ef6cad3c6465ce4e"
+    "schemas/router-verdict.schema.json": "5f70402bbe39fe96e2901b023167afce47e955817b352d52ef6cad3c6465ce4e",
+    "templates/AGENTS.template.md": "4f001005b711ccc3ae9aa7b79d4694d997bf99cd12f01a89accb73439649cd7c"
   }
 }
