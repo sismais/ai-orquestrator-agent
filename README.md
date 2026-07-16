@@ -14,6 +14,29 @@ Aplicação **local, single-user** (backend + frontend na sua máquina). Pré-re
 Node 20+, `gh` autenticado (`gh auth login`) e **Claude Code CLI instalado e logado** — o backend
 executa os agentes via `claude-agent-sdk` usando a assinatura do CLI (**sem** `ANTHROPIC_API_KEY`).
 
+### IA-first (recomendado)
+
+Cole o prompt abaixo num **Claude Code** (ou outra IA com acesso ao terminal):
+
+```text
+Deixe o Sismais AI Orquestrador (painel Kanban da Sismais) rodando na minha máquina.
+
+Fonte da verdade: o repo sismais/ai-orquestrator-agent — README ("Comece rápido") e
+docs/DESENVOLVIMENTO.md (passos detalhados e gotchas, principalmente no Windows). Se eu
+ainda não tiver o checkout local, pergunte em qual diretório clonar.
+
+Regras: confira os pré-requisitos ANTES de executar (Python 3.13, Node 20+, `gh`
+autenticado, Claude Code CLI logado — NÃO use ANTHROPIC_API_KEY); execute os passos
+VALIDANDO cada um pelo critério do doc (backend :3001 com "Dev workflow seeded" no log;
+frontend :5173 respondendo); quando algo falhar, consulte os gotchas do
+DESENVOLVIMENTO.md antes de improvisar; me peça apenas o que exige ação humana (logins).
+Ao final: me diga como registrar meu primeiro projeto no painel, como garantir o
+AGENTS.md dele e como subir os serviços de novo depois que eu fechar tudo.
+```
+
+> Prefere fazer à mão? Os passos abaixo continuam valendo — e são também o **playbook que a
+> IA segue** (e o caminho de debug quando algo falhar).
+
 ```bash
 # 1. Backend (porta 3001)
 cd backend
