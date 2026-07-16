@@ -45,6 +45,21 @@ export interface CardComment {
   author: string | null;   // 'agent' | 'human' | null
   text: string;
   timestamp: string;
+  /** Respostas sugeridas pelo agente (renderizadas como chips clicáveis no card pausado). */
+  options?: string[];
+}
+
+/** `new_value` do comentário carrega as respostas sugeridas como JSON (array de strings). */
+function parseOptions(raw: string | null | undefined): string[] | undefined {
+  if (!raw) return undefined;
+  try {
+    const parsed = JSON.parse(raw);
+    if (Array.isArray(parsed)) {
+      const clean = parsed.filter((o): o is string => typeof o === 'string' && o.trim().length > 0);
+      return clean.length > 0 ? clean : undefined;
+    }
+  } catch { /* new_value de outros tipos de atividade não é JSON — ignora */ }
+  return undefined;
 }
 
 /** Interrompe (Stop) o agente da etapa em execução; o pipeline pausa o card para correção. */
@@ -75,11 +90,11 @@ export async function getCardComments(cardId: string): Promise<CardComment[]> {
   const response = await fetch(`${API_CONFIG.BASE_URL}/api/activities/card/${encodeURIComponent(cardId)}`);
   if (!response.ok) return [];
   const data = await response.json();
-  const rows: Array<{ id: string; type: string; userId: string | null; description: string | null; timestamp: string }> =
+  const rows: Array<{ id: string; type: string; userId: string | null; description: string | null; timestamp: string; newValue?: string | null }> =
     data.activities || data || [];
   return rows
     .filter(r => r.type === 'commented')
-    .map(r => ({ id: r.id, author: r.userId, text: r.description || '', timestamp: r.timestamp }))
+    .map(r => ({ id: r.id, author: r.userId, text: r.description || '', timestamp: r.timestamp, options: parseOptions(r.newValue) }))
     .reverse(); // endpoint devolve desc; queremos cronologico
 }
 

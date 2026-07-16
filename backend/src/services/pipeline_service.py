@@ -150,9 +150,28 @@ def _format_questions(pend: list) -> str:
             question = q.get("question") or q.get("q") or str(q)
             ctx = q.get("context")
             lines.append(f"{i}. {question}" + (f"\n   ({ctx})" if ctx else ""))
+            opts = q.get("options")
+            if isinstance(opts, list) and opts:
+                lines.append("   Opções: " + " · ".join(
+                    f"{j}) {str(o).strip()}" for j, o in enumerate(opts[:4], 1) if str(o).strip()
+                ))
         else:
             lines.append(f"{i}. {q}")
     return "\n".join(lines)
+
+
+def _pending_options(pend: list) -> "Optional[list[str]]":
+    """Respostas sugeridas para renderizar como chips no card pausado.
+
+    So quando ha UMA pergunta pendente com `options` — com varias perguntas, uma resposta
+    unica clicavel seria ambigua (o texto do comentario ja numera as opcoes por pergunta)."""
+    if len(pend) != 1 or not isinstance(pend[0], dict):
+        return None
+    opts = pend[0].get("options")
+    if not isinstance(opts, list):
+        return None
+    clean = [str(o).strip()[:300] for o in opts[:4] if str(o).strip()]
+    return clean or None
 
 
 def _first_stage(transitions: dict, current: str, columns: list) -> Optional[str]:
@@ -285,12 +304,14 @@ async def run_pipeline(
             execution.fix_iterations = iteration
             execution.execution_cost = total_cost or None
 
-        async def finish_pause(reason: str, context: Optional[str], question: Optional[str] = None) -> None:
+        async def finish_pause(reason: str, context: Optional[str], question: Optional[str] = None,
+                               options: Optional[list[str]] = None) -> None:
             await log.event(f"PAUSE: {reason}")
-            # a pergunta do agente vira comentario no card (thread de interacao humana)
+            # a pergunta do agente vira comentario no card (thread de interacao humana);
+            # `options` (respostas sugeridas) viram chips clicaveis no front
             q = question or f"{reason}\n\n{context or ''}".strip()
             try:
-                await ActivityRepository(s).add_comment(card_id, "agent", q[:1900])
+                await ActivityRepository(s).add_comment(card_id, "agent", q[:1900], options=options)
             except Exception:  # noqa: BLE001
                 pass
             prev = card.column_id
@@ -560,7 +581,9 @@ async def run_pipeline(
                             "arquivo de regras do projeto, docs/, codigo existente e skills): score >= 2 "
                             "DECIDE citando as fontes; score < 2 mantem a pergunta pendente. "
                             'Devolva SO o JSON {"decisions": [{"question","decision","score","sources"}], '
-                            '"pendingQuestions": [{"question","context"}]} — sem prosa fora dele.'
+                            '"pendingQuestions": [{"question","context","options"}]} — sem prosa fora dele. '
+                            "Em cada pergunta pendente, `options` = 2-4 respostas plausiveis, completas e "
+                            "auto-contidas (o humano podera escolher uma sem reescrever); omita se nao houver."
                         )
                         gate = await stage_fn("clarify", worktree, gate_prompt, card_id=card_id,
                                               on_log=log, model=stage_model_for_agent("clarify", card))
@@ -607,7 +630,8 @@ async def run_pipeline(
                             await log.event(f"── gate decidiu {len(decided)} pendencia(s) com fonte ──")
                         if remaining:
                             await finish_pause(f"{agent_key}: pendencias", res.text[:1500],
-                                               question=_format_questions(remaining))
+                                               question=_format_questions(remaining),
+                                               options=_pending_options(remaining))
                             return
                         # tudo decidido: re-roda o estagio UMA vez com as decisoes (mesmo canal do human_answer)
                         decided_text = "\n".join(
@@ -646,7 +670,8 @@ async def run_pipeline(
                         if pend2:
                             # re-run ainda com pendencias: pausa direto (gate nao roda em loop)
                             await finish_pause(f"{agent_key}: pendencias apos o gate", res.text[:1500],
-                                               question=_format_questions(pend2))
+                                               question=_format_questions(pend2),
+                                               options=_pending_options(pend2))
                             return
                     nh = detect_needs_human(res.text)
                     if nh:

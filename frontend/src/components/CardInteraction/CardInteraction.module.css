@@ -73,6 +73,36 @@
   padding-top: 12px;
 }
 
+.chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.chip {
+  max-width: 100%;
+  text-align: left;
+  padding: 6px 10px;
+  border-radius: 999px;
+  border: 1px solid var(--accent, #6d5efc);
+  background: transparent;
+  color: var(--accent, #6d5efc);
+  font-size: 12.5px;
+  font-family: inherit;
+  line-height: 1.35;
+  cursor: pointer;
+}
+
+.chip:hover {
+  background: var(--accent, #6d5efc);
+  color: #fff;
+}
+
+.chipsHint {
+  font-size: 11px;
+  color: var(--text-muted, #a9a9b8);
+}
+
 .input {
   width: 100%;
   resize: vertical;

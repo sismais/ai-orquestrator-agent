@@ -3,7 +3,7 @@
   "note": "Gerado por devkit-core/sync.mjs — nao edite os arquivos listados aqui; edite o core e re-sincronize.",
   "files": {
     ".claude/agents/sismais-dev-ci-triage.md": "d3ddfd20e89574349960d49eeb8269d6f68adcb5bb3bca68821403f6ab65176a",
-    ".claude/agents/sismais-dev-clarifier.md": "9a72cea368bb0a7ad2fd3f3b3372f88f9d024d9bdacfaf87532ff76b089d4328",
+    ".claude/agents/sismais-dev-clarifier.md": "7396481e6f7d0d609a6fb9d4a53b799665e4bdcafb9196d3994eabc9d1a285e8",
     ".claude/agents/sismais-dev-implementer.md": "580603b566c99ffa00f8222e8cb3be0be582dee22f37099de58a750190d9afdd",
     ".claude/agents/sismais-dev-planner.md": "e8f13f07e21d15dd0db9f5e519869e802bcdd936bdc7ebc331134a41a7d4ff0e",
     ".claude/agents/sismais-dev-reviewer.md": "49261562d01163c12b6ddd3fa4bab1e41c26a71b095a7316af9f3b912fad8ea6",
@@ -11,7 +11,7 @@
     ".claude/agents/sismais-dev-specifier.md": "fbb79bc7037a7207d9e4f2d773586237de1c03ea8dbf6981c31a149f5f8530cb",
     ".claude/agents/sismais-dev-tasker.md": "f0ceabfd473055f0d21ed02716073cc13dc75e3977922628fcd4b1bfff118176",
     "schemas/ci-triage-verdict.schema.json": "9cb906476b555018b669a0479ac386bd3da3e93188c11de91ac3d8d6d77abae7",
-    "schemas/clarifier-output.schema.json": "6390adcc8b5874f80a4b8f5c56540d527c09a24044e15ad2ae236645d9e8dd29",
+    "schemas/clarifier-output.schema.json": "3ee522ad1964f7b994cb3fbc27f67aabe5b9a23eb6777a19ef48e74928e7677e",
     "schemas/fixtures/review-findings/01-json-puro.expected.json": "b52e9bc641b616b7e5a27aaae64fb5198d2eaf99cdde65168277f2bbfb9829f4",
     "schemas/fixtures/review-findings/01-json-puro.input.txt": "b52e9bc641b616b7e5a27aaae64fb5198d2eaf99cdde65168277f2bbfb9829f4",
     "schemas/fixtures/review-findings/02-cerca-com-prosa.expected.json": "2490aa47ae9344cb85b016b740af986f627fd76452b3fede8806ec452dea042c",

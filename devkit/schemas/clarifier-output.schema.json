@@ -30,7 +30,13 @@
         "properties": {
           "question": { "type": "string" },
           "context": { "type": "string" },
-          "stage": { "type": "string" }
+          "stage": { "type": "string" },
+          "options": {
+            "description": "2–4 respostas plausíveis, completas e auto-contidas — consumidores podem renderizá-las como opções clicáveis/numeradas.",
+            "type": "array",
+            "items": { "type": "string" },
+            "maxItems": 4
+          }
         },
         "required": ["question"]
       }

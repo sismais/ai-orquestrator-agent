@@ -19,6 +19,10 @@ export function CardInteraction({ card }: Props) {
   const [sending, setSending] = useState(false);
   const [resumed, setResumed] = useState(false);
   const isPaused = card.columnId === 'paused';
+  // Chips: respostas sugeridas da ULTIMA pergunta do agente (só faz sentido no card pausado,
+  // e só se ninguem respondeu depois dela).
+  const lastComment = comments[comments.length - 1];
+  const suggestions = isPaused && lastComment?.author === 'agent' && lastComment.options ? lastComment.options : [];
 
   useEffect(() => {
     let alive = true;
@@ -64,6 +68,18 @@ export function CardInteraction({ card }: Props) {
 
       {isPaused ? (
         <div className={styles.answerRow}>
+          {suggestions.length > 0 && (
+            <>
+              <div className={styles.chipsHint}>Sugestões do agente — clique para preencher (você pode editar antes de enviar):</div>
+              <div className={styles.chips}>
+                {suggestions.map((opt, i) => (
+                  <button key={i} type="button" className={styles.chip} onClick={() => setAnswer(opt)}>
+                    {opt.length > 80 ? `${opt.slice(0, 77)}…` : opt}
+                  </button>
+                ))}
+              </div>
+            </>
+          )}
           <textarea
             className={styles.input}
             value={answer}

@@ -1,5 +1,6 @@
 """Activity repository for database operations."""
 
+import json
 from datetime import datetime, timedelta
 from typing import Any, Optional
 from uuid import uuid4
@@ -62,13 +63,20 @@ class ActivityRepository:
         await self.session.refresh(activity)
         return activity
 
-    async def add_comment(self, card_id: str, author: str, text: str) -> ActivityLog:
-        """Grava um comentario no card (author sentinela: 'agent' | 'human')."""
+    async def add_comment(
+        self, card_id: str, author: str, text: str, options: Optional[list[str]] = None
+    ) -> ActivityLog:
+        """Grava um comentario no card (author sentinela: 'agent' | 'human').
+
+        `options`: respostas sugeridas (auto-contidas) para uma pergunta do agente — vao em
+        `new_value` como JSON e o front as renderiza como chips clicaveis no card pausado.
+        """
         return await self.log_activity(
             card_id=card_id,
             activity_type=ActivityType.COMMENTED,
             user_id=author,
             description=text,
+            new_value=json.dumps(options, ensure_ascii=False) if options else None,
         )
 
     async def get_recent_activities(

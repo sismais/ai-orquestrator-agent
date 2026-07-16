@@ -27,7 +27,7 @@ Saída (JSON, devolvido ao orquestrador):
     { "question": "...", "decision": "...", "score": 2, "sources": ["AGENTS.md", "src/..."], "stage": "clarify" }
   ],
   "pendingQuestions": [
-    { "question": "...", "context": "...", "stage": "clarify" }
+    { "question": "...", "context": "...", "stage": "clarify", "options": ["resposta completa A", "resposta completa B"] }
   ]
 }
 ```
@@ -36,4 +36,5 @@ Regras:
 - NÃO invente suporte: se não está escrito no projeto, não conta como fonte.
 - NÃO escolha com score 1 a menos que todas as outras opções violem o `rulesFile`.
 - Considere decisões anteriores do projeto (quando fornecidas) como fonte válida — não re-pergunte o já decidido.
+- Em cada pergunta pendente, devolva em `options` as 2–4 opções plausíveis que você levantou, escritas como **respostas completas e auto-contidas** (o humano pode escolher uma sem reescrever). Omita `options` se não houver alternativas claras.
 - Sem prosa fora do JSON.
