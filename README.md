@@ -1,157 +1,76 @@
 # 🚀 Sismais AI Orquestrador
 
 ![License](https://img.shields.io/badge/license-MIT-green)
-![Python](https://img.shields.io/badge/python-3.9+-blue)
-![Node](https://img.shields.io/badge/node-18+-green)
+![Python](https://img.shields.io/badge/python-3.13-blue)
+![Node](https://img.shields.io/badge/node-20+-green)
 
-Painel Kanban que **dirige e acompanha agentes de IA** (o Sismais AI DevKit) operando sobre projetos reais: cada coluna é uma etapa executada por uma skill-agente, orquestrada pelo backend numa git worktree isolada por card, com logs ao vivo — parando no *ready-to-merge* para o humano aprovar e fazer o merge.
+Painel Kanban que **dirige e acompanha agentes de IA** (o Sismais AI DevKit) operando sobre projetos reais: cada coluna é uma etapa executada por um agente, orquestrada pelo backend numa git worktree isolada por card, com logs ao vivo — parando no *ready-to-merge* para o humano aprovar e fazer o merge.
 
 > **Fork** de [eduwxyz/orquestrator-agent](https://github.com/eduwxyz/orquestrator-agent) ("Zenflow"), sob licença MIT — atribuição preservada em [LICENSE](LICENSE). Repositório privado da Sismais Tecnologia.
 
-## ✨ Features
+## Comece rápido
 
-- 📋 **Workflow Board Visual** - Interface moderna para gerenciamento de tarefas
-- 🤖 **Claude Agent Integration** - Execute tarefas automaticamente com IA
-- 🌲 **Git Worktree Automation** - Isolamento automático de branches
-- 📊 **Métricas e Dashboard** - Acompanhe custos e progresso
-- 💬 **Chat Integrado** - Converse com Claude sobre o projeto
-- 🔄 **Workflow Automation** - Pipeline plan → implement → test → review → done
-
-## 🎯 Use Cases
-
-- Desenvolvimento de features com IA
-- Code review automatizado
-- Geração de testes
-- Refatoração assistida
-- Documentação automática
-
-## 📋 Requisitos
-
-### Sistema
-- Python 3.9+
-- Node.js 18+
-- Git 2.30+
-- Claude Code CLI
-
-### API Keys
-- Anthropic API Key (Claude)
-- Google Generative AI Key (opcional para Gemini)
-
-## 🚀 Instalação Rápida
+Aplicação **local, single-user** (backend + frontend na sua máquina). Pré-requisitos: Python 3.13,
+Node 20+, `gh` autenticado (`gh auth login`) e **Claude Code CLI instalado e logado** — o backend
+executa os agentes via `claude-agent-sdk` usando a assinatura do CLI (**sem** `ANTHROPIC_API_KEY`).
 
 ```bash
-# 1. Clone o repositório
-git clone https://github.com/seu-usuario/zenflow.git
-cd zenflow
+# 1. Backend (porta 3001)
+cd backend
+python -m venv venv && . venv/Scripts/activate     # Windows/Git Bash (Linux/Mac: venv/bin/activate)
+pip install -r requirements.txt
+cp .env.example .env                                # sem API key — usa o login do Claude Code
+./venv/Scripts/python.exe -m src.main               # confira no log: "Dev workflow seeded"
 
-# 2. Instale Claude Code CLI
-curl -fsSL https://claude.ai/install.sh | bash
-
-# 3. Configure as variáveis de ambiente
-cp backend/.env.example backend/.env
-# Edite backend/.env com suas API keys
-
-# 4. Instale dependências
-npm run setup
-
-# 5. Inicie o sistema
+# 2. Frontend (porta 5173) — noutro terminal
+cd frontend
+npm install
+printf 'VITE_API_URL=http://localhost:3001\nVITE_WS_URL=ws://localhost:3001\n' > .env
 npm run dev
 ```
 
-Acesse http://localhost:5173
+Depois, em http://localhost:5173:
 
-## 🏗️ Arquitetura
+3. **Registre o projeto** (seletor no topo): nome, caminho local, branch base, comando de
+   validação. O projeto precisa ser um repo git com ≥ 1 commit; remote no GitHub é necessário
+   para o estágio de PR/CI.
+4. **Garanta o `AGENTS.md` do projeto** — é dele que os agentes tiram as regras (fluxo git,
+   zonas de risco, o que podem sem perguntar). O jeito guiado é rodar `/sismais-dev-init` no
+   projeto via Claude Code ([plugins do DevKit](https://github.com/sismais/sismais-ai-plugins-private)).
+5. **Crie um card no backlog e clique em Run.** O card percorre as colunas com logs ao vivo;
+   se o pipeline pausar, a pergunta vira comentário no card — responda e ele retoma sozinho.
+   Em `ready_to_merge`, faça o merge no GitHub; o card vai para `done` automaticamente.
 
-### Stack Tecnológica
-- **Frontend**: React + TypeScript + Vite
-- **Backend**: FastAPI + Python
-- **Database**: SQLite (multi-database)
-- **IA**: Claude Agent SDK + Gemini
-- **UI**: CSS Modules + Lucide Icons
+Detalhes, testes e gotchas (Windows, processos na 3001, repo-alvo de teste):
+[docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md).
 
-### Estrutura do Projeto
-```
-zenflow/
-├── frontend/          # Interface React
-├── backend/           # API FastAPI
-├── .claude/          # Comandos e skills do Agent SDK
-├── specs/            # Especificações de tarefas
-└── docs/             # Documentação
-```
+## Como funciona
 
-## 📖 Como Usar
+- **Workflow como config**: o board renderiza as colunas do workflow `dev`
+  (`paused → backlog → plan → implement → review → validate_ci → ready_to_merge → done`);
+  transições e agentes por coluna vêm do config em banco.
+- **Backend é o orquestrador**: despacha um agente por estágio (prompts do DevKit), faz todo o
+  git (commit/push/PR), roda o fix-loop review→implement com teto, espera o CI com triagem de
+  falha (related/unrelated) e **nunca faz merge** — regra inegociável.
+- **Pause-or-Decide**: o clarifier decide sozinho o que tem base documental (score 0–3 com
+  fonte, memória de decisões por projeto); só o genuinamente ambíguo pausa para o humano.
+- **Prompts dos agentes** são cópias sincronizadas do
+  [`devkit-core`](https://github.com/sismais/sismais-ai-plugins-private) — não edite
+  `devkit/.claude/agents/` aqui (ver [devkit/README.md](devkit/README.md)).
 
-### 1. Criar um Novo Card
-- Clique em "New Task" no board
-- Descreva a tarefa desejada
-- Selecione o modelo de IA (Claude/Gemini)
+## Documentação
 
-### 2. Executar Workflow Automatizado
-- Arraste o card para "Plan" → Gera especificação
-- Mova para "Implement" → Executa implementação
-- Continue para "Test" → Executa testes
-- Finalize em "Review" → Revisão de código
+| Doc | Conteúdo |
+|---|---|
+| [docs/DESENVOLVIMENTO.md](docs/DESENVOLVIMENTO.md) | Como rodar, testar, smoke do runner, gotchas |
+| [docs/ARQUITETURA_E_ESTADO.md](docs/ARQUITETURA_E_ESTADO.md) | Arquitetura e estado atual (fases/ondas) |
+| [devkit/README.md](devkit/README.md) | Camada de agentes + regra de fonte única (devkit-core) |
+| [docs/superpowers/specs/](docs/superpowers/specs/) | Histórico de decisões de design |
 
-### 3. Comandos Disponíveis
-- `/plan` - Criar plano de implementação
-- `/implement` - Executar implementação
-- `/test-implementation` - Validar e testar
-- `/review` - Revisar código
-- `/dev-workflow` - Pipeline completo
-
-## ⚙️ Configuração
-
-### Backend (.env)
-```env
-ANTHROPIC_API_KEY=your-key
-GOOGLE_API_KEY=your-key-optional
-DATABASE_URL=sqlite+aiosqlite:///./backend/auth.db
-SECRET_KEY=your-secret-key
-```
-
-### Claude Agent SDK
-Configure comandos customizados em `.claude/commands/`
-Configure skills em `.claude/skills/`
-
-## 🔧 Desenvolvimento
-
-### Estrutura de Database
-- **auth.db**: Database principal (users, cards, executions)
-- **.claude/database.db**: Database por projeto
-- **project_history.db**: Histórico de projetos
-
-### API Endpoints
-- `POST /api/cards` - Criar card
-- `GET /api/cards` - Listar cards
-- `PUT /api/cards/{id}` - Atualizar card
-- `POST /api/execute/{id}` - Executar card
-- `WS /ws/execution/{id}` - Stream de execução
-
-## 🤝 Contribuindo
-
-Veja [CONTRIBUTING.md](docs/CONTRIBUTING.md) para diretrizes.
-
-## 📝 Troubleshooting
-
-### Claude Code não encontrado
-```bash
-# Reinstale o CLI
-curl -fsSL https://claude.ai/install.sh | bash
-```
-
-### Database não inicializa
-```bash
-# Reset database
-rm backend/auth.db
-python backend/src/main.py  # Recria automaticamente
-```
+**Modo terminal (sem painel):** os mesmos agentes rodam como plugins do Claude Code
+(CLI/VS Code) — interativo, zero infra, um repo por vez. Ver
+[sismais-ai-plugins-private](https://github.com/sismais/sismais-ai-plugins-private).
 
 ## 📄 Licença
 
 MIT License - veja [LICENSE](LICENSE)
-
-## 🙏 Créditos
-
-- [Claude Agent SDK](https://github.com/anthropics/claude-agent-sdk)
-- [FastAPI](https://fastapi.tiangolo.com/)
-- [React](https://react.dev/)
