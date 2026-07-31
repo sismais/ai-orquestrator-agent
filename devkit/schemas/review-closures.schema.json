@@ -1,0 +1,28 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/review-closures",
+  "title": "Contrato de saída do sismais-dev-review-closure",
+  "description": "Vereditos de fechamento dos achados abertos em iterações anteriores. Consumido por review-track.mjs. Falha-fechada assimétrica: só `resolvido: true` fecha, e fid omitido continua aberto — ausência nunca fecha achado, porque some do relatório por amostragem diferente, não por ter sido corrigido.",
+  "type": "object",
+  "required": ["closures"],
+  "properties": {
+    "closures": { "type": "array", "items": { "$ref": "#/$defs/closure" } }
+  },
+  "$defs": {
+    "closure": {
+      "type": "object",
+      "required": ["fid", "resolvido", "motivo"],
+      "properties": {
+        "fid": {
+          "type": "string",
+          "description": "Id estável do achado, atribuído por review-track.mjs na primeira aparição. Não inclui número de linha: o próprio fix desloca as linhas e o achado viraria outro a cada iteração."
+        },
+        "resolvido": {
+          "type": "boolean",
+          "description": "true SÓ quando verificado no código que o problema não existe mais. Dúvida, trecho não localizado ou fix parcial => false."
+        },
+        "motivo": { "type": "string", "description": "Curto, citando arquivo:linha do estado atual." }
+      }
+    }
+  }
+}

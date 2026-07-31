@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/review-candidates",
+  "title": "Contrato de saída das lentes de review (achados candidatos, lista plana)",
+  "description": "Saída de sismais-dev-reviewer e das lentes -errors/-tests. Lista PLANA: o balde (blocks/fixNow/suggestions) NÃO é decidido pelo agente, e sim pela regra determinística de findings.mjs bucket — assim o mesmo achado cai sempre no mesmo balde entre iterações do loop. Falha-fechada nos consumidores: texto sem um objeto JSON contendo findings NÃO pode aprovar o diff.",
+  "type": "object",
+  "required": ["findings"],
+  "properties": {
+    "findings": { "type": "array", "items": { "$ref": "#/$defs/candidate" } },
+    "cobertura": {
+      "type": "string",
+      "description": "Declaração da varredura sistemática (símbolo enumerado, N total, investigados, faltantes). Fica FORA de findings porque é fato sobre o que o revisor investigou, não hipótese sobre o código: dentro da lista seria julgada pelo juiz e cortada por confiança, sumindo com o 'faltam estes Y'. Vai para meta.cobertura no bucket."
+    }
+  },
+  "$defs": {
+    "candidate": {
+      "type": "object",
+      "required": ["titulo", "porque"],
+      "properties": {
+        "id": {
+          "type": "string",
+          "description": "Único no run; prefixo por agente (r=reviewer, e=errors, t=tests). O juiz casa o veredito por ele.",
+          "pattern": "^[a-z]+[0-9]+$"
+        },
+        "titulo": { "type": "string" },
+        "arquivo": { "type": "string", "description": "caminho ou caminho:linha" },
+        "porque": { "type": "string" },
+        "fonte": { "type": "string", "description": "Referência verificável: arquivo de regra, doc ou código. Achado sem fonte é opinião." },
+        "conf": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 100,
+          "description": "Certeza de que o achado é VÁLIDO — não o impacto (isso é a classe). Ausente = assume o corte (nunca silencia por omissão)."
+        },
+        "atribuicao": {
+          "enum": ["PR-introduzido", "PR-ativado", "pre-existente"],
+          "description": "Causal, não posicional: o PR causou/ativou isto? Ausente ou desconhecido = PR-ativado (erra para revisar)."
+        },
+        "classe": {
+          "type": "string",
+          "description": "bug seguranca rls multi-tenant perda-dados silent-failure breaking-contrato pipeline regressao teste-ausente perf doc nit. O projeto pode definir a lista canônica no rulesFile."
+        },
+        "sugestao": { "type": "string", "description": "Proposta, nunca patch — as lentes são read-only." },
+        "agente": { "type": "string" }
+      }
+    }
+  }
+}

@@ -31,7 +31,7 @@ from ..services.findings import (
     detect_needs_human,
     parse_clarifier_output,
     parse_pending_questions,
-    parse_review_findings_strict,
+    parse_review_result,
     parse_track_verdict,
 )
 from ..services.runner_service import prepare_worktree
@@ -488,15 +488,17 @@ async def run_pipeline(
                     col = next_active_column(transitions, col, pause_cols)
 
                 elif agent_key == "review":
-                    f = parse_review_findings_strict(res.text)
+                    # Aceita os dois contratos: candidatos (`findings`, que passam pela regra
+                    # deterministica de bucket) e baldes (legado/reviewCommand plugavel).
+                    f = parse_review_result(res.text)
                     if f is None:
                         # falha-fechada: reviewer sem JSON re-explica o contrato e tenta 1x (A2)
                         await log.event("review sem JSON parseavel — re-pedindo o veredito")
                         retry_prompt = prompt + (
                             "\n\nIMPORTANTE: sua resposta DEVE terminar com o JSON "
-                            '{"blocks": [...], "fixNow": [...], "suggestions": [...]} '
-                            "(arrays vazios se o diff estiver aprovado). "
-                            "Nao ha veredito valido sem esse JSON."
+                            '{"findings": [...]} (array vazio se o diff estiver aprovado), '
+                            "onde cada achado tem titulo, arquivo, porque, fonte, conf, "
+                            "atribuicao e classe. Nao ha veredito valido sem esse JSON."
                         )
                         res = await stage_fn("review", worktree, retry_prompt, card_id=card_id, on_log=log,
                                              model=stage_model_for_agent("review", card))
@@ -512,7 +514,7 @@ async def run_pipeline(
                         if not res.ok:
                             await finish_pause("erro no re-pedido do review", res.error)
                             return
-                        f = parse_review_findings_strict(res.text)
+                        f = parse_review_result(res.text)
                         if f is None:
                             await finish_pause(
                                 "review sem veredito parseavel", (res.text or "")[:1500],

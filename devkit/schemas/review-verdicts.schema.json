@@ -1,0 +1,30 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/review-verdicts",
+  "title": "Contrato de saída do sismais-dev-review-judge",
+  "description": "Confiança recalibrada por um agente que NÃO produziu os achados. A conf do juiz substitui a do achador em findings.mjs bucket. Vereditos ilegíveis degradam para a conf do achador (erra para reportar demais) — o oposto de review-findings, onde a ausência de parse aprovaria indevidamente.",
+  "type": "object",
+  "required": ["verdicts"],
+  "properties": {
+    "verdicts": { "type": "array", "items": { "$ref": "#/$defs/verdict" } }
+  },
+  "$defs": {
+    "verdict": {
+      "type": "object",
+      "required": ["id", "motivo"],
+      "properties": {
+        "id": { "type": "string", "description": "O id do achado julgado, preservado. Achado sem veredito mantém a conf e a classe do achador." },
+        "conf": { "type": "integer", "minimum": 0, "maximum": 100, "description": "Certeza de que o achado é VERDADEIRO." },
+        "classe": {
+          "type": "string",
+          "description": "Só quando o juiz MUDA a classe da lente (omitir mantém a original). Reclassificar é tão importante quanto recalibrar: a classe decide o bloqueio de merge e vem da mesma lente que tem viés de inflar o impacto do que achou. Achado que não altera comportamento observável nunca é classe bloqueante."
+        },
+        "refutado": {
+          "type": "boolean",
+          "description": "true zera a conf. Só quando a verificação MOSTROU que o achado não procede — nunca por não ter conseguido confirmar."
+        },
+        "motivo": { "type": "string", "description": "Curto, citando a evidência (arquivo:linha ou trecho da regra)." }
+      }
+    }
+  }
+}
