@@ -1,3 +1,4 @@
+import asyncio
 import inspect
 
 import pytest
@@ -802,3 +803,89 @@ async def test_juiz_reclassifica_e_tira_do_bloqueio(maker):
     assert await _card_column(maker, card_id) == "ready_to_merge"
     assert counts.get("review") == 1
     assert counts.get("implement") == 1, "nao houve fix-loop"
+
+
+# --- lentes especializadas em paralelo ---------------------------------------------
+
+def test_poda_por_gatilho_sintatico():
+    """Rodar lente que nao tem o que olhar e so custo e ruido; o gatilho e grep-avel
+    em vez de 'julgue se aplica', que varia a cada rodada."""
+    sel = pipeline_service._select_review_lenses
+    assert sel("diff --git a/x b/x\n+mudou") == []
+    assert sel("+    try:\n+        pass") == ["review-errors"]
+    assert sel("+++ b/src/foo.test.ts\n+it('x', () => {})") == ["review-tests"]
+    assert sel("+    } catch (e) {\n+++ b/a_test.py\n+def test_x():") == [
+        "review-errors", "review-tests"]
+
+
+async def test_lentes_rodam_em_paralelo_e_somam_achados(maker, monkeypatch):
+    async def diff_com_catch(self, worktree_path, base_branch):
+        return "diff --git a/a.py b/a.py\n+    try:\n+        f()\n+    except Exception:\n+        pass"
+    monkeypatch.setattr(GitWorkspaceManager, "diff_against_base", diff_com_catch)
+
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({
+        "review": [_SEM_ACHADO, _SEM_ACHADO],
+        # so a lente de erros acha algo — e isso tem que bloquear o merge
+        "review-errors": [('{"findings":[{"titulo":"except vazio","arquivo":"a.py:3",'
+                           '"porque":"engole","conf":95,"atribuicao":"PR-introduzido",'
+                           '"classe":"silent-failure"}]}'), _SEM_ACHADO],
+        "review-judge": ['{"verdicts":[{"id":"e1","conf":95,"motivo":"confirmado"}]}'],
+        "review-closure": ['{"closures":[]}'],
+    })
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake,
+                                        max_iterations=2)
+
+    assert counts.get("review-errors") is not None, "lente de erros foi despachada"
+    assert counts.get("review-tests") is None, "sem arquivo de teste no diff, a lente nao roda"
+    # achado veio SO da lente: prova que os candidatos dela entram no bucket
+    assert counts.get("implement", 0) >= 2, "o achado da lente disparou o fix-loop"
+
+
+async def test_lente_que_falha_nao_derruba_o_review(maker, monkeypatch):
+    async def diff_com_catch(self, worktree_path, base_branch):
+        return "diff --git a/a.py b/a.py\n+    try:\n+        pass"
+    monkeypatch.setattr(GitWorkspaceManager, "diff_against_base", diff_com_catch)
+
+    counts: dict[str, int] = {}
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        counts[stage_key] = counts.get(stage_key, 0) + 1
+        if stage_key == "review-errors":
+            raise RuntimeError("lente explodiu")
+        text = _SEM_ACHADO if stage_key == "review" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text, cost_usd=0.01)
+
+    card_id = await _make_project_card(maker)
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    # o review geral ja rodou; perder uma lente degrada a cobertura, nao a execucao
+    assert counts.get("review-errors") == 1
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+
+
+async def test_lentes_sao_concorrentes_de_fato(maker, monkeypatch):
+    """A propriedade central do fan-out: se as lentes rodassem em serie, o ganho seria
+    zero e a mudanca so teria adicionado custo."""
+    async def diff_com_tudo(self, worktree_path, base_branch):
+        return ("diff --git a/a.py b/a.py\n+    try:\n+        pass\n"
+                "+++ b/a_test.py\n+def test_x():\n+    pass")
+    monkeypatch.setattr(GitWorkspaceManager, "diff_against_base", diff_com_tudo)
+
+    em_voo = 0
+    pico = 0
+
+    async def fake(stage_key, worktree, prompt, card_id=None, on_log=None, model=None):
+        nonlocal em_voo, pico
+        if stage_key.startswith("review-") and stage_key not in ("review-judge", "review-closure"):
+            em_voo += 1
+            pico = max(pico, em_voo)
+            await asyncio.sleep(0.05)
+            em_voo -= 1
+        text = _SEM_ACHADO if stage_key.startswith("review") and stage_key != "review-judge" else f"{stage_key} ok"
+        return StageResult(ok=True, text=text, cost_usd=0.01)
+
+    card_id = await _make_project_card(maker)
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert pico == 2, f"as duas lentes deviam estar em voo ao mesmo tempo (pico={pico})"

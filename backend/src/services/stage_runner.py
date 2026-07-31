@@ -39,6 +39,10 @@ STAGE_AGENTS: dict[str, tuple[str, list[str]]] = {
     # o closure so verifica se o que ficou aberto antes foi resolvido. Ambos read-only.
     "review-judge": ("sismais-dev-review-judge", ["Read", "Glob", "Grep"]),
     "review-closure": ("sismais-dev-review-closure", ["Read", "Glob", "Grep"]),
+    # Lentes especializadas, despachadas EM PARALELO com o review geral: o tempo total
+    # fica sendo o da lente mais lenta, nao a soma. Read-only, como o resto do review.
+    "review-errors": ("sismais-dev-reviewer-errors", ["Read", "Glob", "Grep"]),
+    "review-tests": ("sismais-dev-reviewer-tests", ["Read", "Glob", "Grep"]),
     "ci-triage": ("sismais-dev-ci-triage", ["Read", "Glob", "Grep", "Bash"]),
     "triage": ("sismais-dev-router", ["Read", "Glob", "Grep"]),
     # Estagios SDD genericos (N4): plugaveis via agentKey nas colunas de workflows custom
@@ -219,6 +223,21 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
             "(lista PLANA — o balde e decidido pelo orquestrador), sem prosa fora dele. "
             "Cada achado leva titulo, arquivo, porque, fonte, conf (0-100), atribuicao "
             "(PR-introduzido | PR-ativado | pre-existente) e classe.\n\n"
+            f"```diff\n{diff}\n```"
+        )
+
+    if stage_key in ("review-errors", "review-tests"):
+        diff = extra.get("diff") or "(diff vazio)"
+        foco = ("falha silenciosa: catch que engole, fallback que mascara, erro que vira "
+                "sucesso, promise solta, log sem contexto acionavel"
+                if stage_key == "review-errors" else
+                "cobertura comportamental: regra nova sem teste que a prove, teste que testa "
+                "o mock, assercao frouxa, caminho de erro descoberto")
+        return (
+            f"{header}\n\nRevise o diff a seguir pela SUA lente — {foco}. Nao repita o que "
+            "outra lente pegaria: fique no seu escopo. Devolva SO o JSON "
+            '`{"findings": [...]}` (lista plana), sem prosa fora dele, com titulo, arquivo, '
+            "porque, fonte, conf (0-100), atribuicao e classe em cada achado.\n\n"
             f"```diff\n{diff}\n```"
         )
 

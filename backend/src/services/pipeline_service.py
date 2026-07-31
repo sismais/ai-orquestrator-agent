@@ -10,6 +10,7 @@ Roda em background (o endpoint dispara e retorna na hora). Abre sua propria sess
 
 import asyncio
 import json
+import re
 import traceback
 from datetime import datetime
 from pathlib import Path
@@ -84,6 +85,58 @@ def stage_model_for_agent(agent_key: str, card) -> "str | None":
 
 # Compat (pre-N4): o nome antigo consultava por coluna; hoje coluna do seed dev == agentKey.
 stage_model_for_column = stage_model_for_agent
+
+
+class _LensSink:
+    """Buffer isolado para uma lente que roda em paralelo.
+
+    O `_LogSink` acumula num buffer unico e toca a sessao do SQLAlchemy — ele so e correto
+    porque tudo e awaited no mesmo coroutine. Com N lentes concorrentes, o texto delas se
+    intercalaria no mesmo buffer e a auditoria viraria uma salada onde nao se sabe qual
+    agente disse o que (e a sessao async nao e segura para uso concorrente).
+
+    Cada lente escreve aqui, em memoria, e o orquestrador despeja no log real depois do
+    gather — em ordem deterministica e com o nome da lente na frente.
+    """
+
+    def __init__(self, label: str):
+        self.label = label
+        self._parts: list[str] = []
+
+    async def __call__(self, text: str, log_type: str = "info") -> None:
+        self._parts.append(text)
+
+    async def flush(self) -> None:  # compat com a interface do _LogSink
+        return None
+
+    async def event(self, text: str) -> None:
+        self._parts.append(f"\n{text}\n")
+
+    def drained(self) -> str:
+        return "".join(self._parts).strip()
+
+
+# Gatilhos sintaticos da poda: rodar uma lente que nao tem o que olhar e so custo e ruido.
+# Regras grep-aveis em vez de "julgue se aplica" — o julgamento varia a cada rodada.
+_ERR_TRIGGER = re.compile(
+    r"^\+.*(\btry\b|\bcatch\b|\.catch\(|\bthrow\b|\breject\b|\bfinally\b|\bexcept\b|"
+    r"\brescue\b|logger\.(error|warn)|console\.(error|warn))",
+    re.MULTILINE,
+)
+_TEST_TRIGGER = re.compile(
+    r"^\+\+\+ .*(\.test\.|\.spec\.|_test\.|test_|/tests?/)|^\+.*\b(def test_|it\(|describe\()",
+    re.MULTILINE,
+)
+
+
+def _select_review_lenses(diff: str) -> list[str]:
+    """Lentes aplicaveis ao diff (o review geral roda sempre e nao entra na lista)."""
+    lenses = []
+    if _ERR_TRIGGER.search(diff or ""):
+        lenses.append("review-errors")
+    if _TEST_TRIGGER.search(diff or ""):
+        lenses.append("review-tests")
+    return lenses
 
 
 class _LogSink:
@@ -534,12 +587,51 @@ async def run_pipeline(
                             )
                             return
 
+                    # --- lentes especializadas, em paralelo ---------------------------
+                    # Enquanto o review geral e o gargalo, cada lente extra cabe na sombra
+                    # dele: o tempo total e o da lente mais lenta, nao a soma.
+                    candidates = parse_review_candidates(res.text)
+                    if candidates is not None:
+                        for i, c in enumerate(candidates):
+                            c["id"] = f"r{i + 1}"  # ids unicos entre lentes (o juiz casa por id)
+                            c.setdefault("agente", "review")
+                        lenses = _select_review_lenses(extra.get("diff") or "")
+                        if lenses:
+                            await log.event(f"lentes em paralelo: {', '.join(lenses)}")
+                            sinks = {k: _LensSink(k) for k in lenses}
+                            results = await asyncio.gather(*[
+                                stage_fn(k, worktree, build_stage_prompt(
+                                    k, card.title, card.description or "", worktree,
+                                    {"diff": extra.get("diff"), "context": stage_context},
+                                ), card_id=card_id, on_log=sinks[k],
+                                    model=stage_model_for_agent(k, card))
+                                for k in lenses
+                            ], return_exceptions=True)
+                            # despeja os buffers em ordem deterministica, ja fora da concorrencia
+                            for k, lres in zip(lenses, results):
+                                texto = sinks[k].drained()
+                                if texto:
+                                    await log.event(f"── {k} ──")
+                                    await log(texto + "\n")
+                                if isinstance(lres, BaseException):
+                                    # lente que falha nao derruba o review: o geral ja rodou
+                                    await log.event(f"{k} falhou ({lres}) — seguindo sem essa lente")
+                                    continue
+                                await account(lres, stage_model_for_agent(k, card))
+                                extras = parse_review_candidates(lres.text) if lres.ok else None
+                                for i, c in enumerate(extras or []):
+                                    c["id"] = f"{k[-1]}{i + 1}"
+                                    c.setdefault("agente", k)
+                                    candidates.append(c)
+                            await log.flush()
+                            f = bucket_findings(candidates)
+
                     # --- juiz: recalibra conf E classe, em contexto limpo -------------
                     # Quem procurou tem vies de justificar o que achou (conf) e de inflar o
                     # peso disso (classe). A classe decide o bloqueio, entao deixa-la sem
                     # revisao poe achado verdadeiro-mas-leve em `blocks` e faz o fix-loop
-                    # iterar "corrigindo" o que nao precisava.
-                    candidates = parse_review_candidates(res.text)
+                    # iterar "corrigindo" o que nao precisava. Julga o conjunto — geral
+                    # mais lentes —, por isso vem depois do gather.
                     if candidates:
                         jprompt = build_stage_prompt(
                             "review-judge", card.title, card.description or "", worktree,
