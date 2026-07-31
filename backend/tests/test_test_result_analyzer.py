@@ -108,7 +108,10 @@ class TestTestResultAnalyzer:
         description = analyzer.generate_fix_description(error_info)
 
         assert "🔧 Contexto do Erro" in description
-        assert "Tipo de erro: Syntax" in description
+        # a descricao e markdown (`**Tipo de erro:** Syntax`); casar a substring crua
+        # quebrava so por causa dos asteriscos, sem nada de errado no conteudo
+        linha_tipo = next(l for l in description.split("\n") if "Tipo de erro" in l)
+        assert "Syntax" in linha_tipo
         assert "test.py" in description
         assert "main.py" in description
         assert "test_login" in description

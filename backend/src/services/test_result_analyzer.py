@@ -30,8 +30,12 @@ class TestResultAnalyzer:
 
         for log in logs:
             if log.type == LogType.ERROR:
-                # Extract error type
-                if "SyntaxError" in log.content:
+                # Extract error type — o PRIMEIRO tipo encontrado vence: numa cadeia de
+                # falhas, o erro inicial costuma ser a causa e os seguintes, cascata.
+                # (Sobrescrever a cada log deixava o card apontando para o ultimo sintoma.)
+                if error_info["error_type"]:
+                    pass
+                elif "SyntaxError" in log.content:
                     error_info["error_type"] = "syntax"
                 elif "ImportError" in log.content or "ModuleNotFoundError" in log.content:
                     error_info["error_type"] = "import"
@@ -48,22 +52,7 @@ class TestResultAnalyzer:
                 elif "failed" in log.content.lower():
                     error_info["error_type"] = "general_failure"
 
-                # Extract files mentioned in error
-                # Match common file paths
-                file_patterns = [
-                    r'File "[^"]+\.(?:py|ts|tsx|js|jsx)"',  # Python/JS file references
-                    r'[a-zA-Z0-9_/\\]+\.(?:py|ts|tsx|js|jsx)',  # General file paths
-                    r'in (?:module|file) (\S+\.(?:py|ts|tsx|js|jsx))',  # Module references
-                ]
-
-                for pattern in file_patterns:
-                    matches = re.findall(pattern, log.content)
-                    for match in matches:
-                        # Clean up the file path
-                        if match.startswith('File "'):
-                            match = match[6:-1]  # Remove 'File "' and '"'
-                        if match not in error_info["affected_files"]:
-                            error_info["affected_files"].append(match)
+                TestResultAnalyzer._collect_files(log.content, error_info["affected_files"])
 
                 # Collect error messages (limit length for context)
                 error_msg = log.content[:1000] if len(log.content) > 1000 else log.content
@@ -77,12 +66,32 @@ class TestResultAnalyzer:
                     test_match = re.search(r'(test_\w+|describe.*?(?:it|test)\(.*?\))', log.content)
                     if test_match:
                         error_info["test_failures"].append(test_match.group(1))
+                    # O arquivo tambem sai daqui: runners reportam a falha em INFO
+                    # ("FAILED test_auth.py::test_login"), e sem isso o caso MAIS COMUM
+                    # — falha de teste — gerava card com "arquivos afetados: nenhum",
+                    # deixando o proximo agente sem por onde comecar.
+                    TestResultAnalyzer._collect_files(log.content, error_info["affected_files"])
 
         # Generate suggestions based on error type
         if error_info["error_type"]:
             error_info["suggestions"] = TestResultAnalyzer._generate_suggestions(error_info)
 
         return error_info
+
+    @staticmethod
+    def _collect_files(content: str, into: List[str]) -> None:
+        """Acrescenta a `into` os caminhos de arquivo citados em `content`, sem duplicar."""
+        file_patterns = [
+            r'File "[^"]+\.(?:py|ts|tsx|js|jsx)"',  # Python/JS file references
+            r'[a-zA-Z0-9_/\\]+\.(?:py|ts|tsx|js|jsx)',  # General file paths
+            r'in (?:module|file) (\S+\.(?:py|ts|tsx|js|jsx))',  # Module references
+        ]
+        for pattern in file_patterns:
+            for match in re.findall(pattern, content):
+                if match.startswith('File "'):
+                    match = match[6:-1]  # Remove 'File "' and '"'
+                if match not in into:
+                    into.append(match)
 
     @staticmethod
     def _generate_suggestions(error_info: Dict) -> List[str]:
