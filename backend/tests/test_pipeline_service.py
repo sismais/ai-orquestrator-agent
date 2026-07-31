@@ -885,7 +885,44 @@ async def test_lentes_sao_concorrentes_de_fato(maker, monkeypatch):
         text = _SEM_ACHADO if stage_key.startswith("review") and stage_key != "review-judge" else f"{stage_key} ok"
         return StageResult(ok=True, text=text, cost_usd=0.01)
 
-    card_id = await _make_project_card(maker)
-    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+    # projeto que cobra cobertura: sem isso a politica resolveria `none` pelo sinal
+    # objetivo (sem validate_command, sem arquivos de teste) e podaria a lente
+    async with maker() as s:
+        s.add(Project(id="p3", name="com-testes", path="/tmp/com-testes", workflow_id="dev",
+                      base_branch="main", validate_command="npm test"))
+        card = await CardRepository(s).create(CardCreate(title="Tarefa"), project_id="p3")
+        await s.commit()
+        card_id = card.id
+    await pipeline_service.run_pipeline("p3", card_id, session_maker=maker, stage_fn=fake)
 
     assert pico == 2, f"as duas lentes deviam estar em voo ao mesmo tempo (pico={pico})"
+
+
+async def test_test_policy_none_desliga_a_lente_e_silencia_a_classe(maker, monkeypatch):
+    """Em MVP, cobrar cobertura e ruido garantido — e desligar so a lente nao basta:
+    o review geral absorveria o trabalho."""
+    async def diff_com_teste(self, worktree_path, base_branch):
+        return "+++ b/a_test.py\n+def test_x():\n+    pass"
+    monkeypatch.setattr(GitWorkspaceManager, "diff_against_base", diff_com_teste)
+
+    async with maker() as s:
+        s.add(Project(id="p2", name="mvp", path="/tmp/mvp", workflow_id="dev",
+                      base_branch="main", validate_command="npm run build",
+                      test_policy="none"))
+        repo = CardRepository(s)
+        card = await repo.create(CardCreate(title="Tarefa MVP"), project_id="p2")
+        await s.commit()
+        card_id = card.id
+
+    # o review geral insiste em cobrar teste; a politica tem que descartar isso
+    fake, counts = make_stage_fn({
+        "review": ['{"findings":[{"titulo":"sem teste","arquivo":"a.py:1","porque":"x",'
+                   '"conf":100,"atribuicao":"PR-introduzido","classe":"teste-ausente"}]}'],
+        "review-judge": ['{"verdicts":[{"id":"r1","conf":100,"motivo":"procede"}]}'],
+    })
+    await pipeline_service.run_pipeline("p2", card_id, session_maker=maker, stage_fn=fake)
+
+    assert counts.get("review-tests") is None, "lente de testes nao roda sob testPolicy none"
+    # classe silenciada => nada a corrigir => converge na primeira rodada
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+    assert counts.get("implement") == 1

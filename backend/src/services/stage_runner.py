@@ -9,6 +9,8 @@ role apendado ao system prompt do Claude Code, e restringimos as tools as declar
 import inspect
 import json
 from dataclasses import dataclass
+
+from .test_policy import prompt_note_for
 from pathlib import Path
 from typing import Optional
 
@@ -215,10 +217,16 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
             "Ao terminar, reporte os arquivos mudados e `status: done` (ou `needs_human` com o motivo)."
         )
 
+    # A politica de testes acompanha as lentes que NAO sao a de testes: desligar a lente
+    # sem instruir as outras faz o review geral absorver o trabalho, e o projeto continua
+    # recebendo cobranca de cobertura — so que de outro agente.
+    policy_note = prompt_note_for(ctx.get("test_policy") or "full")
+
     if stage_key == "review":
         diff = extra.get("diff") or "(diff vazio)"
         return (
-            f"{header}\n\nRevise o diff a seguir contra as regras/padroes do projeto. "
+            f"{header}{policy_note}"
+            "\n\nRevise o diff a seguir contra as regras/padroes do projeto. "
             "Leia o codigo real, nao confie em relatos. Devolva SO o JSON `{\"findings\": [...]}` "
             "(lista PLANA — o balde e decidido pelo orquestrador), sem prosa fora dele. "
             "Cada achado leva titulo, arquivo, porque, fonte, conf (0-100), atribuicao "
@@ -228,13 +236,19 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
 
     if stage_key in ("review-errors", "review-tests"):
         diff = extra.get("diff") or "(diff vazio)"
-        foco = ("falha silenciosa: catch que engole, fallback que mascara, erro que vira "
-                "sucesso, promise solta, log sem contexto acionavel"
-                if stage_key == "review-errors" else
-                "cobertura comportamental: regra nova sem teste que a prove, teste que testa "
-                "o mock, assercao frouxa, caminho de erro descoberto")
+        if stage_key == "review-errors":
+            foco = ("falha silenciosa: catch que engole, fallback que mascara, erro que vira "
+                    "sucesso, promise solta, log sem contexto acionavel")
+            nota = policy_note  # a lente de erros tambem nao cobra cobertura
+        else:
+            foco = ("cobertura comportamental: regra nova sem teste que a prove, teste que testa "
+                    "o mock, assercao frouxa, caminho de erro descoberto")
+            # a lente de testes so e despachada quando a politica permite; em
+            # `critical-only` ela recebe o recorte do que vale cobrir
+            nota = prompt_note_for(ctx.get("test_policy") or "full") \
+                if (ctx.get("test_policy") == "critical-only") else ""
         return (
-            f"{header}\n\nRevise o diff a seguir pela SUA lente — {foco}. Nao repita o que "
+            f"{header}{nota}\n\nRevise o diff a seguir pela SUA lente — {foco}. Nao repita o que "
             "outra lente pegaria: fique no seu escopo. Devolva SO o JSON "
             '`{"findings": [...]}` (lista plana), sem prosa fora dele, com titulo, arquivo, '
             "porque, fonte, conf (0-100), atribuicao e classe em cada achado.\n\n"

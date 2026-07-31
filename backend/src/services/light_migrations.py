@@ -14,6 +14,7 @@ _COLUMNS = [
     ("cards", "requested_by", "VARCHAR(120)"),
     ("projects", "objective", "TEXT"),
     ("executions", "track", "VARCHAR(10)"),
+    ("projects", "test_policy", "VARCHAR(20)"),
 ]
 
 

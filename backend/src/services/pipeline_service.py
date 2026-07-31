@@ -41,6 +41,7 @@ from ..services.findings import (
     parse_track_verdict,
 )
 from ..services.review_track import track_findings
+from ..services.test_policy import muted_classes_for, resolve_test_policy
 from ..services.runner_service import prepare_worktree
 from ..services.stage_runner import (
     build_stage_prompt,
@@ -129,12 +130,12 @@ _TEST_TRIGGER = re.compile(
 )
 
 
-def _select_review_lenses(diff: str) -> list[str]:
+def _select_review_lenses(diff: str, test_policy: str = "full") -> list[str]:
     """Lentes aplicaveis ao diff (o review geral roda sempre e nao entra na lista)."""
     lenses = []
     if _ERR_TRIGGER.search(diff or ""):
         lenses.append("review-errors")
-    if _TEST_TRIGGER.search(diff or ""):
+    if test_policy != "none" and _TEST_TRIGGER.search(diff or ""):
         lenses.append("review-tests")
     return lenses
 
@@ -323,11 +324,15 @@ async def run_pipeline(
         log = _LogSink(s, exec_id, card_id)
         gm = GitWorkspaceManager(project.path)
         base_branch = project.base_branch or "main"
+        test_policy, test_policy_why = resolve_test_policy(
+            getattr(project, "test_policy", None), project.validate_command, project.path,
+        )
         stage_context = {
             "project_name": project.name,
             "objective": getattr(project, "objective", None),
             "rules_file": project.rules_file or "AGENTS.md",
             "requested_by": getattr(card, "requested_by", None),
+            "test_policy": test_policy,
         }
         # Workflow do card (N4): colunas+transicoes e regras de pausa vem do config.
         # Carregado ANTES de finish_pause: o destino da pausa e a coluna isPausedState do config.
@@ -595,7 +600,7 @@ async def run_pipeline(
                         for i, c in enumerate(candidates):
                             c["id"] = f"r{i + 1}"  # ids unicos entre lentes (o juiz casa por id)
                             c.setdefault("agente", "review")
-                        lenses = _select_review_lenses(extra.get("diff") or "")
+                        lenses = _select_review_lenses(extra.get("diff") or "", test_policy)
                         if lenses:
                             await log.event(f"lentes em paralelo: {', '.join(lenses)}")
                             sinks = {k: _LensSink(k) for k in lenses}
@@ -624,7 +629,7 @@ async def run_pipeline(
                                     c.setdefault("agente", k)
                                     candidates.append(c)
                             await log.flush()
-                            f = bucket_findings(candidates)
+                            f = bucket_findings(candidates, muted=muted_classes_for(test_policy))
 
                     # --- juiz: recalibra conf E classe, em contexto limpo -------------
                     # Quem procurou tem vies de justificar o que achou (conf) e de inflar o
@@ -644,7 +649,7 @@ async def run_pipeline(
                         verdicts = parse_review_verdicts(jres.text) if jres.ok else None
                         if verdicts:
                             judged = apply_verdicts(candidates, verdicts)
-                            f = bucket_findings(judged["findings"])
+                            f = bucket_findings(judged["findings"], muted=muted_classes_for(test_policy))
                             await log.event(
                                 f"juiz: {len(verdicts)} julgados, "
                                 f"{judged['reclassificados']} reclassificados, "

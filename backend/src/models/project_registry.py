@@ -20,6 +20,10 @@ class Project(Base):
     # Objetivo de negocio do projeto (A4) — injetado no prompt dos agentes de estagio
     objective: Mapped[str | None] = mapped_column(Text, nullable=True)
     validate_command: Mapped[str | None] = mapped_column(Text, nullable=True)
+    # none | critical-only | full. NULL = resolver pelo sinal objetivo do repo (ver
+    # resolve_test_policy): em MVP, cobrar cobertura e ruido garantido; em projeto
+    # grande e em producao, nao cobrar e risco.
+    test_policy: Mapped[str | None] = mapped_column(String(20), nullable=True)
     base_branch: Mapped[str] = mapped_column(String(255), nullable=False, default="main")
     workflow_id: Mapped[str | None] = mapped_column(String(36), nullable=True)
     favorite: Mapped[bool] = mapped_column(Boolean, nullable=False, default=False)
