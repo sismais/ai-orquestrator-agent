@@ -734,3 +734,71 @@ async def test_gate_sources_nao_string_persistidas_como_strings(maker):
     assert len(rows) == 1
     assert isinstance(rows[0].sources, list)
     assert all(isinstance(x, str) for x in rows[0].sources)
+
+
+# --- contrato de candidatos: juiz, fechamento e parada por achados abertos ----------
+# O caminho legado (baldes) segue coberto pelos testes acima; aqui e o contrato novo,
+# em que o balde sai da regra deterministica e o loop passa a ter memoria do que pediu.
+
+_ACHADO = ('{"findings":[{"id":"r1","titulo":"engole erro","arquivo":"a.py:10",'
+           '"porque":"catch vazio","conf":95,"atribuicao":"PR-introduzido",'
+           '"classe":"silent-failure"}]}')
+_SEM_ACHADO = '{"findings":[]}'
+
+
+async def test_candidatos_com_fechamento_convergem(maker):
+    card_id = await _make_project_card(maker)
+    # o fid nao vem do agente: e derivado de arquivo+classe+titulo pelo motor, e o
+    # closure precisa devolver exatamente ele (por isso o teste o calcula igual)
+    from src.services.review_track import stable_id
+    fid = stable_id({"arquivo": "a.py:10", "classe": "silent-failure", "titulo": "engole erro"})
+    fake, counts = make_stage_fn({
+        "review": [_ACHADO, _SEM_ACHADO],
+        "review-judge": ['{"verdicts":[{"id":"r1","conf":95,"motivo":"confirmado"}]}'],
+        # o closure fecha o achado explicitamente -> so entao o loop pode parar
+        "review-closure": [f'{{"closures":[{{"fid":"{fid}","resolvido":true,"motivo":"relanca agora"}}]}}'],
+    })
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+    assert counts.get("review-judge") == 1, "juiz roda quando ha candidatos"
+    assert counts.get("review-closure") == 1, "closure roda quando ha achado aberto"
+
+
+async def test_ausencia_nao_fecha_achado(maker):
+    """Achado some do relatorio sem veredito de fechamento -> continua aberto.
+
+    No contrato legado isso liberaria o merge; aqui nao, porque sumir do relatorio e
+    amostragem diferente, nao correcao."""
+    card_id = await _make_project_card(maker)
+    fake, counts = make_stage_fn({
+        "review": [_ACHADO, _SEM_ACHADO],
+        "review-judge": ['{"verdicts":[{"id":"r1","conf":95,"motivo":"confirmado"}]}'],
+        "review-closure": ["nao devolvi JSON nenhum"],  # sem fechamento parseavel
+    })
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake, max_iterations=2)
+
+    assert await _card_column(maker, card_id) == "paused"
+
+
+async def test_juiz_reclassifica_e_tira_do_bloqueio(maker):
+    """Achado verdadeiro que nao altera comportamento observavel sai de blocks.
+
+    Caso real do PR 465 do GMS Web: sem isto, o loop iteraria 'corrigindo' o que nao
+    precisava ate estourar o teto."""
+    card_id = await _make_project_card(maker)
+    achado_regressao = ('{"findings":[{"id":"r1","titulo":"remove rota","arquivo":"router.tsx:240",'
+                        '"porque":"stub sem referencia","conf":85,"atribuicao":"PR-introduzido",'
+                        '"classe":"bug"}]}')
+    fake, counts = make_stage_fn({
+        "review": [achado_regressao],
+        # juiz confirma que e verdadeiro (conf sobe) mas rebaixa o impacto para `nit`
+        "review-judge": ['{"verdicts":[{"id":"r1","conf":92,"classe":"nit",'
+                         '"motivo":"stub inalcancavel — nao muda comportamento observavel"}]}'],
+    })
+    await pipeline_service.run_pipeline("p1", card_id, session_maker=maker, stage_fn=fake)
+
+    # `nit` vira sugestao: nao bloqueia, entao converge na PRIMEIRA rodada
+    assert await _card_column(maker, card_id) == "ready_to_merge"
+    assert counts.get("review") == 1
+    assert counts.get("implement") == 1, "nao houve fix-loop"

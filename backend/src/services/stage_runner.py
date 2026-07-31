@@ -7,6 +7,7 @@ role apendado ao system prompt do Claude Code, e restringimos as tools as declar
 """
 
 import inspect
+import json
 from dataclasses import dataclass
 from pathlib import Path
 from typing import Optional
@@ -34,6 +35,10 @@ STAGE_AGENTS: dict[str, tuple[str, list[str]]] = {
     "plan": ("sismais-dev-planner", ["Read", "Glob", "Grep"]),
     "implement": ("sismais-dev-implementer", ["Read", "Glob", "Grep", "Edit", "Write", "Bash"]),
     "review": ("sismais-dev-reviewer", ["Read", "Glob", "Grep", "Bash"]),
+    # Contexto limpo, sem o vies de quem achou: o juiz refuta e recalibra conf/classe;
+    # o closure so verifica se o que ficou aberto antes foi resolvido. Ambos read-only.
+    "review-judge": ("sismais-dev-review-judge", ["Read", "Glob", "Grep"]),
+    "review-closure": ("sismais-dev-review-closure", ["Read", "Glob", "Grep"]),
     "ci-triage": ("sismais-dev-ci-triage", ["Read", "Glob", "Grep", "Bash"]),
     "triage": ("sismais-dev-router", ["Read", "Glob", "Grep"]),
     # Estagios SDD genericos (N4): plugaveis via agentKey nas colunas de workflows custom
@@ -210,9 +215,35 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
         diff = extra.get("diff") or "(diff vazio)"
         return (
             f"{header}\n\nRevise o diff a seguir contra as regras/padroes do projeto. "
-            "Leia o codigo real, nao confie em relatos. Devolva SO o JSON de achados "
-            "(`blocks`/`fixNow`/`suggestions`), sem prosa fora dele.\n\n"
+            "Leia o codigo real, nao confie em relatos. Devolva SO o JSON `{\"findings\": [...]}` "
+            "(lista PLANA — o balde e decidido pelo orquestrador), sem prosa fora dele. "
+            "Cada achado leva titulo, arquivo, porque, fonte, conf (0-100), atribuicao "
+            "(PR-introduzido | PR-ativado | pre-existente) e classe.\n\n"
             f"```diff\n{diff}\n```"
+        )
+
+    if stage_key == "review-judge":
+        diff = extra.get("diff") or "(diff vazio)"
+        candidatos = json.dumps(extra.get("candidates") or [], ensure_ascii=False, indent=1)
+        return (
+            f"{header}\n\nVoce NAO produziu estes achados — julgue-os. Tente REFUTAR cada um "
+            "contra o codigo e as regras do projeto, e devolva SO o JSON "
+            '`{"verdicts": [...]}`, um veredito por `id` recebido, sem prosa fora dele. '
+            "Recalibre `conf` (o achado e verdadeiro?) e, quando o impacto estiver errado, "
+            "devolva tambem `classe` (o achado e grave?).\n\n"
+            f"Achados candidatos:\n```json\n{candidatos}\n```\n\nDiff:\n```diff\n{diff}\n```"
+        )
+
+    if stage_key == "review-closure":
+        diff = extra.get("diff") or "(diff vazio)"
+        abertos = json.dumps(extra.get("open_findings") or [], ensure_ascii=False, indent=1)
+        return (
+            f"{header}\n\nEstes achados ficaram ABERTOS em iteracoes anteriores. Verifique, "
+            "contra o codigo atual, quais foram de fato resolvidos — o problema sumiu, nao "
+            "apenas a sugestao foi seguida. NAO procure problemas novos. Devolva SO o JSON "
+            '`{"closures": [...]}`, um veredito por `fid`, sem prosa fora dele. '
+            "`resolvido: true` SO quando voce verificou que o problema nao existe mais.\n\n"
+            f"Achados abertos:\n```json\n{abertos}\n```\n\nDiff da correcao:\n```diff\n{diff}\n```"
         )
 
     if stage_key == "ci-triage":

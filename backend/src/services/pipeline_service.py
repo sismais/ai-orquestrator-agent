@@ -28,12 +28,18 @@ from ..repositories.decision_repository import DecisionRepository, format_decisi
 from ..services.card_ws import card_ws_manager
 from ..services.execution_ws import execution_ws_manager
 from ..services.findings import (
+    apply_verdicts,
+    bucket_findings,
     detect_needs_human,
     parse_clarifier_output,
     parse_pending_questions,
+    parse_review_candidates,
+    parse_review_closures,
     parse_review_result,
+    parse_review_verdicts,
     parse_track_verdict,
 )
+from ..services.review_track import track_findings
 from ..services.runner_service import prepare_worktree
 from ..services.stage_runner import (
     build_stage_prompt,
@@ -287,6 +293,11 @@ async def run_pipeline(
             decisions_block = ""
         total_cost = 0.0
         iteration = 0
+        # Memoria dos achados ENTRE iteracoes do fix-loop. Os revisores sao frescos a cada
+        # rodada (sessao que persiste cristaliza o proprio engano e passa a checar "meu
+        # conselho foi seguido?" em vez de "o problema sumiu?"); o que nao pode ser fresco
+        # e o registro do que foi apontado — ele vive aqui, como dado.
+        review_state: "dict | None" = None
         chain_parts: list[str] = []  # saidas dos estagios genericos, encadeadas ate o implement
         tokens = {"input": 0, "output": 0}
         models_used: set[str] = set()
@@ -522,7 +533,81 @@ async def run_pipeline(
                                           "Como devo proceder?"),
                             )
                             return
-                    blocking = len(f["blocks"]) + len(f["fixNow"])
+
+                    # --- juiz: recalibra conf E classe, em contexto limpo -------------
+                    # Quem procurou tem vies de justificar o que achou (conf) e de inflar o
+                    # peso disso (classe). A classe decide o bloqueio, entao deixa-la sem
+                    # revisao poe achado verdadeiro-mas-leve em `blocks` e faz o fix-loop
+                    # iterar "corrigindo" o que nao precisava.
+                    candidates = parse_review_candidates(res.text)
+                    if candidates:
+                        jprompt = build_stage_prompt(
+                            "review-judge", card.title, card.description or "", worktree,
+                            {"candidates": candidates, "diff": extra.get("diff"), "context": stage_context},
+                        )
+                        jres = await stage_fn("review-judge", worktree, jprompt, card_id=card_id, on_log=log,
+                                              model=stage_model_for_agent("review-judge", card))
+                        await log.flush()
+                        await account(jres, stage_model_for_agent("review-judge", card))
+                        verdicts = parse_review_verdicts(jres.text) if jres.ok else None
+                        if verdicts:
+                            judged = apply_verdicts(candidates, verdicts)
+                            f = bucket_findings(judged["findings"])
+                            await log.event(
+                                f"juiz: {len(verdicts)} julgados, "
+                                f"{judged['reclassificados']} reclassificados, "
+                                f"{f['meta']['descartados']} abaixo do corte"
+                            )
+                        else:
+                            # Sem juiz o pipeline reporta DEMAIS, nao de menos — seguir com a
+                            # confianca do achador erra para o lado seguro.
+                            await log.event("juiz sem veredito parseavel — seguindo com a confianca do achador")
+
+                    # --- fechamento: o que ficou aberto antes foi resolvido? -----------
+                    closures = None
+                    abertos = [x for x in ((review_state or {}).get("findings") or [])
+                               if x.get("status") == "aberto"]
+                    if abertos:
+                        cprompt = build_stage_prompt(
+                            "review-closure", card.title, card.description or "", worktree,
+                            {"open_findings": abertos, "diff": extra.get("diff"), "context": stage_context},
+                        )
+                        cres = await stage_fn("review-closure", worktree, cprompt, card_id=card_id, on_log=log,
+                                              model=stage_model_for_agent("review-closure", card))
+                        await log.flush()
+                        await account(cres, stage_model_for_agent("review-closure", card))
+                        closures = parse_review_closures(cres.text) if cres.ok else None
+
+                    # O ciclo de vida vale SO para o contrato de candidatos. O legado
+                    # (baldes, reviewCommand plugavel) nao tem fid nem como emitir
+                    # fechamento — exigi-lo ali travaria todo review externo ate o teto,
+                    # entao nele "baldes vazios" continua significando aprovado.
+                    if candidates is not None:
+                        review_state = track_findings(
+                            current=f, previous=review_state, closures=closures, iteration=iteration + 1,
+                        )
+                        tmeta = review_state["meta"]
+                        if tmeta["semVerificacao"]:
+                            # ausencia nao fecha achado: sumiu do relatorio por amostragem
+                            # diferente, nao por ter sido corrigido
+                            await log.event(
+                                f"{tmeta['semVerificacao']} achado(s) sem verificacao de fechamento — seguem abertos"
+                            )
+                        if tmeta["escalar"]:
+                            # reabertura = loop andando em circulo entre implement e review
+                            await finish_pause(
+                                "review em circulo: achado resolvido reabriu",
+                                json.dumps(review_state["findings"], ensure_ascii=False)[:1500],
+                                question=("Um achado dado como resolvido voltou a aparecer — o loop esta "
+                                          "indo e voltando. Como devo proceder?"),
+                            )
+                            return
+                        # Parada por achados ABERTOS, nao por "o revisor nao achou nada nesta
+                        # rodada": a rodada pode ter passado longe do que apontou antes, e
+                        # "fechou 2, abriu 3" pareceria convergencia.
+                        blocking = tmeta["aindaAbertos"]
+                    else:
+                        blocking = len(f["blocks"]) + len(f["fixNow"])
                     if blocking > 0:
                         if iteration >= max_iterations:
                             await finish_pause(
