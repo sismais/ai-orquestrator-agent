@@ -45,6 +45,10 @@ STAGE_AGENTS: dict[str, tuple[str, list[str]]] = {
     # fica sendo o da lente mais lenta, nao a soma. Read-only, como o resto do review.
     "review-errors": ("sismais-dev-reviewer-errors", ["Read", "Glob", "Grep"]),
     "review-tests": ("sismais-dev-reviewer-tests", ["Read", "Glob", "Grep"]),
+    "review-comments": ("sismais-dev-reviewer-comments", ["Read", "Glob", "Grep"]),
+    # a unica lente com Bash: o valor dela esta justamente no que NAO esta no diff
+    # (git log/blame, PRs anteriores)
+    "review-history": ("sismais-dev-reviewer-history", ["Read", "Glob", "Grep", "Bash"]),
     "ci-triage": ("sismais-dev-ci-triage", ["Read", "Glob", "Grep", "Bash"]),
     "triage": ("sismais-dev-router", ["Read", "Glob", "Grep"]),
     # Estagios SDD genericos (N4): plugaveis via agentKey nas colunas de workflows custom
@@ -234,9 +238,21 @@ def build_stage_prompt(stage_key: str, title: str, description: str,
             f"```diff\n{diff}\n```"
         )
 
-    if stage_key in ("review-errors", "review-tests"):
+    if stage_key in ("review-errors", "review-tests", "review-comments", "review-history"):
         diff = extra.get("diff") or "(diff vazio)"
-        if stage_key == "review-errors":
+        if stage_key == "review-comments":
+            foco = ("comentario que mente: docstring que nao bate com a assinatura, garantia "
+                    "que o codigo nao da, TODO ja resolvido, referencia a algo renomeado. "
+                    "Compare o comentario com o codigo AO LADO — a pergunta e factual, nao "
+                    "estetica; ausencia de comentario nao e achado seu")
+            nota = policy_note
+        elif stage_key == "review-history":
+            foco = ("historico: o trecho ja foi mudado e revertido? a linha alterada nasceu de "
+                    "um fix cuja mensagem explica um caso limite? revisores ja pediram isto em "
+                    "PR anterior no mesmo arquivo? Use Bash para `git log`/`git blame`/`gh pr` — "
+                    "o diff voce ja tem. Todo achado cita sha ou numero de PR")
+            nota = policy_note
+        elif stage_key == "review-errors":
             foco = ("falha silenciosa: catch que engole, fallback que mascara, erro que vira "
                     "sucesso, promise solta, log sem contexto acionavel")
             nota = policy_note  # a lente de erros tambem nao cobra cobertura

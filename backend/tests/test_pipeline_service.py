@@ -926,3 +926,23 @@ async def test_test_policy_none_desliga_a_lente_e_silencia_a_classe(maker, monke
     # classe silenciada => nada a corrigir => converge na primeira rodada
     assert await _card_column(maker, card_id) == "ready_to_merge"
     assert counts.get("implement") == 1
+
+
+def test_poda_das_lentes_de_comentario_e_historico():
+    sel = pipeline_service._select_review_lenses
+    novo_sem_comentario = "--- /dev/null\n+++ b/novo.py\n+def f():\n+    return 1"
+    assert sel(novo_sem_comentario) == [], "arquivo novo sem comentario: nenhuma lente"
+    # comentario adicionado -> lente de comentarios
+    assert "review-comments" in sel("--- /dev/null\n+++ b/a.py\n+# calcula o total\n+x = 1")
+    # arquivo preexistente -> ha historico para consultar
+    assert "review-history" in sel("--- a/a.py\n+++ b/a.py\n+x = 2")
+    assert "review-history" not in sel(novo_sem_comentario), "arquivo novo nao tem historico"
+
+
+def test_prefixo_de_id_por_lente_nao_colide():
+    """`review-errors`[-1] e `review-tests`[-1] sao ambos 's' — derivar o prefixo do nome
+    fazia dois achados diferentes virarem o mesmo id, e o juiz casa veredito por id."""
+    prefixos = [pipeline_service._LENS_ID_PREFIX[k] for k in pipeline_service._LENS_ID_PREFIX]
+    assert len(prefixos) == len(set(prefixos)), f"prefixos colidem: {prefixos}"
+    assert set(pipeline_service._LENS_ID_PREFIX) == {
+        "review-errors", "review-tests", "review-comments", "review-history"}

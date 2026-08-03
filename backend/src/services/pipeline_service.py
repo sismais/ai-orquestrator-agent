@@ -128,15 +128,36 @@ _TEST_TRIGGER = re.compile(
     r"^\+\+\+ .*(\.test\.|\.spec\.|_test\.|test_|/tests?/)|^\+.*\b(def test_|it\(|describe\()",
     re.MULTILINE,
 )
+# Linha ADICIONADA que e comentario. Sem comentario novo no diff, nao ha o que comparar.
+_COMMENT_TRIGGER = re.compile(
+    r'^\+\s*(//|#|/\*|\*(?!/)|"""|\'\'\'|<!--|--\s)',
+    re.MULTILINE,
+)
+# Arquivo PREEXISTENTE (o `--- a/x` de um arquivo novo e `--- /dev/null`): arquivo novo
+# nao tem `git log`, `blame` nem PR anterior para consultar.
+_HISTORY_TRIGGER = re.compile(r"^--- (?!/dev/null)", re.MULTILINE)
+
+# Prefixo do id por lente. EXPLICITO de proposito: derivar do nome (`k[-1]`) fazia
+# "review-errors" e "review-tests" gerarem o mesmo "s", e o juiz casa veredito por id —
+# o parecer de um achado acabaria aplicado a outro.
+_LENS_ID_PREFIX = {
+    "review-errors": "e", "review-tests": "t",
+    "review-comments": "c", "review-history": "h",
+}
 
 
 def _select_review_lenses(diff: str, test_policy: str = "full") -> list[str]:
     """Lentes aplicaveis ao diff (o review geral roda sempre e nao entra na lista)."""
+    diff = diff or ""
     lenses = []
-    if _ERR_TRIGGER.search(diff or ""):
+    if _ERR_TRIGGER.search(diff):
         lenses.append("review-errors")
-    if test_policy != "none" and _TEST_TRIGGER.search(diff or ""):
+    if test_policy != "none" and _TEST_TRIGGER.search(diff):
         lenses.append("review-tests")
+    if _COMMENT_TRIGGER.search(diff):
+        lenses.append("review-comments")
+    if _HISTORY_TRIGGER.search(diff):
+        lenses.append("review-history")
     return lenses
 
 
@@ -625,7 +646,7 @@ async def run_pipeline(
                                 await account(lres, stage_model_for_agent(k, card))
                                 extras = parse_review_candidates(lres.text) if lres.ok else None
                                 for i, c in enumerate(extras or []):
-                                    c["id"] = f"{k[-1]}{i + 1}"
+                                    c["id"] = f"{_LENS_ID_PREFIX.get(k, 'x')}{i + 1}"
                                     c.setdefault("agente", k)
                                     candidates.append(c)
                             await log.flush()
