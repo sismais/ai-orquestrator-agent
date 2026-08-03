@@ -1,0 +1,73 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/sync-candidates",
+  "title": "Contrato de saída das lentes de sync",
+  "description": "Saída das lentes sismais-dev-sync-*. `findings` é o MESMO contrato de review-candidates (lista plana, sem balde) — de propósito: o juiz sismais-dev-review-judge e o findings.mjs bucket são reusados sem adaptação. O que o sync acrescenta é `pendingQuestions`: existe uma classe de conflito que NÃO é achado técnico e não pode virar decisão do agente — mudança de comportamento de algo que já funciona para o usuário. Falha-fechada: texto sem um objeto JSON com findings não aprova o merge.",
+  "type": "object",
+  "required": ["findings"],
+  "properties": {
+    "findings": {
+      "type": "array",
+      "description": "Cada item segue sismais-devkit-core/review-candidates#/$defs/candidate, com dois campos a mais: `classeRisco` (número do catálogo) e `lado`.",
+      "items": { "$ref": "#/$defs/syncCandidate" }
+    },
+    "pendingQuestions": {
+      "type": "array",
+      "description": "Decisões de produto. Vão para o humano SEMPRE — score alto de Pause-or-Decide não as torna do agente, porque não é falta de base documental: é escolha de dono. No modo interativo viram pergunta na hora; no autônomo, pendência devolvida ao orquestrador. Um sync com pendências abertas não é um sync concluído.",
+      "items": { "$ref": "#/$defs/pendingQuestion" }
+    },
+    "naoVerificado": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "O que a lente não conseguiu verificar e por quê. 'Não consegui verificar' é resultado válido; silêncio no lugar dele é falso senso de segurança."
+    },
+    "cobertura": { "type": "string", "description": "Quando houve varredura sistemática: símbolo enumerado, N total, investigados, faltantes." }
+  },
+  "$defs": {
+    "syncCandidate": {
+      "type": "object",
+      "required": ["titulo", "porque"],
+      "properties": {
+        "id": { "type": "string", "pattern": "^[a-z]+[0-9]+$", "description": "Prefixo `s` nas lentes de sync (s1, s2…). O juiz casa o veredito por ele." },
+        "titulo": { "type": "string" },
+        "arquivo": { "type": "string", "description": "caminho ou caminho:linha" },
+        "porque": { "type": "string" },
+        "fonte": { "type": "string", "description": "Referência verificável: rulesFile, doc, inventário de rupturas ou o próprio código." },
+        "conf": { "type": "integer", "minimum": 0, "maximum": 100 },
+        "atribuicao": {
+          "enum": ["PR-introduzido", "PR-ativado", "pre-existente"],
+          "description": "No sync, `PR-introduzido` = criado pela combinação dos dois lados (mesmo que cada lado, sozinho, estivesse correto)."
+        },
+        "classe": { "type": "string", "description": "Mesma lista do review (bug, seguranca, rls, multi-tenant, breaking-contrato, regressao, teste-ausente…)." },
+        "classeRisco": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8,
+          "description": "Número da classe no catálogo de risco do sync. Sem ele não dá para saber se o catálogo está cobrindo ou se a classe está faltando."
+        },
+        "lado": {
+          "enum": ["nosso", "deles", "combinacao"],
+          "description": "De onde veio o código problemático. `combinacao` é o caso típico do sync: nenhum lado errou sozinho."
+        },
+        "sugestao": { "type": "string", "description": "Proposta, nunca patch — as lentes são read-only." },
+        "agente": { "type": "string" }
+      }
+    },
+    "pendingQuestion": {
+      "type": "object",
+      "required": ["question", "context", "options"],
+      "properties": {
+        "question": { "type": "string" },
+        "context": { "type": "string", "description": "Curto: o que os dois lados fizeram e por que a escolha não é técnica." },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string" },
+          "description": "Respostas completas e auto-contidas — o humano escolhe uma sem reescrever nada. Mesmo formato do sismais-dev-clarifier."
+        },
+        "arquivo": { "type": "string" },
+        "stage": { "type": "string", "const": "sync" }
+      }
+    }
+  }
+}

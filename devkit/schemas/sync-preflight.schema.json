@@ -1,0 +1,70 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/sync-preflight",
+  "title": "Pré-voo do sync (fatos determinísticos, sem modelo)",
+  "description": "Saída de devkit-core/scripts/sync-preflight.mjs. Mede o trabalho ANTES de gastar agente: o porte dimensiona o fan-out das lentes. Campo nulo significa 'não consegui verificar' e nunca 'está tudo certo' — conflitosPrevistos null é git antigo, prsAbertos null é gh ausente; zero falso seria pior que a ausência.",
+  "type": "object",
+  "required": ["version", "ours", "theirs", "mergeBase", "arquivos", "porte"],
+  "properties": {
+    "version": { "const": 1 },
+    "ours": { "type": "string", "description": "Nossa branch (a que recebe)." },
+    "theirs": { "type": "string", "description": "Ref do outro lado (a que traz)." },
+    "mergeBase": { "type": "string" },
+    "commits": {
+      "type": "object",
+      "description": "Contagem informativa. NÃO é medida de risco — 67 commits que não encostam nos nossos arquivos são mais baratos que 3 que encostam.",
+      "properties": { "nossos": { "type": "integer" }, "deles": { "type": "integer" } }
+    },
+    "arquivos": {
+      "type": "object",
+      "required": ["intersecao"],
+      "properties": {
+        "nossos": { "type": "integer" },
+        "deles": { "type": "integer" },
+        "intersecao": { "type": "integer", "description": "A medida que importa: arquivos tocados pelos DOIS lados." }
+      }
+    },
+    "intersecao": { "type": "array", "items": { "type": "string" } },
+    "conflitosPrevistos": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "Via `git merge-tree --write-tree` (não suja a árvore de trabalho). null = git < 2.38, só o merge real dirá."
+    },
+    "migrations": {
+      "type": "object",
+      "description": "Estado versionado do alvo. `intercaladas` é a classe 4 do catálogo: migration do outro lado que, ordenada, cai antes da última nossa — numa base limpa roda antes; no ambiente que já aplicou as nossas, rodou depois.",
+      "properties": {
+        "nossas": { "type": "array", "items": { "type": "string" } },
+        "deles": { "type": "array", "items": { "type": "string" } },
+        "intercaladas": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "porte": { "enum": ["P", "M", "G"] },
+    "porteMotivo": { "type": "string" },
+    "lentesRecomendadas": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Fan-out proporcional ao porte. Sync pequeno não abre o leque completo."
+    },
+    "prsAbertos": {
+      "type": ["array", "null"],
+      "items": { "type": "string" },
+      "description": "PRs abertos contra a nossa branch — vão herdar este merge. null = `gh` indisponível."
+    },
+    "armadilhas": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Declaradas em .sismais-dev.json (sync.armadilhas): onde a bateria do projeto mente. Fica na config, não na cabeça de quem executa."
+    },
+    "proibidos": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Comandos que não podem ser rodados contra o ambiente de trabalho."
+    },
+    "naoVerificado": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "O que o pré-voo NÃO checou. Existe para o relatório não passar falso senso de segurança."
+    }
+  }
+}

@@ -41,6 +41,8 @@ Se o `rulesFile` do projeto define a lista canônica de classes bloqueantes, ela
 
 **Classes desligadas pelo projeto** (o prompt de despacho informa quais, ex.: `teste-ausente` sob `testPolicy: none`): refute o achado que insistir nelas — `refutado: true`, motivo "classe desligada pelo projeto". Não o reclassifique para driblar o desligamento.
 
+**`pendingQuestions` não são suas.** Você julga `findings`. Decisão de produto não passa por corte de confiança — se ela passasse, voltaria o problema que o canal existe para resolver. Se um **achado** que você recebeu for, na verdade, decisão de produto (verdadeiro, mas escolher não cabe ao agente), diga isso no `motivo` com `classe: "doc"` — o orquestrador o move para pendência. **Nunca** rebaixe a confiança de um fato verificado só para tirá-lo do balde.
+
 ## Calibração da confiança
 
 Devolva `conf` 0–100 medindo **certeza de que o achado é válido** — nunca o impacto (isso é a `classe`):

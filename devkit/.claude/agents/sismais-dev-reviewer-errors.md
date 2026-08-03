@@ -30,6 +30,8 @@ O `rulesFile` manda no formato de log, no cliente de erro e nos níveis: violaç
 
 **Reporte apenas `conf` ≥ 80.** Sem achado que passe o corte, devolva `{"findings": []}` — review limpo é resultado válido, não force nada.
 
+**Fallback que é escolha de produto** (degradar em silêncio porque o negócio prefere assim) não é achado seu nem confiança baixa: vai em `pendingQuestions` (`question`, `context`, `options` auto-contidas), que não passa pelo corte. Baixar a `conf` de um fato verificado para tirá-lo do balde usa o eixo errado — `conf` mede se o fato é verdadeiro, não de quem é a decisão.
+
 ## Confiança e atribuição
 
 `conf` 0–100 mede **certeza de que o achado é válido** (não o impacto): 76–90 importante, 91–100 falha silenciosa certa em caminho exercitado.

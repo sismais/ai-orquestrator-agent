@@ -10,6 +10,22 @@
     "cobertura": {
       "type": "string",
       "description": "Declaração da varredura sistemática (símbolo enumerado, N total, investigados, faltantes). Fica FORA de findings porque é fato sobre o que o revisor investigou, não hipótese sobre o código: dentro da lista seria julgada pelo juiz e cortada por confiança, sumindo com o 'faltam estes Y'. Vai para meta.cobertura no bucket."
+    },
+    "pendingQuestions": {
+      "type": "array",
+      "description": "Decisão de produto: o achado é VERDADEIRO, mas escolher não cabe ao agente. Mesmo contrato de sync-candidates (stage 'review'). Existe porque sem esse canal o modelo derruba a CONFIANÇA para tirar o item do balde — usando o eixo errado, já que ele não duvida do fato, duvida de quem decide. Vai para o humano sempre; nunca é cortado por confiança.",
+      "items": { "$ref": "#/$defs/pendingQuestion" }
+    },
+    "verificado": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "Riscos levantados e DESCARTADOS com evidência ('X não quebra porque Y, verificado em Z'). Responde a pergunta que o humano faz diante de um review curto: 'você chegou a olhar isso?'. Não é seção de elogio — item sem evidência citável não entra.",
+      "$comment": "Distinto de cobertura (o que enumerei/amostrei) e de naoVerificado (o que não consegui checar)."
+    },
+    "naoVerificado": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "O que a lente não conseguiu verificar e por quê. 'Não consegui verificar' é resultado válido; silêncio no lugar dele é falso senso de segurança."
     }
   },
   "$defs": {
@@ -42,6 +58,22 @@
         },
         "sugestao": { "type": "string", "description": "Proposta, nunca patch — as lentes são read-only." },
         "agente": { "type": "string" }
+      }
+    },
+    "pendingQuestion": {
+      "type": "object",
+      "required": ["question", "context", "options"],
+      "properties": {
+        "question": { "type": "string" },
+        "context": { "type": "string", "description": "Curto: o que o diff torna possível e por que a escolha não é técnica." },
+        "options": {
+          "type": "array",
+          "minItems": 2,
+          "items": { "type": "string" },
+          "description": "Respostas completas e auto-contidas — o humano escolhe uma sem reescrever nada. Mesmo formato do sismais-dev-clarifier."
+        },
+        "arquivo": { "type": "string" },
+        "stage": { "type": "string", "const": "review" }
       }
     }
   }

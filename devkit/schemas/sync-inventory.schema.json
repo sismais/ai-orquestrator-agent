@@ -1,0 +1,60 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/sync-inventory",
+  "title": "Inventário de rupturas + sondas contra o outro lado",
+  "description": "Saída de devkit-core/scripts/sync-inventory.mjs. É o que faz um fluxo genérico ficar preciso sem conhecer o projeto: em vez de uma lista escrita à mão do que procurar, deriva do próprio diff O QUE A NOSSA BRANCH ABOLIU e transforma cada item em sonda contra o outro lado. Hit é PISTA para a lente semântica, nunca veredito — a sonda é textual e não resolve escopo.",
+  "type": "object",
+  "required": ["version", "rupturas", "resumo", "limites"],
+  "properties": {
+    "version": { "const": 1 },
+    "ours": { "type": "string" },
+    "theirs": { "type": "string" },
+    "mergeBase": { "type": "string" },
+    "sondadoContra": {
+      "enum": ["diff", "worktree"],
+      "description": "`diff` antes do merge (o que vem por aí); `worktree` depois dele (o que de fato sobreviveu)."
+    },
+    "rupturas": { "type": "array", "items": { "$ref": "#/$defs/ruptura" } },
+    "resumo": {
+      "type": "object",
+      "properties": {
+        "rupturas": { "type": "integer" },
+        "comHits": { "type": "integer", "description": "Rupturas com uso do outro lado — a fila de trabalho real." },
+        "hitsTotal": { "type": "integer" }
+      }
+    },
+    "limites": {
+      "type": "array",
+      "items": { "type": "string" },
+      "description": "O que a heurística NÃO cobre (assinatura alterada sem DROP, renomeação sem remoção) e onde houve truncamento. Cobertura silenciosa vira falso senso de segurança."
+    }
+  },
+  "$defs": {
+    "ruptura": {
+      "type": "object",
+      "required": ["tipo", "token", "origem"],
+      "properties": {
+        "tipo": {
+          "enum": ["objeto-removido", "simbolo-removido", "regra-nova", "arquivo-removido"],
+          "description": "`regra-nova` vem de config de lint: a regra DECLARA o que virou proibido — a fonte mais barata que existe."
+        },
+        "token": { "type": "string", "description": "O que foi abolido. Chave de deduplicação: o mesmo token pego por duas sondas é uma ruptura só." },
+        "origem": { "type": "string", "description": "arquivo[:linha] do NOSSO diff onde a ruptura foi derivada." },
+        "evidencia": { "type": "string" },
+        "hits": {
+          "type": "array",
+          "description": "Ocorrências no outro lado (ou na árvore pós-merge), truncadas.",
+          "items": {
+            "type": "object",
+            "properties": {
+              "arquivo": { "type": "string" },
+              "linha": { "type": "integer" },
+              "trecho": { "type": "string" }
+            }
+          }
+        },
+        "hitsTotal": { "type": "integer", "description": "Total encontrado; pode ser maior que hits.length (truncamento vai para limites)." }
+      }
+    }
+  }
+}
