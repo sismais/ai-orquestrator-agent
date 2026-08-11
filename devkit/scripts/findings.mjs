@@ -10,6 +10,8 @@
 //   bucket --file <raw> ...     -> converte achados PLANOS (findings[]) nos 3 baldes por regra
 //                                  determinística. Tira a decisão de balde do modelo: o mesmo
 //                                  achado cai sempre no mesmo balde entre iterações do loop.
+//   stamp --file <relatorio.md> -> carimba o frontmatter do relatório (escopo, commit, rodada e
+//                                  as duas datas). Idempotente: preserva a `data-criacao`.
 import fs from 'node:fs';
 import path from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -341,6 +343,39 @@ export function bucketFindings(candidates, { blocking = DEFAULT_BLOCKING_CLASSES
   };
 }
 
+// Frontmatter do relatório de review. Mesmo contrato de formato do `stamp` do run-state.mjs
+// (skill sismais-dev): chaves entre aspas, `data-criacao` preservada em recarimbagem, um único
+// bloco. As duas implementações são separadas de propósito — moram em plugins diferentes e o
+// custo de mais um alvo de sync do core é maior que o das ~15 linhas repetidas.
+//
+// Existe porque o relatório é lido SOLTO: cai em `<workRoot>/reviews/`, fora do diretório do run,
+// e quem o abre (humano ou agente) recebe só o caminho. Sem cabeçalho, não dá para saber de que
+// escopo é, contra qual commit rodou, nem se já foi superado por uma rodada posterior.
+const FM_BLOCK = /^---\r?\n([\s\S]*?)\r?\n---\r?\n?/;
+
+export function nowIso(now = new Date()) {
+  return now.toISOString().replace(/\.\d{3}Z$/, 'Z');
+}
+
+export function stampReport(filePath, meta = {}) {
+  const raw = fs.readFileSync(filePath, 'utf8');
+  const existing = raw.match(FM_BLOCK);
+  const previous = existing ? (existing[1].match(/^data-criacao:\s*"?([^"\n]*)"?\s*$/m) || [])[1] : undefined;
+  const now = nowIso();
+  const fields = { tipo: 'review' };
+  // Campo ausente não vira chave vazia: cabeçalho com `commit: ""` mente mais do que a omissão.
+  for (const k of ['escopo', 'modo', 'base', 'commit', 'rodada']) {
+    if (meta[k] !== undefined && meta[k] !== null && String(meta[k]) !== '') fields[k] = String(meta[k]);
+  }
+  fields['data-criacao'] = previous || now;
+  fields['data-ultima-modificacao'] = now;
+  const block = Object.entries(fields)
+    .map(([k, v]) => `${k}: "${v.replace(/"/g, '\\"')}"`)
+    .join('\n');
+  fs.writeFileSync(filePath, `---\n${block}\n---\n` + raw.replace(FM_BLOCK, '').replace(/^\n+/, ''));
+  return fields;
+}
+
 function parseArgs(argv) {
   const args = {};
   for (let i = 0; i < argv.length; i += 2) {
@@ -359,7 +394,12 @@ function isMain() {
 if (isMain()) {
   const [cmd, ...rest] = process.argv.slice(2);
   const a = parseArgs(rest);
-  if (cmd === 'parse-review') {
+  if (cmd === 'stamp') {
+    stampReport(a.file, {
+      escopo: a.escopo, modo: a.modo, base: a.base, commit: a.commit, rodada: a.rodada
+    });
+    process.stdout.write('ok\n');
+  } else if (cmd === 'parse-review') {
     const text = fs.readFileSync(a.file, 'utf8');
     const findings = parseReviewFindingsStrict(text);
     if (findings === null) {

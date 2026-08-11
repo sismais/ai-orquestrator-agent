@@ -45,7 +45,7 @@
     "schemas/sync-inventory.schema.json": "3bceeeae55da3b2055cc97a110d5fed62a870f496091d5eb63cf3fb3d21a0f70",
     "schemas/sync-migrations.schema.json": "01a19cca043fb7221b9953378ffc64b7058b7e4fdf31c5be565e5a22cc8c2ddf",
     "schemas/sync-preflight.schema.json": "8d68d591d3120289861bc570baa701e7cac8b45d8630963a0778c735906f1511",
-    "scripts/findings.mjs": "7c94fb83b8449f78d36aa81c0c4bcb5d98831c0bfcb107c48bfc6d597791d191",
+    "scripts/findings.mjs": "58539de0d4d040e2476b87047ba68073adee61e4d68a0d68dd34f32b476c97d2",
     "scripts/sync-inventory.mjs": "ce288205fd3248ec5909ed8e72695b5b575335f79c0e8ed959473aac137929bb",
     "scripts/sync-lib.mjs": "43410cb3ea768626ea7010669bd9a17754fdf0a7c16af677a9026d2855150d7f",
     "scripts/sync-migrations.mjs": "bf5c2188cd69bf2c0f938c6071afe22a618965b2bad7250b861726128a81986d",
