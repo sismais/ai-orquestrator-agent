@@ -21,8 +21,18 @@ export const DEFAULT_SYNC_CONFIG = {
   // Ex.: "npm test puro derruba a suíte nesta máquina — usar npx vitest run --maxWorkers=4".
   armadilhas: [],
   // Comandos proibidos contra o ambiente de trabalho (ex.: reset/push de schema no clone).
-  proibidos: []
+  proibidos: [],
+  // Adaptador de stack (concretudes por classe do catálogo). null = detectar.
+  adapter: null
 };
+
+/** Detecta a stack quando o projeto não declara. Só o que dá para afirmar por arquivo. */
+export function detectarAdaptador(repoRoot, cfg) {
+  if (cfg.sync.adapter) return cfg.sync.adapter;
+  const supabase = ['supabase/config.toml', 'supabase/migrations']
+    .some((p) => fs.existsSync(path.join(repoRoot, p)));
+  return supabase ? 'supabase-postgres' : null;
+}
 
 export function resolveSyncConfig(repoRoot) {
   const cfgPath = path.join(repoRoot, '.sismais-dev.json');

@@ -10,7 +10,8 @@ import { spawnSync } from 'node:child_process';
 import { fileURLToPath } from 'node:url';
 import {
   resolveSyncConfig, git, revExists, mergeBase, countCommits, changedFiles,
-  predictConflicts, isMigration, interleavedMigrations, classificarPorte, lentesPorPorte
+  predictConflicts, isMigration, interleavedMigrations, classificarPorte, lentesPorPorte,
+  detectarAdaptador
 } from './sync-lib.mjs';
 
 /** PRs abertos contra a branch — best-effort: sem `gh` autenticado devolve null, nunca []. */
@@ -74,6 +75,7 @@ export function preflight(repoRoot, { ours = 'HEAD', theirs = null } = {}) {
     porte,
     porteMotivo: motivo,
     lentesRecomendadas: lentesPorPorte(porte),
+    adaptador: detectarAdaptador(repoRoot, cfg),
     prsAbertos: prs,
     armadilhas: cfg.sync.armadilhas,
     proibidos: cfg.sync.proibidos,

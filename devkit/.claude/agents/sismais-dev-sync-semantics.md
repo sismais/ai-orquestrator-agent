@@ -3,6 +3,7 @@ name: sismais-dev-sync-semantics
 description: Lente semântica do sync Sismais Dev. Procura o conflito que o git NÃO aponta — trava perdida em reescrita, uso de objeto que a branch removeu, resolução de contexto pela via antiga e recurso novo sem as exigências da branch. Read-only, despachada pelo orquestrador do sync.
 tools: Read, Glob, Grep, Bash
 model: opus
+color: blue
 ---
 
 # Lente semântica do sync — o conflito que auto-mergeou

@@ -125,15 +125,24 @@ def _fold(value: Any) -> str:
     return s.lower().strip()
 
 
-def normalize_attribution(value: Any) -> str:
-    """Ausencia e valor desconhecido caem em PR-ativado: erra para 'revisa', nunca para
-    'ignora' (so `pre-existente` e descartavel, e por isso exige ser explicito)."""
+def parse_attribution(value: Any) -> Optional[str]:
+    """Valor RECONHECIVEL do contrato, ou None. Existe separado de normalize_attribution
+    porque o juiz pode corrigir a atribuicao, e ali 'nao reconheci o que ele escreveu'
+    tem de preservar o que a lente disse — nao virar PR-ativado por baixo do pano."""
     v = _fold(value)
     if v.startswith("pre-existente") or v.startswith("preexistente"):
         return "pre-existente"
     if v.startswith("pr-introduzido") or v.startswith("introduzido"):
         return "PR-introduzido"
-    return "PR-ativado"
+    if v.startswith("pr-ativado") or v.startswith("ativado"):
+        return "PR-ativado"
+    return None
+
+
+def normalize_attribution(value: Any) -> str:
+    """Ausencia e valor desconhecido caem em PR-ativado: erra para 'revisa', nunca para
+    'ignora' (so `pre-existente` e descartavel, e por isso exige ser explicito)."""
+    return parse_attribution(value) or "PR-ativado"
 
 
 def _conf_of(f: dict) -> int:
@@ -192,19 +201,30 @@ def parse_review_coverage(text: str) -> Optional[str]:
 
 
 def apply_verdicts(candidates: list, verdicts: Optional[list]) -> dict:
-    """O juiz decide a confianca final E a classe — os dois eixos vem da lente que achou,
-    e e ela que tem vies de justificar (validade) e de inflar (impacto) o proprio achado.
+    """O juiz decide a confianca final, a classe E a atribuicao — os TRES eixos vem da
+    lente que achou, e e ela que tem vies de justificar (validade), de inflar (impacto) e
+    de puxar para si a causalidade (atribuicao) do proprio achado.
+
     Deixar a classe sem revisao e pior que deixar a confianca: e a classe que decide o
     bloqueio, entao achado verdadeiro-mas-leve entraria em `blocks` e o fix-loop iteraria
-    tentando 'corrigir' o que nao precisava.
+    tentando 'corrigir' o que nao precisava. A atribuicao entrou pelo mesmo argumento:
+    `pre-existente` e regra de corte ANTES da classe em bucket_findings — mesmo poder de
+    decisao — e o juiz nao tinha onde registrar que o caminho se comporta igual antes do
+    diff. Sem campo, quem decidia era o orquestrador.
 
     Achado sem veredito mantem o que tinha (degradar erra para 'reporta demais')."""
     if not verdicts:
-        return {"findings": candidates, "semVeredito": len(candidates), "reclassificados": 0}
+        return {
+            "findings": candidates,
+            "semVeredito": len(candidates),
+            "reclassificados": 0,
+            "reatribuidos": 0,
+        }
     by_id = {str(v["id"]): v for v in verdicts if v.get("id") is not None}
     out = []
     sem_veredito = 0
     reclassificados = 0
+    reatribuidos = 0
     for f in candidates:
         v = by_id.get(str(f.get("id"))) if f.get("id") is not None else None
         if v is None:
@@ -222,14 +242,39 @@ def apply_verdicts(candidates: list, verdicts: Optional[list]) -> dict:
             novo["classeOriginal"] = _class_of(f)
             novo["classe"] = classe.strip()
             reclassificados += 1
+        # Erro seguro: so um valor DO CONTRATO reatribui. Ausente ou irreconhecivel
+        # preserva o da lente — o juiz nao silencia achado por escrever torto.
+        atribuicao = parse_attribution(v.get("atribuicao"))
+        if atribuicao and atribuicao != normalize_attribution(f.get("atribuicao")):
+            novo["atribuicaoOriginal"] = normalize_attribution(f.get("atribuicao"))
+            novo["atribuicao"] = atribuicao
+            reatribuidos += 1
+        # Fusao declarada pelo juiz: ele e quem enxerga os achados lado a lado e sabe que
+        # duas lentes ancoraram o MESMO defeito em linhas diferentes (a assinatura da
+        # funcao, o comentario acima dela, o ramo do `if`). A chave arquivo:linha nao
+        # funde isso, e fundir na mao era o orquestrador decidindo duplicata.
+        duplicata_de = v.get("duplicataDe")
+        if isinstance(duplicata_de, str) and duplicata_de.strip():
+            novo["duplicataDe"] = duplicata_de.strip()
         out.append(novo)
-    return {"findings": out, "semVeredito": sem_veredito, "reclassificados": reclassificados}
+    return {
+        "findings": out,
+        "semVeredito": sem_veredito,
+        "reclassificados": reclassificados,
+        "reatribuidos": reatribuidos,
+    }
 
 
 def _dedupe_key(f: dict) -> str:
     """Duplicata = mesma LINHA + mesma classe. Sem numero de linha, o titulo entra na
     chave: dois bugs distintos no mesmo arquivo sao achados diferentes, e fundi-los
-    apagaria um deles."""
+    apagaria um deles.
+
+    `grupo` NAO entra na chave, de proposito. Ele rotula o mesmo defeito em locais
+    DIFERENTES (o par simetrico, as tres chamadas do mesmo invariante) — irmaos que
+    precisam continuar contados e verificaveis um a um, senao o implementador corrige um
+    e o gemeo esquecido volta como achado novo na rodada seguinte. Grupo agrupa no
+    relatorio; fusao exige `duplicataDe` explicito do juiz."""
     arquivo = _fold(f.get("arquivo"))
     tem_linha = re.search(r":\d+$", arquivo) is not None
     if tem_linha:
@@ -237,16 +282,41 @@ def _dedupe_key(f: dict) -> str:
     return f"{arquivo}|{_class_of(f)}|{_fold(f.get('titulo'))}"
 
 
+def _resolve_keys(findings: list) -> dict:
+    """Chave final por achado, com `duplicataDe` do juiz redirecionando para a do alvo.
+    Cadeia (c->b->a) resolve para a ponta; ciclo ou alvo inexistente cai na propria
+    chave — erro do juiz nao pode apagar achado nem travar o parser."""
+    by_id = {str(f["id"]): f for f in findings if f.get("id") is not None}
+    keys = {}
+    for idx, f in enumerate(findings):
+        vistos: set = set()
+        atual = f
+        while atual.get("duplicataDe") and id(atual) not in vistos:
+            vistos.add(id(atual))
+            alvo = by_id.get(str(atual["duplicataDe"]))
+            if alvo is None or alvo is f:
+                break
+            atual = alvo
+        keys[idx] = _dedupe_key(atual)
+    return keys
+
+
 def _dedupe(findings: list) -> tuple:
     """Consolida na de maior confianca e preserva a autoria das duas — guardrail
     anti-vies: o consolidador so funde duplicata, nunca apaga achado por discordar."""
+    keys = _resolve_keys(findings)
     by_key: dict = {}
     duplicatas = 0
-    for f in findings:
-        key = _dedupe_key(f)
+    for idx, f in enumerate(findings):
+        key = keys[idx]
         prev = by_key.get(key)
+        locais = [f["arquivo"]] if f.get("arquivo") else []
         if prev is None:
-            by_key[key] = {**f, "agentes": [f["agente"]] if f.get("agente") else []}
+            by_key[key] = {
+                **f,
+                "agentes": [f["agente"]] if f.get("agente") else [],
+                "locais": locais,
+            }
             continue
         duplicatas += 1
         winner = dict(f) if _conf_of(f) > _conf_of(prev) else dict(prev)
@@ -254,6 +324,13 @@ def _dedupe(findings: list) -> tuple:
         if f.get("agente") and f["agente"] not in agentes:
             agentes.append(f["agente"])
         winner["agentes"] = agentes
+        # Todos os locais dos fundidos, nao so o do vencedor: quando a fusao vem do juiz,
+        # o perdedor pode carregar a ancora que o implementador precisa abrir.
+        todos = list(prev.get("locais") or [])
+        for local in locais:
+            if local not in todos:
+                todos.append(local)
+        winner["locais"] = todos
         by_key[key] = winner
     return list(by_key.values()), duplicatas
 
@@ -267,7 +344,7 @@ def bucket_findings(
     """Regra de bucket, nesta ordem (a primeira que casar decide):
 
     1. classe silenciada pelo projeto -> descartada (ex.: `teste-ausente` em MVP)
-    2. conf < min_conf                -> descartado
+    2. conf < min_conf                -> descartado (preservado em abaixoDoCorte)
     3. atribuicao `pre-existente`     -> suggestions (nunca bloqueia merge)
     4. classe `nit`/`remover`         -> suggestions
     5. classe bloqueante              -> blocks
@@ -280,6 +357,7 @@ def bucket_findings(
     muted_set = {_fold(c) for c in (muted or [])}
     findings, duplicatas = _dedupe(candidates)
     out: dict = {"blocks": [], "fixNow": [], "suggestions": []}
+    abaixo_do_corte: list = []
     descartados = 0
     silenciados = 0
     for f in findings:
@@ -297,13 +375,30 @@ def bucket_findings(
         }
         if f.get("sugestao"):
             item["sugestao"] = f["sugestao"]
+        # Criterio de pronto, nao a correcao: e o que a lente de fechamento usa para
+        # decidir "resolvido" por evidencia em vez de por semelhanca com a sugestao.
+        if f.get("verificacao"):
+            item["verificacao"] = f["verificacao"]
+        # Rotulo do defeito comum (o invariante violado). O relatorio agrupa por ele; os
+        # irmaos seguem separados, cada um com o seu local editavel.
+        if f.get("grupo"):
+            item["grupo"] = f["grupo"]
         if f.get("agentes"):
             item["agentes"] = f["agentes"]
+        if f.get("locais") and len(f["locais"]) > 1:
+            item["locais"] = f["locais"]
         if classe in muted_set:
             silenciados += 1
             continue
         if conf < min_conf:
             descartados += 1
+            # Conteudo preservado, nao so contado. Achado abaixo do corte nao e achado
+            # falso: e achado que a rodada nao conseguiu sustentar. O codigo muda ao
+            # redor, a confianca sobe, e sem isso ele so volta se as lentes o
+            # redescobrirem do zero.
+            abaixo_do_corte.append(
+                {**item, **({"motivoJuiz": f["motivoJuiz"]} if f.get("motivoJuiz") else {})}
+            )
             continue
         if atribuicao == "pre-existente" or classe in ("nit", "remover"):
             out["suggestions"].append(item)
@@ -313,6 +408,11 @@ def bucket_findings(
             out["fixNow"].append(item)
     for bucket in ("blocks", "fixNow", "suggestions"):
         out[bucket].sort(key=lambda x: x["conf"], reverse=True)
+    if abaixo_do_corte:
+        # Fora de `meta` pelo mesmo motivo das pendencias: e material para a proxima
+        # rodada, nao estatistica desta.
+        abaixo_do_corte.sort(key=lambda x: x["conf"], reverse=True)
+        out["abaixoDoCorte"] = abaixo_do_corte
     meta = {
         "candidatos": len(candidates),
         "descartados": descartados,

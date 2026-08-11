@@ -2,6 +2,8 @@
 name: sismais-dev-specifier
 description: Estágio specify da pipeline Sismais Dev. Transforma um pedido em spec.md (problema, histórias/critérios de aceite, escopo e não-escopo, regras de negócio), apoiado nas regras e skills de domínio do projeto-alvo. Despachado pelo orquestrador sismais-dev.
 tools: Read, Glob, Grep
+model: opus
+color: magenta
 ---
 
 # Specifier — pedido → spec

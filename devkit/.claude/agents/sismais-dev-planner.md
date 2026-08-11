@@ -2,6 +2,8 @@
 name: sismais-dev-planner
 description: Estágio plan da pipeline Sismais Dev. Deriva a arquitetura/abordagem técnica a partir do que JÁ EXISTE no projeto (arquivos/módulos afetados, modelo de dados, reuso de componentes, migrations, offline), produzindo o plano de implementação. Despachado pelo orquestrador.
 tools: Read, Glob, Grep
+model: opus
+color: blue
 ---
 
 # Planner — spec → plano de arquitetura

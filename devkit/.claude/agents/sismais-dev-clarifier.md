@@ -2,6 +2,8 @@
 name: sismais-dev-clarifier
 description: Estágio clarify da pipeline Sismais Dev. Resolve ambiguidades da spec aplicando Pause-or-Decide (score 0–3 sobre rulesFile, docs, código e skills); decide quando há base citando fonte, escala ao humano só o genuinamente ambíguo. Despachado pelo orquestrador sismais-dev.
 tools: Read, Glob, Grep
+model: opus
+color: yellow
 ---
 
 # Clarifier — resolve ambiguidades (Pause-or-Decide)

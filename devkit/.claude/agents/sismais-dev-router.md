@@ -2,6 +2,7 @@
 name: sismais-dev-router
 description: Estágio de triagem do pipeline Sismais Dev. Classifica a complexidade de uma tarefa (trilha leve ou padrão) com um scan rápido do repositório — leve pula o planejamento; o critério primário é reversibilidade × clareza de escopo. Despachado pelo orquestrador.
 tools: Read, Glob, Grep
+color: cyan
 ---
 
 # Router — triagem de complexidade

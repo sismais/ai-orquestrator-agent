@@ -19,6 +19,14 @@
           "type": "string",
           "description": "Só quando o juiz MUDA a classe da lente (omitir mantém a original). Reclassificar é tão importante quanto recalibrar: a classe decide o bloqueio de merge e vem da mesma lente que tem viés de inflar o impacto do que achou. Achado que não altera comportamento observável nunca é classe bloqueante."
         },
+        "atribuicao": {
+          "enum": ["PR-introduzido", "PR-ativado", "pre-existente"],
+          "description": "Só quando o juiz MUDA a da lente (omitir, ou valor fora deste enum, mantém a original). É o terceiro eixo de decisão: `pre-existente` nunca bloqueia merge, e esse corte acontece ANTES da classe no bucket — mesmo poder de decisão. Sem o campo, o juiz que constatava 'esse caminho se comporta igual antes do diff' só podia escrever isso no motivo, e quem decidia o balde acabava sendo o orquestrador."
+        },
+        "duplicataDe": {
+          "type": "string",
+          "description": "id de outro achado do mesmo lote que descreve o MESMO defeito. Existe porque lentes independentes ancoram um defeito em linhas diferentes (a assinatura, o comentário acima, o ramo do if) e a chave arquivo:linha não funde isso — a alternativa era o orquestrador editar as linhas na mão para consolidar, que é a decisão que o bucket determinístico existe para tirar do modelo. O consolidado preserva todos os locais. NÃO use para achados irmãos em locais distintos: esses têm o mesmo `grupo` e continuam separados."
+        },
         "refutado": {
           "type": "boolean",
           "description": "true zera a conf. Só quando a verificação MOSTROU que o achado não procede — nunca por não ter conseguido confirmar."

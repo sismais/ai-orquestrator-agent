@@ -54,9 +54,18 @@
         },
         "classe": {
           "type": "string",
-          "description": "bug seguranca rls multi-tenant perda-dados silent-failure breaking-contrato pipeline regressao teste-ausente perf doc nit. O projeto pode definir a lista canônica no rulesFile."
+          "description": "bug seguranca rls multi-tenant perda-dados silent-failure breaking-contrato comment-errado pipeline regressao teste-ausente perf doc comment-impreciso nit. O projeto pode definir a lista canônica no rulesFile. As bloqueantes por default estão em findings.mjs (DEFAULT_BLOCKING_CLASSES) — comment-errado bloqueia (comentário falso é entrada envenenada para a próxima sessão), comment-impreciso não (conclusão defensável com evidência mal escolhida se corrige, não segura merge)."
         },
         "sugestao": { "type": "string", "description": "Proposta, nunca patch — as lentes são read-only." },
+        "verificacao": {
+          "type": "string",
+          "description": "Critério de PRONTO, não a correção: uma linha com o que deve ser verdade depois do fix, de preferência checável ('grep -c X docs/ retorna 0', 'o teste Y fica vermelho se o guard for removido'). Distinto de sugestao, que descreve o caminho. Dois ganhos: o implementador se autoverifica antes de commitar, e o sismais-dev-review-closure ganha critério objetivo em vez de julgar por semelhança com a sugestão — que era como achado 'corrigido pela metade' passava por resolvido."
+        },
+        "grupo": {
+          "type": "string",
+          "description": "O invariante violado, em uma linha ('front espelha o 1º ramo de tenant_over_limit_state'). Mesmo texto ⇒ mesmo defeito em locais DIFERENTES (achados irmãos). Agrupa no relatório para o implementador corrigir por regra e não por linha; NÃO funde no bucket — irmão fundido é gêmeo esquecido, que volta como achado novo na rodada seguinte. Fusão de verdade só por duplicataDe do juiz.",
+          "$comment": "Cada achado aponta UM local editável. Mesmo defeito em N arquivos ⇒ N achados irmãos com o mesmo grupo."
+        },
         "agente": { "type": "string" }
       }
     },

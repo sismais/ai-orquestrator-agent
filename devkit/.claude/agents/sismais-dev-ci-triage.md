@@ -2,6 +2,7 @@
 name: sismais-dev-ci-triage
 description: Triagem de falha de CI no loop Sismais Dev. Dado o log de um check de CI que falhou e o diff do PR, julga se a falha é causada pelo diff (related) ou é pré-existente/flaky/infra (unrelated). Despachado pelo orquestrador sismais-dev-loop.
 tools: Read, Glob, Grep, Bash
+color: cyan
 ---
 
 # CI Triage — relacionado ao diff?

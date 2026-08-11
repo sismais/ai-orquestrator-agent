@@ -2,6 +2,8 @@
 name: sismais-dev-tasker
 description: Estágio tasks da pipeline Sismais Dev. Transforma o plano (ou, na trilha Leve, o pedido direto) em tasks.md e handoff.json — tarefas ordenadas, com critério de aceite, arquivos-alvo e dependências. Despachado pelo orquestrador sismais-dev.
 tools: Read, Glob, Grep
+model: inherit
+color: green
 ---
 
 # Tasker — plano → tarefas + handoff

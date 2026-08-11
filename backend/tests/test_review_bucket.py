@@ -10,6 +10,7 @@ from src.services.findings import (
     apply_verdicts,
     bucket_findings,
     normalize_attribution,
+    parse_attribution,
     parse_review_candidates,
     parse_review_closures,
     parse_review_coverage,
@@ -110,6 +111,33 @@ class TestBucket:
         assert "regressao" not in DEFAULT_BLOCKING_CLASSES
         assert "comment-errado" in DEFAULT_BLOCKING_CLASSES
 
+    def test_irmaos_do_mesmo_grupo_nao_se_fundem(self):
+        # e o gemeo esquecido: corrigir um e perder o outro reabre achado na rodada seguinte
+        grupo = "front espelha o 1o ramo de tenant_over_limit_state"
+        r = bucket_findings([cand(id="r1", arquivo="src/a.ts:10", grupo=grupo),
+                             cand(id="r2", arquivo="src/a.ts:110", grupo=grupo)])
+        assert len(r["blocks"]) == 2 and r["meta"]["duplicatas"] == 0
+        assert r["blocks"][0]["grupo"] == grupo
+
+    def test_verificacao_sobrevive_ate_o_balde(self):
+        r = bucket_findings([cand(arquivo="a.ts:1", verificacao="grep -c X docs/ retorna 0")])
+        assert r["blocks"][0]["verificacao"] == "grep -c X docs/ retorna 0"
+
+    def test_descartado_por_confianca_e_preservado_com_o_motivo_do_juiz(self):
+        r = apply_verdicts([cand(id="r1", arquivo="a.ts:1", conf=90)],
+                           [{"id": "r1", "conf": 70, "motivo": "cenario depende de status que nao vi"}])
+        out = bucket_findings(r["findings"])
+        assert out["blocks"] == [] and out["meta"]["descartados"] == 1
+        assert len(out["abaixoDoCorte"]) == 1
+        assert out["abaixoDoCorte"][0]["conf"] == 70
+        assert "nao vi" in out["abaixoDoCorte"][0]["motivoJuiz"]
+
+    def test_silenciado_pelo_projeto_nao_e_preservado(self):
+        # foi desligado, nao cortado: reoferecer na proxima rodada seria reabrir a cobranca
+        r = bucket_findings([cand(arquivo="a.ts", classe="teste-ausente", conf=40)],
+                            muted=["teste-ausente"])
+        assert "abaixoDoCorte" not in r and r["meta"]["silenciados"] == 1
+
 
 class TestJuiz:
     def test_substitui_conf_refutado_zera_sem_veredito_preserva(self):
@@ -143,6 +171,50 @@ class TestJuiz:
         r = apply_verdicts([cand(id="r1", classe="bug")],
                            [{"id": "r1", "conf": 90, "classe": "BUG", "motivo": "ok"}])
         assert r["reclassificados"] == 0
+
+    def test_reatribui_para_pre_existente_e_o_achado_deixa_de_bloquear(self):
+        # o juiz percebia que o caminho se comporta igual antes do diff e so podia
+        # escrever isso no motivo; o achado entrava em blocks como PR-ativado
+        r = apply_verdicts(
+            [cand(id="r1", atribuicao="PR-ativado", arquivo="a.ts:9", conf=88)],
+            [{"id": "r1", "conf": 88, "atribuicao": "pre-existente",
+              "motivo": "identico antes do diff; o diff so torna visivel"}],
+        )
+        assert r["reatribuidos"] == 1
+        assert r["findings"][0]["atribuicaoOriginal"] == "PR-ativado"
+        out = bucket_findings(r["findings"])
+        assert out["blocks"] == [] and len(out["suggestions"]) == 1
+
+    def test_atribuicao_fora_do_contrato_preserva_a_da_lente(self):
+        # erro seguro: juiz escrevendo torto nao tira achado da decisao de merge
+        assert parse_attribution("sei la") is None
+        r = apply_verdicts([cand(id="r1", atribuicao="PR-introduzido")],
+                           [{"id": "r1", "conf": 90, "atribuicao": "talvez pre?", "motivo": "m"}])
+        assert r["reatribuidos"] == 0
+        assert r["findings"][0]["atribuicao"] == "PR-introduzido"
+
+    def test_duplicata_de_funde_o_que_a_chave_por_linha_nao_funde(self):
+        # tres lentes ancoraram o mesmo defeito em linhas diferentes do mesmo arquivo
+        r = apply_verdicts(
+            [cand(id="r1", arquivo="src/planStates.ts:35", conf=85, agente="reviewer"),
+             cand(id="e1", arquivo="src/planStates.ts:40", conf=92, agente="errors"),
+             cand(id="c1", arquivo="src/planStates.ts:43", conf=80, agente="comments")],
+            [{"id": "r1", "conf": 85, "motivo": "ok"},
+             {"id": "e1", "conf": 92, "duplicataDe": "r1", "motivo": "mesmo defeito"},
+             {"id": "c1", "conf": 80, "duplicataDe": "e1", "motivo": "idem (cadeia ate r1)"}],
+        )
+        out = bucket_findings(r["findings"])
+        assert len(out["blocks"]) == 1 and out["blocks"][0]["conf"] == 92
+        assert out["meta"]["duplicatas"] == 2
+        assert sorted(out["blocks"][0]["locais"]) == [
+            "src/planStates.ts:35", "src/planStates.ts:40", "src/planStates.ts:43"]
+
+    def test_duplicata_de_com_alvo_invalido_nao_apaga_achado(self):
+        sem_alvo = bucket_findings([cand(id="r1", arquivo="a.ts:1", duplicataDe="nao-existe")])
+        assert len(sem_alvo["blocks"]) == 1
+        ciclo = bucket_findings([cand(id="r1", arquivo="a.ts:1", duplicataDe="r2"),
+                                 cand(id="r2", arquivo="b.ts:2", duplicataDe="r1")])
+        assert len(ciclo["blocks"]) == 2
 
 
 class TestParsers:

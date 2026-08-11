@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "sismais-devkit-core/sync-migrations",
+  "title": "Regra do par: migration editada depois de publicada × reconciliação",
+  "description": "Saída de devkit-core/scripts/sync-migrations.mjs. Corrigir uma migration NO ARQUIVO não conserta o ambiente onde ela já rodou — o alvo rastreia por versão, nunca por conteúdo. Toda correção de migration já publicada sai em par: a edição no arquivo (base limpa, CI) MAIS uma migration nova de reconciliação idempotente. Meia-parte do par compila, passa no CI e quebra na promoção. O script aponta; quem julga é a lente de banco.",
+  "type": "object",
+  "required": ["version", "pares", "resumo", "limites"],
+  "properties": {
+    "version": { "const": 1 },
+    "ours": { "type": "string" },
+    "theirs": { "type": "string" },
+    "mergeBase": { "type": "string" },
+    "novas": {
+      "type": "object",
+      "description": "Migrations que existem de um lado só. NÃO são cobradas de par: ainda não rodaram em lugar nenhum, então editá-las no arquivo basta.",
+      "properties": {
+        "nossas": { "type": "array", "items": { "type": "string" } },
+        "deles": { "type": "array", "items": { "type": "string" } }
+      }
+    },
+    "pares": { "type": "array", "items": { "$ref": "#/$defs/par" } },
+    "resumo": {
+      "type": "object",
+      "properties": {
+        "editadas": { "type": "integer" },
+        "semPar": { "type": "integer", "description": "Quantas correções entregues pela metade — a fila de trabalho." }
+      }
+    },
+    "limites": { "type": "array", "items": { "type": "string" } }
+  },
+  "$defs": {
+    "par": {
+      "type": "object",
+      "required": ["arquivo", "lado", "objetos", "parCoberto"],
+      "properties": {
+        "arquivo": { "type": "string", "description": "Migration que existe nos dois lados com conteúdo diferente — ou seja, editada depois de publicada." },
+        "lado": { "enum": ["nosso", "deles"], "description": "Quem editou. O caso `deles` também precisa de par, se aquela versão já rodou no nosso ambiente." },
+        "objetos": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Objetos que a migration editada define. O par é procurado por eles, não pelo nome do arquivo: a reconciliação tem outro nome, por definição."
+        },
+        "parCoberto": { "type": "boolean" },
+        "reconciliacaoProvavel": {
+          "type": "array",
+          "items": { "type": "string" },
+          "description": "Migrations novas que mencionam algum dos objetos. Pista forte, não prova de que a reconciliação está correta ou idempotente — divergência entre as duas metades é pior que a ausência do par, porque parece resolvido."
+        }
+      }
+    }
+  }
+}
