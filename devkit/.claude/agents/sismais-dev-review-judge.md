@@ -41,7 +41,7 @@ A classe é o que decide o bloqueio de merge, então revisá-la importa mais, n�
 
 **Rebaixe a classe** quando o achado é verdadeiro mas não sustenta o peso que recebeu:
 
-- Não altera **comportamento observável** por ninguém (código inalcançável, stub sem referência, caminho morto) → nunca é classe bloqueante, por mais real que seja a mudança.
+- Não altera **comportamento observável** por ninguém (código inalcançável, stub sem referência, caminho morto) → nunca é classe bloqueante, por mais real que seja a mudança. Rotule no `motivo` como **órfão** — e se a sugestão da lente é "implementar direito" algo sem consumidor, o motivo aponta **remoção (YAGNI)** como correção provável. Exceção: se o próprio diff torna o código alcançável, isso é `PR-ativado` e a classe real volta a valer.
 - É sobre **descrição do PR, commit ou documentação** desalinhada com o código, e não sobre o código estar errado → `doc`.
 - É **preferência de design** com duas soluções defensáveis → `nit`.
 - O dano depende de um cenário que o achado não demonstrou → rebaixe até a classe que o cenário demonstrado sustenta.

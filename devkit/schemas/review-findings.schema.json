@@ -2,7 +2,7 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "sismais-devkit-core/review-findings",
   "title": "Contrato de saída do sismais-dev-reviewer (e de reviewCommand plugável)",
-  "description": "Falha-fechada nos consumidores: texto sem um objeto JSON contendo ao menos um dos baldes NÃO pode aprovar o diff.",
+  "description": "Falha-fechada nos consumidores: texto sem um objeto JSON contendo ao menos um dos baldes NÃO pode aprovar o diff. Contrato mínimo/legado: sem conf, classe, atribuicao, verificacao e grupo — um reviewCommand externo que emite só isto não alimenta o closure nem o review-track (o fechamento exige re-review completo). O contrato rico do fluxo nativo é review-candidates + review-verdicts.",
   "type": "object",
   "anyOf": [
     { "required": ["blocks"] },

@@ -75,11 +75,13 @@ Não aplique o protocolo em componente folha, fix localizado em arquivo único o
 
 ## Confiança (0–100)
 
-- **0–25**: provável falso positivo ou pré-existente sem relação com a mudança.
-- **26–50**: nitpick não coberto por regra explícita do projeto.
-- **51–75**: válido, mas de baixo impacto.
-- **76–90**: importante, merece atenção.
-- **91–100**: bug crítico ou violação explícita de regra do projeto.
+`conf` mede **certeza de que o achado é válido** — nunca o impacto (isso é a `classe`; um `nit` verdadeiro pode ter `conf` 95). É a mesma semântica das lentes especializadas e do juiz — o bucket assume essa leitura:
+
+- **0–25**: provável falso positivo; não resiste à verificação que você mesmo consegue fazer.
+- **26–50**: suspeita não confirmada; a evidência é indireta.
+- **51–75**: provável, mas o cenário é estreito ou falta uma verificação que você não conseguiu fazer.
+- **76–90**: verificado contra o código ou regra citável; procede.
+- **91–100**: confirmado com evidência direta e citável (regra explícita violada, comportamento reproduzido).
 
 **Não aplique corte de confiança.** Atribua a `conf` que o achado merece de verdade — inclusive 60 ou 70 — e reporte. Quem corta é o `findings.mjs bucket`, por `minConf`, **depois** de o juiz recalibrar cada um. É o oposto do instinto de "filtrar agressivamente para não gastar o julgamento do juiz": o juiz existe exatamente para esse gasto, ele pode **subir** a confiança de um achado verdadeiro que você marcou baixo por prudência, e não tem como reavaliar o que você matou antes de reportar.
 
