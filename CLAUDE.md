@@ -2,6 +2,13 @@
 
 Bootstrap para o Claude Code neste repo. Regras de alta frequência aqui; **detalhe nos docs**.
 
+> **STATUS (decisão de 2026-08-12): EM HIBERNAÇÃO — não usar em produção por ora.** A prioridade é
+> amadurecer os plugins/agentes do DevKit no modo interativo (Claude Code); a plataforma será
+> retomada quando o kit estiver maduro para execução autônoma supervisionada. Enquanto isso o
+> `devkit-core` evolui **sem** sync obrigatório para cá — **antes de reativar**, rode
+> `node devkit-core/sync.mjs --platform <este repo> --check` no repo privado e reconcilie o drift
+> de contrato (schemas/prompts) acumulado.
+
 ## O que é (1 parágrafo)
 
 Painel Kanban que **dirige agentes de IA** (o **Sismais AI DevKit**) sobre projetos reais: o **backend

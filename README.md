@@ -8,6 +8,11 @@ Painel Kanban que **dirige e acompanha agentes de IA** (o Sismais AI DevKit) ope
 
 > **Fork** de [eduwxyz/orquestrator-agent](https://github.com/eduwxyz/orquestrator-agent) ("Zenflow"), sob licença MIT — atribuição preservada em [LICENSE](LICENSE). Repositório privado da Sismais Tecnologia.
 
+> **Status (2026-08-12): em hibernação.** O projeto não está em uso — o DevKit está sendo
+> amadurecido no modo interativo (plugins do Claude Code) e a plataforma será retomada depois.
+> O contrato com o `devkit-core` pode ter driftado nesse meio tempo: rode o
+> `sync.mjs --platform ... --check` do repo privado antes de retomar.
+
 ## Comece rápido
 
 Aplicação **local, single-user** (backend + frontend na sua máquina). Pré-requisitos: Python 3.13,
