@@ -12,5 +12,9 @@
         ]
       }
     ]
-  }
+  },
+  "claudeMdExcludes": [
+    "**/Users/*/.claude/CLAUDE.md",
+    "**/home/*/.claude/CLAUDE.md"
+  ]
 }
